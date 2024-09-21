@@ -1,0 +1,48 @@
+package logger
+
+import (
+	"sync"
+
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+)
+
+var (
+	Log      *zap.Logger
+	onceInit sync.Once
+)
+
+func Init(level zapcore.Level, meta ...zap.Field) error {
+	onceInit.Do(func() {
+		instance := zap.Must(configure(level).Build())
+
+		// attach the additional meta fields to the logger before committing to global instance
+		instance = instance.With(meta...)
+
+		Log = zap.New(instance.Core(), zap.AddCaller())
+	})
+
+	if Log == nil {
+		return errors.New("logger not initialized")
+	}
+
+	return nil
+}
+
+func configure(level zapcore.Level) zap.Config {
+	encoder := zap.NewProductionEncoderConfig()
+	encoder.TimeKey = "timestamp"
+	encoder.EncodeTime = zapcore.ISO8601TimeEncoder
+
+	return zap.Config{
+		Level:             zap.NewAtomicLevelAt(level),
+		Development:       false,
+		DisableCaller:     false,
+		DisableStacktrace: false,
+		Encoding:          "json",
+		EncoderConfig:     encoder,
+		OutputPaths:       []string{"stdout"},
+		ErrorOutputPaths:  []string{"stderr"},
+	}
+}
