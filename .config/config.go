@@ -3,7 +3,7 @@ package config
 import (
 	"time"
 
-	"github.com/FACorreiaa/ink-app-backend-protos/modules/customer"
+	"github.com/FACorreiaa/fitme-protos/modules/customer"
 	"github.com/spf13/viper"
 )
 
