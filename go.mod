@@ -28,6 +28,8 @@ require (
 )
 
 require (
+	github.com/FACorreiaa/ink-app-backend-grpc v0.0.0-20240322231149-49682d8f14a5 // indirect
+	github.com/FACorreiaa/ink-app-backend-protos v0.0.0-20240611150132-88ec9e0d3fcd // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect

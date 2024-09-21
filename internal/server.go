@@ -8,12 +8,7 @@ import (
 	"sync/atomic"
 
 	"github.com/FACorreiaa/fitme-protos/container"
-	cpb "github.com/FACorreiaa/fitme-protos/modules/customer/generated"
-	upb "github.com/FACorreiaa/fitme-protos/modules/user/generated"
 
-	"github.com/FACorreiaa/fitme-grpc/internal/domain"
-	"github.com/FACorreiaa/fitme-grpc/internal/domain/repository"
-	"github.com/FACorreiaa/fitme-grpc/internal/domain/service"
 	"github.com/FACorreiaa/fitme-grpc/logger"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc"
 
@@ -56,15 +51,15 @@ func ServeGRPC(ctx context.Context, port string, _ *container.Brokers, pgPool *p
 	// client := generated.NewCustomerClient(brokers.Customer)
 
 	// customerService and any implementation is a dependency that is injected to dest and delete
-	customerService := domain.NewCustomerService(pgPool, redisClient)
+	//customerService := domain.NewCustomerService(pgPool, redisClient)
 
 	// implement brokers
 
-	authRepo := repository.NewAuthService(pgPool, redisClient)
-	authService := service.NewAuthService(authRepo)
+	//authRepo := repository.NewAuthService(pgPool, redisClient)
+	//authService := service.NewAuthService(authRepo)
 
-	cpb.RegisterCustomerServer(server, customerService)
-	upb.RegisterAuthServer(server, authService)
+	//cpb.RegisterCustomerServer(server, customerService)
+	//upb.RegisterAuthServer(server, authService)
 
 	// Enable reflection to be able to use grpcui or insomnia without
 	// having to manually maintain .proto files
