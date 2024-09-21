@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	pb "github.com/FACorreiaa/ink-app-backend-protos/modules/user/generated"
+	pb "github.com/FACorreiaa/fitme-protos/modules/user/generated"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"

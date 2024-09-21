@@ -3,8 +3,9 @@ package service
 import (
 	"context"
 
-	"github.com/FACorreiaa/ink-app-backend-grpc/internal/domain/repository"
-	pb "github.com/FACorreiaa/ink-app-backend-protos/modules/user/generated"
+	pb "github.com/FACorreiaa/fitme-protos/modules/user/generated"
+
+	"github.com/FACorreiaa/fitme-grpc/internal/domain/repository"
 )
 
 type AuthService struct {

@@ -3,7 +3,7 @@ package domain
 import (
 	"context"
 
-	pb "github.com/FACorreiaa/ink-app-backend-protos/modules/customer/generated"
+	pb "github.com/FACorreiaa/fitme-protos/modules/customer/generated"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/jackc/pgx/v5/pgxpool"

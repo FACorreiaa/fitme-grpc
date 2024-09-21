@@ -2,22 +2,20 @@ package internal
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"sync/atomic"
 
-	"github.com/FACorreiaa/ink-app-backend-protos/container"
-	cpb "github.com/FACorreiaa/ink-app-backend-protos/modules/customer/generated"
-	upb "github.com/FACorreiaa/ink-app-backend-protos/modules/user/generated"
+	"github.com/FACorreiaa/fitme-protos/container"
+	cpb "github.com/FACorreiaa/fitme-protos/modules/customer/generated"
+	upb "github.com/FACorreiaa/fitme-protos/modules/user/generated"
 
-	"github.com/FACorreiaa/ink-app-backend-grpc/config"
-	"github.com/FACorreiaa/ink-app-backend-grpc/internal/domain"
-	"github.com/FACorreiaa/ink-app-backend-grpc/internal/domain/repository"
-	"github.com/FACorreiaa/ink-app-backend-grpc/internal/domain/service"
-	"github.com/FACorreiaa/ink-app-backend-grpc/logger"
-	"github.com/FACorreiaa/ink-app-backend-grpc/protocol/grpc"
+	"github.com/FACorreiaa/fitme-grpc/internal/domain"
+	"github.com/FACorreiaa/fitme-grpc/internal/domain/repository"
+	"github.com/FACorreiaa/fitme-grpc/internal/domain/service"
+	"github.com/FACorreiaa/fitme-grpc/logger"
+	"github.com/FACorreiaa/fitme-grpc/protocol/grpc"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
@@ -98,12 +96,12 @@ func ServeHTTP(port string) error {
 
 	log.Info("running http server", zap.String("port", port))
 
-	cfg, err := config.InitConfig()
-
-	if err != nil {
-		log.Error("failed to initialize config", zap.Error(err))
-		return err
-	}
+	//cfg, err := config.InitConfig()
+	//
+	//if err != nil {
+	//	log.Error("failed to initialize config", zap.Error(err))
+	//	return err
+	//}
 
 	server := http.NewServeMux()
 	// Add healthcheck endpoints
@@ -122,15 +120,15 @@ func ServeHTTP(port string) error {
 	})
 	server.HandleFunc("/metrics", promhttp.Handler().ServeHTTP)
 
-	listener := &http.Server{
-		Addr:              fmt.Sprintf(":%s", port),
-		ReadHeaderTimeout: cfg.Server.Timeout,
-		Handler:           server,
-	}
-
-	if err := listener.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		return errors.Wrap(err, "failed to create telemetry server")
-	}
+	//listener := &http.Server{
+	//	Addr:              fmt.Sprintf(":%s", port),
+	//	ReadHeaderTimeout: cfg.Server.Timeout,
+	//	Handler:           server,
+	//}
+	//
+	//if err := listener.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	//	return errors.Wrap(err, "failed to create telemetry server")
+	//}
 
 	return nil
 }
