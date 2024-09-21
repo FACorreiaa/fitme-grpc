@@ -2,10 +2,10 @@ cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMT
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/FACorreiaa/fitme-protos v0.0.0-20240919204841-888f633ec404 h1:K9BeBGKC6fNnidcbSFBZzTODvOpdJyow0kRZ05wzkeU=
 github.com/FACorreiaa/fitme-protos v0.0.0-20240919204841-888f633ec404/go.mod h1:A3NzIxvW38lMkxx1xJ/dtrma/KzMvmwE2vICkk2jXrc=
-github.com/FACorreiaa/fitme-grpc v0.0.0-20240912212154-3a01d062f80e h1:MY/cDIwPrdP+8XV+QEc3BGY3+wiDUXEFOnEpkqqWm1A=
-github.com/FACorreiaa/fitme-grpc v0.0.0-20240912212154-3a01d062f80e/go.mod h1:858AdUCmFCJjwIK3jOBZ8QnT0W8jsLTQgEhKgWMtzE0=
-github.com/FACorreiaa/fitme-protos v0.0.0-20240611150132-88ec9e0d3fcd h1:eQkDFt9wT16sw35+nvJ1qmz9MVuH5ljlj+ehKwaMYGM=
-github.com/FACorreiaa/fitme-protos v0.0.0-20240611150132-88ec9e0d3fcd/go.mod h1:cQbi1r73uXxvuXFsAG5LJcLA66VE65vfLgwLcKNRBkQ=
+github.com/FACorreiaa/ink-app-backend-grpc v0.0.0-20240322231149-49682d8f14a5 h1:K98QvHutqNWMK2r+/E4BYP4LwCqs3uWLU46/StPKltc=
+github.com/FACorreiaa/ink-app-backend-grpc v0.0.0-20240322231149-49682d8f14a5/go.mod h1:343P0xYZ4srfLvA93R/9N9T+zWJxsiSYs8oD1RWjbhc=
+github.com/FACorreiaa/ink-app-backend-protos v0.0.0-20240611150132-88ec9e0d3fcd h1:eQkDFt9wT16sw35+nvJ1qmz9MVuH5ljlj+ehKwaMYGM=
+github.com/FACorreiaa/ink-app-backend-protos v0.0.0-20240611150132-88ec9e0d3fcd/go.mod h1:cQbi1r73uXxvuXFsAG5LJcLA66VE65vfLgwLcKNRBkQ=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=

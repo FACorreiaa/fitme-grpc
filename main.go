@@ -1,9 +1,6 @@
 package main
 
 import (
-	"context"
-
-	"github.com/FACorreiaa/fitme-protos/utils"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
@@ -60,9 +57,9 @@ func run() (*pgxpool.Pool, *redis.Client, error) {
 }
 
 func main() {
-	ctx := context.Background()
+	//ctx := context.Background()
 
-	cfg, err := config.InitConfig()
+	_, err := config.InitConfig()
 	if err != nil {
 		zap.L().Error("failed to initialize config", zap.Error(err))
 		return
@@ -87,25 +84,25 @@ func main() {
 	defer pool.Close()
 	defer redisClient.Close()
 
-	tu := new(utils.TransportUtils)
+	//tu := new(utils.TransportUtils)
 
-	brokers := internal.ConfigureUpstreamClients(log, tu)
-	if brokers == nil {
-		log.Error("failed to configure brokers")
-		return
-	}
+	//brokers := internal.ConfigureUpstreamClients(log, tu)
+	//if brokers == nil {
+	//	log.Error("failed to configure brokers")
+	//	return
+	//}
 
 	metrics.InitPprof()
 
-	go func() {
-		if err := internal.ServeGRPC(ctx, cfg.Server.GrpcPort, brokers, pool, redisClient); err != nil {
-			log.Error("failed to serve grpc", zap.Error(err))
-			return
-		}
-	}()
-
-	if err := internal.ServeHTTP(cfg.Server.HTTPPort); err != nil {
-		log.Error("failed to serve http", zap.Error(err))
-		return
-	}
+	//go func() {
+	//	if err := internal.ServeGRPC(ctx, cfg.Server.GrpcPort, brokers, pool, redisClient); err != nil {
+	//		log.Error("failed to serve grpc", zap.Error(err))
+	//		return
+	//	}
+	//}()
+	//
+	//if err := internal.ServeHTTP(cfg.Server.HTTPPort); err != nil {
+	//	log.Error("failed to serve http", zap.Error(err))
+	//	return
+	//}
 }
