@@ -32,7 +32,6 @@ services:
 
 repositories:
   postgres:
-    host: localhost
     port: "5440"
     username: "postgres"
     db: "fit-me-dev"
@@ -46,7 +45,7 @@ repositories:
 #change later
 server:
   HTTPPort: "7077"
-  GRPCPort: "8088"
+  GRPCPort: "8000"
   HTTPTimeout: 15s
 
 upstreamServices:
