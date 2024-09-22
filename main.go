@@ -1,19 +1,23 @@
 package main
 
 import (
+	"context"
+	"os"
+
+	"github.com/FACorreiaa/fitme-protos/utils"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 
-	config "github.com/FACorreiaa/fitme-grpc/.config"
+	config "github.com/FACorreiaa/fitme-grpc/config"
 	"github.com/FACorreiaa/fitme-grpc/internal"
 	"github.com/FACorreiaa/fitme-grpc/internal/metrics"
 	"github.com/FACorreiaa/fitme-grpc/logger"
 )
 
 func run() (*pgxpool.Pool, *redis.Client, error) {
-	// ctx, cancel := context.WithCancel(context.Background())
-	// defer cancel()
+	//ctx, cancel := context.WithCancel(context.Background())
+	//defer cancel()
 
 	cfg, err := config.InitConfig()
 	if err != nil {
@@ -35,7 +39,7 @@ func run() (*pgxpool.Pool, *redis.Client, error) {
 		return nil, nil, err
 	}
 	internal.WaitForDB(pool)
-	log.Info("Connected to Postgres", zap.String("host", cfg.Repositories.Postgres.Host))
+	log.Info("Connected to Postgres", zap.String("host", os.Getenv("DB_HOST")), zap.String("port", os.Getenv("DB_PORT")))
 
 	redisClient, err := internal.NewRedisConfig()
 	if err != nil {
@@ -57,9 +61,9 @@ func run() (*pgxpool.Pool, *redis.Client, error) {
 }
 
 func main() {
-	//ctx := context.Background()
+	ctx := context.Background()
 
-	_, err := config.InitConfig()
+	cfg, err := config.InitConfig()
 	if err != nil {
 		zap.L().Error("failed to initialize config", zap.Error(err))
 		return
@@ -84,25 +88,25 @@ func main() {
 	defer pool.Close()
 	defer redisClient.Close()
 
-	//tu := new(utils.TransportUtils)
+	tu := new(utils.TransportUtils)
 
-	//brokers := internal.ConfigureUpstreamClients(log, tu)
-	//if brokers == nil {
-	//	log.Error("failed to configure brokers")
-	//	return
-	//}
+	brokers := internal.ConfigureUpstreamClients(log, tu)
+	if brokers == nil {
+		log.Error("failed to configure brokers")
+		return
+	}
 
 	metrics.InitPprof()
 
-	//go func() {
-	//	if err := internal.ServeGRPC(ctx, cfg.Server.GrpcPort, brokers, pool, redisClient); err != nil {
-	//		log.Error("failed to serve grpc", zap.Error(err))
-	//		return
-	//	}
-	//}()
-	//
-	//if err := internal.ServeHTTP(cfg.Server.HTTPPort); err != nil {
-	//	log.Error("failed to serve http", zap.Error(err))
-	//	return
-	//}
+	go func() {
+		if err := internal.ServeGRPC(ctx, cfg.Server.GrpcPort, brokers, pool, redisClient); err != nil {
+			log.Error("failed to serve grpc", zap.Error(err))
+			return
+		}
+	}()
+
+	if err := internal.ServeHTTP(cfg.Server.HTTPPort); err != nil {
+		log.Error("failed to serve http", zap.Error(err))
+		return
+	}
 }

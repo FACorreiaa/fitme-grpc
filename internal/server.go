@@ -2,13 +2,19 @@ package internal
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"sync/atomic"
 
 	"github.com/FACorreiaa/fitme-protos/container"
+	cpb "github.com/FACorreiaa/fitme-protos/modules/customer/generated"
+	upb "github.com/FACorreiaa/fitme-protos/modules/user/generated"
 
+	config "github.com/FACorreiaa/fitme-grpc/config"
+	"github.com/FACorreiaa/fitme-grpc/internal/domain/repository"
+	"github.com/FACorreiaa/fitme-grpc/internal/domain/service"
 	"github.com/FACorreiaa/fitme-grpc/logger"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc"
 
@@ -47,19 +53,19 @@ func ServeGRPC(ctx context.Context, port string, _ *container.Brokers, pgPool *p
 	}
 
 	// Replace with your actual generated registration method
-	// generated.RegisterDummyServer(server, implementation)
-	// client := generated.NewCustomerClient(brokers.Customer)
+	//generated.RegisterDummyServer(server, implementation)
+	//client := generated.NewCustomerClient(brokers.Customer)
 
-	// customerService and any implementation is a dependency that is injected to dest and delete
-	//customerService := domain.NewCustomerService(pgPool, redisClient)
+	//customerService and any implementation is a dependency that is injected to dest and delete
+	customerService := service.NewCustomerService(pgPool, redisClient)
 
 	// implement brokers
 
-	//authRepo := repository.NewAuthService(pgPool, redisClient)
-	//authService := service.NewAuthService(authRepo)
+	authRepo := repository.NewAuthService(pgPool, redisClient)
+	authService := service.NewAuthService(authRepo)
 
-	//cpb.RegisterCustomerServer(server, customerService)
-	//upb.RegisterAuthServer(server, authService)
+	cpb.RegisterCustomerServer(server, customerService)
+	upb.RegisterAuthServer(server, authService)
 
 	// Enable reflection to be able to use grpcui or insomnia without
 	// having to manually maintain .proto files
@@ -91,12 +97,12 @@ func ServeHTTP(port string) error {
 
 	log.Info("running http server", zap.String("port", port))
 
-	//cfg, err := config.InitConfig()
-	//
-	//if err != nil {
-	//	log.Error("failed to initialize config", zap.Error(err))
-	//	return err
-	//}
+	cfg, err := config.InitConfig()
+
+	if err != nil {
+		log.Error("failed to initialize config", zap.Error(err))
+		return err
+	}
 
 	server := http.NewServeMux()
 	// Add healthcheck endpoints
@@ -115,15 +121,15 @@ func ServeHTTP(port string) error {
 	})
 	server.HandleFunc("/metrics", promhttp.Handler().ServeHTTP)
 
-	//listener := &http.Server{
-	//	Addr:              fmt.Sprintf(":%s", port),
-	//	ReadHeaderTimeout: cfg.Server.Timeout,
-	//	Handler:           server,
-	//}
-	//
-	//if err := listener.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-	//	return errors.Wrap(err, "failed to create telemetry server")
-	//}
+	listener := &http.Server{
+		Addr:              fmt.Sprintf(":%s", port),
+		ReadHeaderTimeout: cfg.Server.Timeout,
+		Handler:           server,
+	}
+
+	if err := listener.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return errors.Wrap(err, "failed to create telemetry server")
+	}
 
 	return nil
 }

@@ -11,3 +11,4 @@ CREATE TABLE "costumer" (
                         phone VARCHAR(255)
   -- Add other fields as needed
 );
+

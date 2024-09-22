@@ -32,7 +32,6 @@ type Config struct {
 	} `mapstructure:"handlers"`
 	Repositories struct {
 		Postgres struct {
-			Host              string `mapstructure:"host"`
 			Port              string `mapstructure:"port"`
 			Username          string `mapstructure:"username"`
 			DB                string `mapstructure:"db"`
