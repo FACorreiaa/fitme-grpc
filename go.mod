@@ -3,7 +3,8 @@ module github.com/FACorreiaa/fitme-grpc
 go 1.23.1
 
 require (
-	github.com/FACorreiaa/fitme-protos v0.0.0-20240921185210-43ebddf253a4
+	github.com/FACorreiaa/fitme-protos v0.0.0-20240922200342-35b6fe921ddd
+	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.0.1
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0
@@ -36,7 +37,6 @@ require (
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.22.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect

@@ -11,17 +11,20 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/FACorreiaa/fitme-grpc/internal/domain/auth"
 )
 
 type AuthService struct {
 	pb.UnimplementedAuthServer
-	pgpool *pgxpool.Pool
-	redis  *redis.Client
+	pgpool         *pgxpool.Pool
+	redis          *redis.Client
+	sessionManager *auth.SessionManager
 }
 
 // NewAuthService creates a new AuthService
-func NewAuthService(db *pgxpool.Pool, redis *redis.Client) *AuthService {
-	return &AuthService{pgpool: db, redis: redis}
+func NewAuthService(db *pgxpool.Pool, redis *redis.Client, sessionManager *auth.SessionManager) *AuthService {
+	return &AuthService{pgpool: db, redis: redis, sessionManager: sessionManager}
 }
 
 func (a *AuthService) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
@@ -50,6 +53,9 @@ func (a *AuthService) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Logi
 		return nil, errors.New("invalid credentials")
 	}
 
+	//sessionID, err := a.sessionManager.GenerateSession(auth.UserSession{
+	//	Email: req.Email
+	//})
 	token := "generated-jwt-token"
 
 	err = a.redis.Set(ctx, req.Username, token, 0).Err()
@@ -57,6 +63,7 @@ func (a *AuthService) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Logi
 		return nil, err
 	}
 
+	//return &pb.LoginResponse{Token: sessionID, Message: "Login successful!"}, nil
 	return &pb.LoginResponse{Token: token}, nil
 }
 

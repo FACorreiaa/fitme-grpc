@@ -7,8 +7,10 @@ import (
 	"github.com/FACorreiaa/fitme-protos/utils"
 	"go.uber.org/zap"
 
-	config "github.com/FACorreiaa/fitme-grpc/config"
+	"github.com/FACorreiaa/fitme-grpc/config"
 )
+
+// ask
 
 // ConfigureUpstreamClients maintains the broker container so we have a struct that we can pass
 // down to the service, with connections to all other services that we need
