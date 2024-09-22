@@ -4,17 +4,26 @@ import (
 	"context"
 
 	pb "github.com/FACorreiaa/fitme-protos/modules/user/generated"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 
-	"github.com/FACorreiaa/fitme-grpc/internal/domain/repository"
+	"github.com/FACorreiaa/fitme-grpc/internal/domain"
+	"github.com/FACorreiaa/fitme-grpc/internal/domain/auth"
 )
 
 type AuthService struct {
 	pb.UnimplementedAuthServer
-	repo repository.AuthRepository
+	repo           domain.AuthRepository
+	pgpool         *pgxpool.Pool
+	redis          *redis.Client
+	sessionManager *auth.SessionManager
 }
 
-func NewAuthService(repo repository.AuthRepository) *AuthService {
-	return &AuthService{repo: repo}
+func NewAuthService(repo domain.AuthRepository,
+	db *pgxpool.Pool,
+	redis *redis.Client,
+	sessionManager *auth.SessionManager) *AuthService {
+	return &AuthService{repo: repo, pgpool: db, redis: redis, sessionManager: sessionManager}
 }
 
 func (s *AuthService) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {

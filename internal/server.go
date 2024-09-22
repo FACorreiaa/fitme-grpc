@@ -13,6 +13,8 @@ import (
 	upb "github.com/FACorreiaa/fitme-protos/modules/user/generated"
 
 	config "github.com/FACorreiaa/fitme-grpc/config"
+	"github.com/FACorreiaa/fitme-grpc/internal/domain"
+	"github.com/FACorreiaa/fitme-grpc/internal/domain/auth"
 	"github.com/FACorreiaa/fitme-grpc/internal/domain/repository"
 	"github.com/FACorreiaa/fitme-grpc/internal/domain/service"
 	"github.com/FACorreiaa/fitme-grpc/logger"
@@ -57,12 +59,14 @@ func ServeGRPC(ctx context.Context, port string, _ *container.Brokers, pgPool *p
 	//client := generated.NewCustomerClient(brokers.Customer)
 
 	//customerService and any implementation is a dependency that is injected to dest and delete
-	customerService := service.NewCustomerService(pgPool, redisClient)
+	customerService := domain.NewCustomerService(pgPool, redisClient)
 
 	// implement brokers
 
-	authRepo := repository.NewAuthService(pgPool, redisClient)
-	authService := service.NewAuthService(authRepo)
+	sessionManager := auth.NewSessionManager(pgPool, redisClient)
+
+	authRepo := repository.NewAuthService(pgPool, redisClient, sessionManager)
+	authService := service.NewAuthService(authRepo, pgPool, redisClient, sessionManager)
 
 	cpb.RegisterCustomerServer(server, customerService)
 	upb.RegisterAuthServer(server, authService)
