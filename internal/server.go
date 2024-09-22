@@ -37,6 +37,17 @@ var isReady atomic.Value
 func ServeGRPC(ctx context.Context, port string, _ *container.Brokers, pgPool *pgxpool.Pool, redisClient *redis.Client) error {
 	log := logger.Log
 
+	// dependencies
+
+	customerService := domain.NewCustomerService(pgPool, redisClient)
+
+	// implement brokers
+
+	sessionManager := auth.NewSessionManager(pgPool, redisClient)
+
+	authRepo := repository.NewAuthService(pgPool, redisClient, sessionManager)
+	authService := service.NewAuthService(authRepo, pgPool, redisClient, sessionManager)
+
 	// When you have a configured prometheus registry and OTEL trace provider,
 	// pass in as param 3 & 4
 
@@ -49,7 +60,7 @@ func ServeGRPC(ctx context.Context, port string, _ *container.Brokers, pgPool *p
 	if err != nil {
 		return errors.Wrap(err, "failed to configure jaeger trace provider")
 	}
-	server, listener, err := grpc.BootstrapServer(port, logger.Log, registry, tp)
+	server, listener, err := grpc.BootstrapServer(port, logger.Log, registry, tp, sessionManager)
 	if err != nil {
 		return errors.Wrap(err, "failed to configure grpc server")
 	}
@@ -59,14 +70,6 @@ func ServeGRPC(ctx context.Context, port string, _ *container.Brokers, pgPool *p
 	//client := generated.NewCustomerClient(brokers.Customer)
 
 	//customerService and any implementation is a dependency that is injected to dest and delete
-	customerService := domain.NewCustomerService(pgPool, redisClient)
-
-	// implement brokers
-
-	sessionManager := auth.NewSessionManager(pgPool, redisClient)
-
-	authRepo := repository.NewAuthService(pgPool, redisClient, sessionManager)
-	authService := service.NewAuthService(authRepo, pgPool, redisClient, sessionManager)
 
 	cpb.RegisterCustomerServer(server, customerService)
 	upb.RegisterAuthServer(server, authService)
