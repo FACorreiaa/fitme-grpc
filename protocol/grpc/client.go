@@ -1,6 +1,7 @@
 package grpc
 
 import (
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
@@ -10,6 +11,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpclog"
+	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpcprometheus"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpcspan"
 )
 
@@ -35,6 +37,12 @@ func BootstrapClient(
 	logInterceptor, _ := grpclog.Interceptors(log)
 
 	// -- Prometheus exporter setup
+	prometheusCollectors := grpcprometheus.NewPrometheusMetricsCollectors()
+	if err := grpcprometheus.RegisterMetrics(prometheus, prometheusCollectors); err != nil {
+		return nil, errors.Wrap(err, "failed to register grpc metrics")
+	}
+
+	clientMetrics := prometheusCollectors.Client
 
 	connOptions := []grpc.DialOption{
 		// We terminate TLS in the linkerd sidecar, so no need for TLS on the listen server
@@ -44,12 +52,14 @@ func BootstrapClient(
 		grpc.WithChainUnaryInterceptor(
 			spanInterceptor.Unary,
 			logInterceptor.Unary,
+			clientMetrics.UnaryClientInterceptor(),
 		),
 
 		// Add the stream interceptors
 		grpc.WithChainStreamInterceptor(
 			spanInterceptor.Stream,
 			logInterceptor.Stream,
+			clientMetrics.StreamClientInterceptor(),
 		),
 	}
 

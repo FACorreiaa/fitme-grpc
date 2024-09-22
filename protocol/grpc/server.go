@@ -12,11 +12,13 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 
+	"github.com/FACorreiaa/fitme-grpc/internal/domain/auth"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpclog"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpcprometheus"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpcrecovery"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpcspan"
+	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/session"
 )
 
 // BootstrapServer creates a new gRPC server with the base middleware included.
@@ -27,6 +29,7 @@ func BootstrapServer(
 	log *zap.Logger,
 	registry *prometheus.Registry,
 	traceProvider trace.TracerProvider,
+	sessionManager *auth.SessionManager,
 	opts ...grpc.ServerOption,
 ) (*grpc.Server, net.Listener, error) {
 	// initiate the listener
@@ -61,6 +64,9 @@ func BootstrapServer(
 	// -- Recovery interceptor setup
 	_, recoveryInterceptor := grpcrecovery.Interceptors(grpcrecovery.RegisterMetrics(registry))
 
+	// session
+	sessionInterceptor := session.InterceptorSession(sessionManager)
+
 	// Configure server options from our base configuration
 	serverOptions := []grpc.ServerOption{
 		grpc.KeepaliveEnforcementPolicy(middleware.KeepaliveEnforcementPolicy()),
@@ -76,6 +82,7 @@ func BootstrapServer(
 			promInterceptor.Unary,
 			logInterceptor.Unary,
 			recoveryInterceptor.Unary,
+			sessionInterceptor,
 		),
 
 		// Add the stream interceptors

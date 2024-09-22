@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
+	"google.golang.org/grpc/metadata"
 
 	"github.com/FACorreiaa/fitme-grpc/internal/domain/auth"
 )
@@ -53,26 +55,53 @@ func (a *AuthService) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Logi
 		return nil, errors.New("invalid credentials")
 	}
 
-	//sessionID, err := a.sessionManager.GenerateSession(auth.UserSession{
-	//	Email: req.Email
-	//})
-	token := "generated-jwt-token"
+	sessionID, err := a.sessionManager.GenerateSession(auth.UserSession{
+		Email: req.Email,
+	})
 
-	err = a.redis.Set(ctx, req.Username, token, 0).Err()
+	// check
+
+	err = a.redis.Set(ctx, req.Username, sessionID, 0).Err()
 	if err != nil {
 		return nil, err
 	}
 
-	//return &pb.LoginResponse{Token: sessionID, Message: "Login successful!"}, nil
-	return &pb.LoginResponse{Token: token}, nil
+	return &pb.LoginResponse{Token: sessionID, Message: "Login successful!"}, nil
 }
 
 func (a *AuthService) Logout(ctx context.Context, req *pb.NilReq) (*pb.NilRes, error) {
-	username := "extracted-username"
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.New("unable to retrieve metadata")
+	}
 
-	err := a.redis.Del(ctx, username).Err()
+	authHeader := md["authorization"]
+	if len(authHeader) != 1 {
+		return nil, errors.New("invalid authorization header")
+	}
+
+	token := authHeader[0]
+	sessionData, err := a.redis.Get(ctx, token).Result()
 	if err != nil {
-		return nil, err
+		return nil, errors.New("invalid or expired token")
+	}
+
+	var session auth.UserSession
+	err = json.Unmarshal([]byte(sessionData), &session)
+	if err != nil {
+		return nil, errors.New("invalid or expired token")
+	}
+
+	//username := session.Username
+	//
+	//err := a.sessionManager.SignOut(username)
+	//if err != nil {
+	//	return nil, err
+	//}
+
+	err = a.redis.Del(ctx, token).Err()
+	if err != nil {
+		return nil, errors.New("delete item")
 	}
 
 	return &pb.NilRes{}, nil
