@@ -98,8 +98,10 @@ func main() {
 
 	metrics.InitPprof()
 
+	container := internal.NewServiceContainer(pool, redisClient, brokers)
+
 	go func() {
-		if err := internal.ServeGRPC(ctx, cfg.Server.GrpcPort, brokers, pool, redisClient); err != nil {
+		if err := internal.ServeGRPC(ctx, cfg.Server.GrpcPort, container); err != nil {
 			log.Error("failed to serve grpc", zap.Error(err))
 			return
 		}

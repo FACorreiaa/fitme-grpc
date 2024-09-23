@@ -8,22 +8,15 @@ import (
 	"os/signal"
 	"sync/atomic"
 
-	"github.com/FACorreiaa/fitme-protos/container"
 	cpb "github.com/FACorreiaa/fitme-protos/modules/customer/generated"
 	upb "github.com/FACorreiaa/fitme-protos/modules/user/generated"
 
 	config "github.com/FACorreiaa/fitme-grpc/config"
-	"github.com/FACorreiaa/fitme-grpc/internal/domain"
-	"github.com/FACorreiaa/fitme-grpc/internal/domain/auth"
-	"github.com/FACorreiaa/fitme-grpc/internal/domain/repository"
-	"github.com/FACorreiaa/fitme-grpc/internal/domain/service"
 	"github.com/FACorreiaa/fitme-grpc/logger"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/reflection"
 )
@@ -34,19 +27,19 @@ import (
 // the gRPC server is ready to handle requests
 var isReady atomic.Value
 
-func ServeGRPC(ctx context.Context, port string, _ *container.Brokers, pgPool *pgxpool.Pool, redisClient *redis.Client) error {
+func ServeGRPC(ctx context.Context, port string, container *ServiceContainer) error {
 	log := logger.Log
 
 	// dependencies
 
-	customerService := domain.NewCustomerService(pgPool, redisClient)
-
-	// implement brokers
-
-	sessionManager := auth.NewSessionManager(pgPool, redisClient)
-
-	authRepo := repository.NewAuthService(pgPool, redisClient, sessionManager)
-	authService := service.NewAuthService(authRepo, pgPool, redisClient, sessionManager)
+	//customerService := domain.NewCustomerService(pgPool, redisClient)
+	//
+	//// implement brokers
+	//
+	//sessionManager := auth.NewSessionManager(pgPool, redisClient)
+	//
+	//authRepo := repository.NewAuthService(pgPool, redisClient, sessionManager)
+	//authService := service.NewAuthService(authRepo, pgPool, redisClient, sessionManager)
 
 	// When you have a configured prometheus registry and OTEL trace provider,
 	// pass in as param 3 & 4
@@ -60,7 +53,7 @@ func ServeGRPC(ctx context.Context, port string, _ *container.Brokers, pgPool *p
 	if err != nil {
 		return errors.Wrap(err, "failed to configure jaeger trace provider")
 	}
-	server, listener, err := grpc.BootstrapServer(port, logger.Log, registry, tp, sessionManager)
+	server, listener, err := grpc.BootstrapServer(port, logger.Log, registry, tp, container.AuthService.SessionManager)
 	if err != nil {
 		return errors.Wrap(err, "failed to configure grpc server")
 	}
@@ -71,8 +64,8 @@ func ServeGRPC(ctx context.Context, port string, _ *container.Brokers, pgPool *p
 
 	//customerService and any implementation is a dependency that is injected to dest and delete
 
-	cpb.RegisterCustomerServer(server, customerService)
-	upb.RegisterAuthServer(server, authService)
+	cpb.RegisterCustomerServer(server, container.CustomerService)
+	upb.RegisterAuthServer(server, container.AuthService)
 
 	// Enable reflection to be able to use grpcui or insomnia without
 	// having to manually maintain .proto files

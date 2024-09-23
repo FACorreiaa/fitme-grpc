@@ -16,14 +16,14 @@ type AuthService struct {
 	repo           domain.AuthRepository
 	pgpool         *pgxpool.Pool
 	redis          *redis.Client
-	sessionManager *auth.SessionManager
+	SessionManager *auth.SessionManager
 }
 
 func NewAuthService(repo domain.AuthRepository,
 	db *pgxpool.Pool,
 	redis *redis.Client,
 	sessionManager *auth.SessionManager) *AuthService {
-	return &AuthService{repo: repo, pgpool: db, redis: redis, sessionManager: sessionManager}
+	return &AuthService{repo: repo, pgpool: db, redis: redis, SessionManager: sessionManager}
 }
 
 func (s *AuthService) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
