@@ -48,7 +48,7 @@ func run() (*pgxpool.Pool, *redis.Client, error) {
 		return nil, nil, err
 	}
 
-	log.Info("Connected to Redis", zap.String("host", cfg.Repositories.Redis.Host))
+	log.Info("Connected to Redis", zap.String("host", cfg.Repositories.Redis.Host), zap.String("port", cfg.Repositories.Redis.Port))
 
 	if err = internal.Migrate(pool); err != nil {
 		log.Error("failed to migrate database", zap.Error(err))

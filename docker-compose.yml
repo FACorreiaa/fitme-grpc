@@ -4,7 +4,7 @@ services:
   postgres:
     env_file:
       - .env
-    container_name: fitme-dev-postgres
+    container_name: postgres
     hostname: ${DB_HOST}
     image: postgres:alpine
     environment:
@@ -23,7 +23,7 @@ services:
   redis:
     env_file:
       - .env
-    container_name: fitme-dev-redis
+    container_name: redis
     hostname: redis
     image: redis:latest
     command: redis-server --port 6388
