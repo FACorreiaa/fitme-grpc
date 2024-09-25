@@ -52,8 +52,9 @@ type Config struct {
 		CustomerBroker *customer.Broker
 	} `mapstructure:"server"`
 	UpstreamServices struct {
-		Customer string `mapstructure:"customer"`
-		Auth     string `mapstructure:"auth"`
+		Customer   string `mapstructure:"customer"`
+		Auth       string `mapstructure:"auth"`
+		Calculator string `mapstructure:"calculator"`
 	} `mapstructure:"upstreamServices"`
 }
 
