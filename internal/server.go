@@ -30,6 +30,7 @@ var isReady atomic.Value
 func ServeGRPC(ctx context.Context, port string, container *ServiceContainer) error {
 	log := logger.Log
 
+	fmt.Printf("PORTPORT %s", port)
 	// dependencies
 
 	//customerService := domain.NewCustomerService(pgPool, redisClient)
@@ -93,8 +94,6 @@ func ServeGRPC(ctx context.Context, port string, container *ServiceContainer) er
 // query readiness. By default, these should serve on "/healthz" and "/readyz"
 func ServeHTTP(port string) error {
 	log := logger.Log
-	log.Info("running http server", zap.String("port", port))
-
 	log.Info("running http server", zap.String("port", port))
 
 	cfg, err := config.InitConfig()

@@ -38,7 +38,8 @@ repositories:
     SSLMODE: "verify-full"
     MAXCONWAITINGTIME: 10
   redis:
-    host: "redis:6388"
+    host: "localhost"
+    port: "6388"
     db: 0
 
 

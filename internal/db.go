@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/url"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -66,7 +67,7 @@ func NewRedisConfig() (*redis.Client, error) {
 		zap.Error(err)
 	}
 	return redis.NewClient(&redis.Options{
-		Addr:     cfg.Repositories.Redis.Host,
+		Addr:     fmt.Sprintf("%s:%s", cfg.Repositories.Redis.Host, cfg.Repositories.Redis.Port),
 		Password: redisPassword,
 		DB:       cfg.Repositories.Redis.DB,
 	}), nil
@@ -178,6 +179,11 @@ func Migrate(conn *pgxpool.Pool) error {
 	}
 
 	for _, file := range files {
+		sort.SliceStable(files, func(i, j int) bool {
+			return files[i].Name() < files[j].Name()
+		})
+		fmt.Printf("files %s \n:", file.Name())
+
 		contents, err := migrationFS.ReadFile("migrations/" + file.Name())
 		if err != nil {
 			return err

@@ -35,7 +35,7 @@ func (a *AuthService) Register(ctx context.Context, req *pb.RegisterRequest) (*p
 		return nil, err
 	}
 
-	_, err = a.pgpool.Exec(ctx, `INSERT INTO "user" (username, email, password_hash) VALUES ($1, $2, $3)`, req.Username, req.Email, hashedPassword)
+	_, err = a.pgpool.Exec(ctx, `INSERT INTO "users" (username, email, password) VALUES ($1, $2, $3)`, req.Username, req.Email, hashedPassword)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +45,8 @@ func (a *AuthService) Register(ctx context.Context, req *pb.RegisterRequest) (*p
 
 func (a *AuthService) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResponse, error) {
 	var passwordHash string
-	err := a.pgpool.QueryRow(ctx, `SELECT password_hash FROM "user" WHERE username=$1`, req.Username).Scan(&passwordHash)
+	var email string
+	err := a.pgpool.QueryRow(ctx, `SELECT password, email FROM "users" WHERE username=$1`, req.Username).Scan(&passwordHash, &email)
 	if err != nil {
 		return nil, errors.New("user not found")
 	}
@@ -56,15 +57,16 @@ func (a *AuthService) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Logi
 	}
 
 	sessionID, err := a.sessionManager.GenerateSession(auth.UserSession{
-		Email: req.Email,
+		Email:    req.Email,
+		Username: req.Username,
 	})
 
-	// check
+	fmt.Printf("sessionIDsessionID %s", sessionID)
 
-	err = a.redis.Set(ctx, req.Username, sessionID, 0).Err()
-	if err != nil {
-		return nil, err
-	}
+	//err = a.redis.Set(ctx, req.Username, sessionID, 0).Err()
+	//if err != nil {
+	//	return nil, err
+	//}
 
 	return &pb.LoginResponse{Token: sessionID, Message: "Login successful!"}, nil
 }
@@ -109,7 +111,7 @@ func (a *AuthService) Logout(ctx context.Context, req *pb.NilReq) (*pb.NilRes, e
 
 func (a *AuthService) ChangePassword(ctx context.Context, req *pb.ChangePasswordRequest) (*pb.ChangePasswordResponse, error) {
 	var passwordHash string
-	err := a.pgpool.QueryRow(ctx, `SELECT password_hash FROM "user" WHERE username=$1`, req.Username).Scan(&passwordHash)
+	err := a.pgpool.QueryRow(ctx, `SELECT password FROM "users" WHERE username=$1`, req.Username).Scan(&passwordHash)
 	if err != nil {
 		return nil, errors.New("user not found")
 	}
@@ -124,7 +126,7 @@ func (a *AuthService) ChangePassword(ctx context.Context, req *pb.ChangePassword
 		return nil, err
 	}
 
-	_, err = a.pgpool.Exec(ctx, `UPDATE "user" SET password_hash=$1, updated_at=now() WHERE username=$2`, newHashedPassword, req.Username)
+	_, err = a.pgpool.Exec(ctx, `UPDATE "users" SET password=$1, updated_at=now() WHERE username=$2`, newHashedPassword, req.Username)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +136,7 @@ func (a *AuthService) ChangePassword(ctx context.Context, req *pb.ChangePassword
 
 func (a *AuthService) ChangeEmail(ctx context.Context, req *pb.ChangeEmailRequest) (*pb.ChangeEmailResponse, error) {
 	var passwordHash string
-	err := a.pgpool.QueryRow(ctx, `SELECT password_hash FROM "user" WHERE username=$1`, req.Username).Scan(&passwordHash)
+	err := a.pgpool.QueryRow(ctx, `SELECT password FROM "users" WHERE username=$1`, req.Username).Scan(&passwordHash)
 	if err != nil {
 		return nil, errors.New("user not found")
 	}
@@ -144,7 +146,7 @@ func (a *AuthService) ChangeEmail(ctx context.Context, req *pb.ChangeEmailReques
 		return nil, errors.New("invalid credentials")
 	}
 
-	_, err = a.pgpool.Exec(ctx, `UPDATE "user" SET email=$1, updated_at=now() WHERE username=$2`, req.NewEmail, req.Username)
+	_, err = a.pgpool.Exec(ctx, `UPDATE "users" SET email=$1, updated_at=now() WHERE username=$2`, req.NewEmail, req.Username)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +155,7 @@ func (a *AuthService) ChangeEmail(ctx context.Context, req *pb.ChangeEmailReques
 }
 
 func (a *AuthService) GetAllUsers(ctx context.Context) (*pb.GetAllUsersResponse, error) {
-	rows, err := a.pgpool.Query(ctx, `SELECT user_id, username, email, created_at, updated_at FROM "user"`)
+	rows, err := a.pgpool.Query(ctx, `SELECT id, username, email, role, created_at, updated_at FROM "users"`)
 	if err != nil {
 		return nil, err
 	}
@@ -161,13 +163,27 @@ func (a *AuthService) GetAllUsers(ctx context.Context) (*pb.GetAllUsersResponse,
 
 	var users []*pb.User
 	for rows.Next() {
-		var id, username, email string
+		var id, username, email, roleStr string
 		var createdAt time.Time
 		var updatedAt *time.Time
 
-		err := rows.Scan(&id, &username, &email, &createdAt, &updatedAt)
+		err := rows.Scan(&id, &username, &email, &roleStr, &createdAt, &updatedAt)
 		if err != nil {
 			return nil, err
+		}
+
+		fmt.Printf("role %s", roleStr)
+
+		var role pb.User_Role
+		switch roleStr {
+		case "ADMIN":
+			role = pb.User_ADMIN
+		case "MODERATOR":
+			role = pb.User_MODERATOR
+		case "COACH":
+			role = pb.User_COACH
+		default:
+			role = pb.User_ROLE_UNSPECIFIED
 		}
 
 		var updatedAtStr string
@@ -179,6 +195,7 @@ func (a *AuthService) GetAllUsers(ctx context.Context) (*pb.GetAllUsersResponse,
 			Id:        id,
 			Username:  username,
 			Email:     email,
+			Role:      role,
 			CreatedAt: createdAt.Format(time.RFC3339),
 			UpdatedAt: updatedAtStr,
 		})
@@ -196,9 +213,9 @@ func (a *AuthService) GetUserByID(ctx context.Context, req *pb.GetUserByIDReques
 	var updatedAt *time.Time
 
 	err := a.pgpool.QueryRow(ctx, `
-			SELECT u.user_id, u.username, u.email, u.created_at, u.updated_at
-			FROM "user" u
-			WHERE user_id = $1`, req.Id).Scan(
+			SELECT u.id, u.username, u.email, u.created_at, u.updated_at
+			FROM "users" u
+			WHERE id = $1`, req.Id).Scan(
 		&u.Id, &u.Username, &u.Email, &createdAt, &updatedAt)
 
 	if err != nil {
@@ -218,7 +235,7 @@ func (a *AuthService) GetUserByID(ctx context.Context, req *pb.GetUserByIDReques
 
 func (a *AuthService) DeleteUser(ctx context.Context, req *pb.DeleteUserRequest) (*pb.DeleteUserResponse, error) {
 	// Execute the delete query
-	commandTag, err := a.pgpool.Exec(ctx, `DELETE FROM "user" WHERE user_id = $1`, req.Id)
+	commandTag, err := a.pgpool.Exec(ctx, `DELETE FROM "users" WHERE user = $1`, req.Id)
 	if err != nil {
 		return nil, fmt.Errorf("error deleting user: %v", err)
 	}
@@ -234,9 +251,9 @@ func (a *AuthService) DeleteUser(ctx context.Context, req *pb.DeleteUserRequest)
 func (a *AuthService) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest) (*pb.UpdateUserResponse, error) {
 	// Execute the update query
 	commandTag, err := a.pgpool.Exec(ctx, `
-		UPDATE "user"
+		UPDATE "users"
 		SET username = $1, email = $2, updated_at = NOW()
-		WHERE user_id = $3`,
+		WHERE id = $3`,
 		req.User.Username, req.User.Email, req.User.Id)
 	if err != nil {
 		return nil, fmt.Errorf("error updating user: %v", err)
@@ -255,7 +272,7 @@ func (a *AuthService) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest)
 func (a *AuthService) InsertUser(ctx context.Context, req *pb.InsertUserRequest) (*pb.InsertUserResponse, error) {
 	// Insert the new user
 	_, err := a.pgpool.Exec(ctx, `
-		INSERT INTO "user" (user_id, username, email, password_hash, created_at, updated_at)
+		INSERT INTO "users" (id, username, email, password, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, NOW(), NOW())`,
 		req.User.Id, req.User.Username, req.User.Email, req.User.PasswordHash, req.User.IsAdmin)
 	if err != nil {

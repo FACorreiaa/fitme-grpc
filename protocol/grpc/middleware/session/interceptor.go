@@ -19,7 +19,12 @@ func InterceptorSession(sessionManager *auth.SessionManager) grpc.UnaryServerInt
 		info *grpc.UnaryServerInfo,
 		handler grpc.UnaryHandler,
 	) (interface{}, error) {
-		if info.FullMethod == "/auth.Auth/Register" {
+		unauthenticatedMethods := map[string]bool{
+			"/auth.Auth/Register":    true,
+			"/auth.Auth/Login":       true,
+			"/auth.Auth/GetAllUsers": true,
+		}
+		if unauthenticatedMethods[info.FullMethod] {
 			return handler(ctx, req)
 		}
 
@@ -42,32 +47,28 @@ func InterceptorSession(sessionManager *auth.SessionManager) grpc.UnaryServerInt
 			return nil, status.Error(codes.Unauthenticated, "invalid session token")
 		}
 
+		requiredPermission, ok := MethodPermissions[info.FullMethod]
+		if !ok {
+			return nil, status.Error(codes.PermissionDenied, "method not found")
+		}
+
+		userPermissions := GetUserPermissions(userSession.Role)
+
+		if !hasPermission(userPermissions, requiredPermission) {
+			return nil, status.Error(codes.PermissionDenied, "user does not have permission to access this method")
+		}
+
 		// Pass user session in context
 		ctx = context.WithValue(ctx, "userSession", userSession)
 		return handler(ctx, req)
 	}
 }
 
-//// Add a custom type for context key
-//type contextKey string
-//
-//const userKey contextKey = "userID"
-//
-//// In your UnaryInterceptor, you could do something like this:
-//func (i *StaticInterceptor) UnaryInterceptor(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-//	err := i.engines.IsAuthorized(ctx)
-//	if err != nil {
-//		if status.Code(err) == codes.PermissionDenied {
-//			logger.Infof("unauthorized RPC request rejected for method %s: %v", info.FullMethod, err)
-//			return nil, status.Errorf(codes.PermissionDenied, "unauthorized request to %s", info.FullMethod)
-//		}
-//		return nil, err
-//	}
-//
-//	// Assuming user information is set in the context after authorization
-//	userID, ok := ctx.Value(userKey).(string)
-//	if ok {
-//		logger.Infof("User %s authorized for method %s", userID, info.FullMethod)
-//	}
-//	return handler(ctx, req)
-//}
+func hasPermission(userPermissions []string, requiredPermission string) bool {
+	for _, perm := range userPermissions {
+		if perm == requiredPermission {
+			return true
+		}
+	}
+	return false
+}

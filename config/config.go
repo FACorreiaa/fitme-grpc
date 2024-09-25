@@ -40,6 +40,7 @@ type Config struct {
 		}
 		Redis struct {
 			Host string `mapstructure:"host"`
+			Port string `mapstructure:"port"`
 			Pass string `mapstructure:"pass"`
 			DB   int    `mapstructure:"db"`
 		}
