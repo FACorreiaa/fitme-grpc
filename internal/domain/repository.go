@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 
+	pbc "github.com/FACorreiaa/fitme-protos/modules/calculator/generated"
 	pb "github.com/FACorreiaa/fitme-protos/modules/user/generated"
 )
 
@@ -19,4 +20,8 @@ type AuthRepository interface {
 	DeleteUser(ctx context.Context, req *pb.DeleteUserRequest) (*pb.DeleteUserResponse, error)
 	UpdateUser(ctx context.Context, req *pb.UpdateUserRequest) (*pb.UpdateUserResponse, error)
 	InsertUser(ctx context.Context, req *pb.InsertUserRequest) (*pb.InsertUserResponse, error)
+}
+
+type CalculatorRepository interface {
+	CreateUserMacro(ctx context.Context, req *pbc.CreateUserMacroRequest) (*pbc.CreateUserMacroResponse, error)
 }

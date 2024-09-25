@@ -272,7 +272,7 @@ func (a *AuthService) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest)
 func (a *AuthService) InsertUser(ctx context.Context, req *pb.InsertUserRequest) (*pb.InsertUserResponse, error) {
 	// Insert the new user
 	_, err := a.pgpool.Exec(ctx, `
-		INSERT INTO "users" (id, username, email, password, created_at, updated_at)
+		INSERT INTO "users" (id, username, email, password, role, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, NOW(), NOW())`,
 		req.User.Id, req.User.Username, req.User.Email, req.User.PasswordHash, req.User.IsAdmin)
 	if err != nil {
