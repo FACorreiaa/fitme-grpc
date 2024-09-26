@@ -3,7 +3,7 @@ module github.com/FACorreiaa/fitme-grpc
 go 1.23.1
 
 require (
-	github.com/FACorreiaa/fitme-protos v0.0.0-20240926170704-5763e8468188
+	github.com/FACorreiaa/fitme-protos v0.0.0-20240926213556-8f0f8b72a772
 	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.0.1

@@ -20,13 +20,12 @@ func InterceptorSession(sessionManager *auth.SessionManager) grpc.UnaryServerInt
 		handler grpc.UnaryHandler,
 	) (interface{}, error) {
 		unauthenticatedMethods := map[string]bool{
-			"/auth.Auth/Register":                         true,
-			"/auth.Auth/Login":                            true,
-			"/auth.Auth/GetAllUsers":                      true,
-			"CalculatorService/GetUsersMacros":            true,
-			"CalculatorService/GetUserMacros":             true,
-			"CalculatorService/GetUserMacrosAll":          true,
-			"calculator.CalculatorService/GetUsersMacros": true,
+			"/auth.Auth/Register":                  true,
+			"/auth.Auth/Login":                     true,
+			"/auth.Auth/GetAllUsers":               true,
+			"calculator.Calculator/GetUsersMacros": true,
+			"CalculatorService/GetUserMacros":      true,
+			"CalculatorService/GetUserMacrosAll":   true,
 		}
 		if unauthenticatedMethods[info.FullMethod] {
 			return handler(ctx, req)
@@ -51,16 +50,18 @@ func InterceptorSession(sessionManager *auth.SessionManager) grpc.UnaryServerInt
 			return nil, status.Error(codes.Unauthenticated, "invalid session token")
 		}
 
-		requiredPermission, ok := MethodPermissions[info.FullMethod]
-		if !ok {
-			return nil, status.Error(codes.PermissionDenied, "method not found")
-		}
+		// TODO handle permissions later
 
-		userPermissions := GetUserPermissions(userSession.Role)
-
-		if !hasPermission(userPermissions, requiredPermission) {
-			return nil, status.Error(codes.PermissionDenied, "user does not have permission to access this method")
-		}
+		//requiredPermission, ok := MethodPermissions[info.FullMethod]
+		//if !ok {
+		//	return nil, status.Error(codes.PermissionDenied, "method not found")
+		//}
+		//
+		//userPermissions := GetUserPermissions(userSession.Role)
+		//fmt.Printf("userPermissions: %+v\n", userPermissions)
+		//if !hasPermission(userPermissions, requiredPermission) {
+		//	return nil, status.Error(codes.PermissionDenied, "user does not have permission to access this method")
+		//}
 
 		// Pass user session in context
 		ctx = context.WithValue(ctx, "userSession", userSession)
