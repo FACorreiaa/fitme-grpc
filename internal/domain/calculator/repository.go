@@ -2,18 +2,22 @@ package calculator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	pbc "github.com/FACorreiaa/fitme-protos/modules/calculator/generated"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/FACorreiaa/fitme-grpc/internal/domain/auth"
 )
 
 type CalculatorRepository struct {
-	pbc.UnimplementedCalculatorServiceServer
+	pbc.UnimplementedCalculatorServer
 	pgpool         *pgxpool.Pool
 	redis          *redis.Client
 	sessionManager *auth.SessionManager
@@ -39,7 +43,7 @@ func (c *CalculatorRepository) GetUsersMacros(ctx context.Context, req *pbc.GetA
 
 	rows, err := c.pgpool.Query(ctx, query, req.UserId)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute query: %w", err)
+		return nil, status.Error(codes.Internal, "error querying db")
 	}
 	defer rows.Close()
 
@@ -55,7 +59,10 @@ func (c *CalculatorRepository) GetUsersMacros(ctx context.Context, req *pbc.GetA
 			&macro.Carbs, &macro.Bmr, &macro.Tdee, &macro.Goal, &createdAt,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to scan row: %w", err)
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, status.Error(codes.NotFound, "User macro not found")
+			}
+			return nil, status.Error(codes.Internal, "Internal server error")
 		}
 
 		// Convert the timestamp to string for the proto message

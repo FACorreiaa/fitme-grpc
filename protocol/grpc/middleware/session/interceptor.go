@@ -20,9 +20,13 @@ func InterceptorSession(sessionManager *auth.SessionManager) grpc.UnaryServerInt
 		handler grpc.UnaryHandler,
 	) (interface{}, error) {
 		unauthenticatedMethods := map[string]bool{
-			"/auth.Auth/Register":    true,
-			"/auth.Auth/Login":       true,
-			"/auth.Auth/GetAllUsers": true,
+			"/auth.Auth/Register":                         true,
+			"/auth.Auth/Login":                            true,
+			"/auth.Auth/GetAllUsers":                      true,
+			"CalculatorService/GetUsersMacros":            true,
+			"CalculatorService/GetUserMacros":             true,
+			"CalculatorService/GetUserMacrosAll":          true,
+			"calculator.CalculatorService/GetUsersMacros": true,
 		}
 		if unauthenticatedMethods[info.FullMethod] {
 			return handler(ctx, req)
