@@ -7,27 +7,27 @@ import (
 
 	"github.com/FACorreiaa/fitme-grpc/internal/domain"
 	"github.com/FACorreiaa/fitme-grpc/internal/domain/auth"
+	"github.com/FACorreiaa/fitme-grpc/internal/domain/calculator"
 )
 
 type ServiceContainer struct {
-	PgPool          *pgxpool.Pool
-	RedisClient     *redis.Client
-	Brokers         *container.Brokers
-	AuthService     *auth.AuthService
-	CustomerService *domain.CustomerService
+	Brokers           *container.Brokers
+	AuthService       *auth.AuthService
+	CustomerService   *domain.CustomerService
+	CalculatorService *calculator.CalculatorService
 }
 
 func NewServiceContainer(pgPool *pgxpool.Pool, redisClient *redis.Client, brokers *container.Brokers) *ServiceContainer {
 	sessionManager := auth.NewSessionManager(pgPool, redisClient)
 	authRepo := auth.NewAuthRepository(pgPool, redisClient, sessionManager)
+	calculatorRepo := calculator.NewCalculatorRepository(pgPool, redisClient, sessionManager)
 	authService := auth.NewAuthService(authRepo, pgPool, redisClient, sessionManager)
 	customerService := domain.NewCustomerService(pgPool, redisClient)
-
+	calculatorService := calculator.NewCalculatorService(calculatorRepo)
 	return &ServiceContainer{
-		PgPool:          pgPool,
-		RedisClient:     redisClient,
-		Brokers:         brokers,
-		AuthService:     authService,
-		CustomerService: customerService,
+		Brokers:           brokers,
+		AuthService:       authService,
+		CustomerService:   customerService,
+		CalculatorService: calculatorService,
 	}
 }

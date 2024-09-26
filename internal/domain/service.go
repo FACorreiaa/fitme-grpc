@@ -40,3 +40,7 @@ func (s *CustomerService) DeleteCustomer(ctx context.Context, req *pb.DeleteCust
 	// Implementation of DeleteCustomer
 	return &pb.NilRes{}, nil
 }
+
+// AuthService
+
+// Calculator service

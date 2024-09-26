@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"sync/atomic"
 
+	ccpb "github.com/FACorreiaa/fitme-protos/modules/calculator/generated"
 	cpb "github.com/FACorreiaa/fitme-protos/modules/customer/generated"
 	upb "github.com/FACorreiaa/fitme-protos/modules/user/generated"
 
@@ -67,7 +68,7 @@ func ServeGRPC(ctx context.Context, port string, container *ServiceContainer) er
 
 	cpb.RegisterCustomerServer(server, container.CustomerService)
 	upb.RegisterAuthServer(server, container.AuthService)
-
+	ccpb.RegisterCalculatorServiceServer(server, container.CalculatorService)
 	// Enable reflection to be able to use grpcui or insomnia without
 	// having to manually maintain .proto files
 
