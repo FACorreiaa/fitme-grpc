@@ -7,6 +7,7 @@ import (
 	"time"
 
 	pbc "github.com/FACorreiaa/fitme-protos/modules/calculator/generated"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
@@ -41,9 +42,18 @@ func (c *CalculatorRepository) GetUsersMacros(ctx context.Context, req *pbc.GetA
 				WHERE id = $1
 				ORDER BY created_at`
 
-	rows, err := c.pgpool.Query(ctx, query, req.UserId)
+	id, err := uuid.Parse(req.UserId)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "error querying db")
+		return nil, status.Errorf(codes.InvalidArgument,
+			"invalid UUID format for user ID: %v",
+			err.Error())
+	}
+	rows, err := c.pgpool.Query(ctx, query, id)
+	if err != nil {
+		if errors.Is(rows.Err(), pgx.ErrNoRows) {
+			return nil, status.Error(codes.NotFound, "No user macros found")
+		}
+		return nil, fmt.Errorf("rows iteration error: %w", rows.Err())
 	}
 	defer rows.Close()
 

@@ -6,6 +6,8 @@ import (
 
 	pb "github.com/FACorreiaa/fitme-protos/modules/calculator/generated"
 	"github.com/jackc/pgx/v5"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"errors"
 
@@ -94,9 +96,22 @@ func (s *CalculatorService) GetUsersMacros(ctx context.Context, req *pb.GetAllUs
 
 	response := &pb.GetAllUserMacrosResponse{}
 	for _, macro := range userMacrosResponse.UserMacros {
+		//id, err := uuid.Parse(macro.Id)
+		//if err != nil {
+		//	return nil, status.Errorf(codes.InvalidArgument,
+		//		"invalid UUID format for ID: %v",
+		//		err.Error())
+		//}
+		//
+		//userID, err := uuid.Parse(macro.UserId)
+		//if err != nil {
+		//	return nil, status.Errorf(codes.InvalidArgument,
+		//		"invalid UUID format for user ID: %v",
+		//		err.Error())
+		//}
 		response.UserMacros = append(response.UserMacros, &pb.UserMacroDistribution{
 			Id:                              macro.Id,
-			UserId:                          int32(macro.UserId),
+			UserId:                          macro.UserId,
 			Age:                             uint32(macro.Age),
 			Height:                          uint32(macro.Height),
 			Weight:                          uint32(macro.Weight),
@@ -128,9 +143,9 @@ func (s *CalculatorService) GetUserMacros(ctx context.Context, req *pb.GetUserMa
 	macro, err := s.repo.GetUserMacros(ctx, req)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, err
+			return nil, status.Error(codes.NotFound, "macro not found")
 		}
-		return nil, err
+		return nil, status.Errorf(codes.Internal, "failed to retrieve user macro: %v", err)
 	}
 
 	macros := macro.UserMacro
@@ -138,7 +153,7 @@ func (s *CalculatorService) GetUserMacros(ctx context.Context, req *pb.GetUserMa
 	response := &pb.GetUserMacroResponse{
 		UserMacro: &pb.UserMacroDistribution{
 			Id:                              macros.Id,
-			UserId:                          int32(macros.UserId),
+			UserId:                          macros.UserId,
 			Age:                             uint32(macros.Age),
 			Height:                          uint32(macros.Height),
 			Weight:                          uint32(macros.Weight),

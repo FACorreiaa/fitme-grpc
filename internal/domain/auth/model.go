@@ -4,9 +4,9 @@ type SessionManagerKey struct{}
 
 type UserSession struct {
 	Id       int
-	Username string   `json:"username"`
-	Email    string   `json:"email"`
-	Role     []string `json:"role"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Role     string `json:"role"`
 }
 
 type User struct {
