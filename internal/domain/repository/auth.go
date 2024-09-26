@@ -17,7 +17,7 @@ import (
 	"github.com/FACorreiaa/fitme-grpc/internal/domain/auth"
 )
 
-type AuthService struct {
+type AuthRepository struct {
 	pb.UnimplementedAuthServer
 	pgpool         *pgxpool.Pool
 	redis          *redis.Client
@@ -25,11 +25,11 @@ type AuthService struct {
 }
 
 // NewAuthService creates a new AuthService
-func NewAuthService(db *pgxpool.Pool, redis *redis.Client, sessionManager *auth.SessionManager) *AuthService {
-	return &AuthService{pgpool: db, redis: redis, sessionManager: sessionManager}
+func NewAuthRepository(db *pgxpool.Pool, redis *redis.Client, sessionManager *auth.SessionManager) *AuthRepository {
+	return &AuthRepository{pgpool: db, redis: redis, sessionManager: sessionManager}
 }
 
-func (a *AuthService) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
+func (a *AuthRepository) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
@@ -43,7 +43,7 @@ func (a *AuthService) Register(ctx context.Context, req *pb.RegisterRequest) (*p
 	return &pb.RegisterResponse{Message: "Registration successful"}, nil
 }
 
-func (a *AuthService) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResponse, error) {
+func (a *AuthRepository) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResponse, error) {
 	var passwordHash string
 	var email string
 	err := a.pgpool.QueryRow(ctx, `SELECT password, email FROM "users" WHERE username=$1`, req.Username).Scan(&passwordHash, &email)
@@ -71,7 +71,7 @@ func (a *AuthService) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Logi
 	return &pb.LoginResponse{Token: sessionID, Message: "Login successful!"}, nil
 }
 
-func (a *AuthService) Logout(ctx context.Context, req *pb.NilReq) (*pb.NilRes, error) {
+func (a *AuthRepository) Logout(ctx context.Context, req *pb.NilReq) (*pb.NilRes, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return nil, errors.New("unable to retrieve metadata")
@@ -109,7 +109,7 @@ func (a *AuthService) Logout(ctx context.Context, req *pb.NilReq) (*pb.NilRes, e
 	return &pb.NilRes{}, nil
 }
 
-func (a *AuthService) ChangePassword(ctx context.Context, req *pb.ChangePasswordRequest) (*pb.ChangePasswordResponse, error) {
+func (a *AuthRepository) ChangePassword(ctx context.Context, req *pb.ChangePasswordRequest) (*pb.ChangePasswordResponse, error) {
 	var passwordHash string
 	err := a.pgpool.QueryRow(ctx, `SELECT password FROM "users" WHERE username=$1`, req.Username).Scan(&passwordHash)
 	if err != nil {
@@ -134,7 +134,7 @@ func (a *AuthService) ChangePassword(ctx context.Context, req *pb.ChangePassword
 	return &pb.ChangePasswordResponse{Message: "Password changed successfully"}, nil
 }
 
-func (a *AuthService) ChangeEmail(ctx context.Context, req *pb.ChangeEmailRequest) (*pb.ChangeEmailResponse, error) {
+func (a *AuthRepository) ChangeEmail(ctx context.Context, req *pb.ChangeEmailRequest) (*pb.ChangeEmailResponse, error) {
 	var passwordHash string
 	err := a.pgpool.QueryRow(ctx, `SELECT password FROM "users" WHERE username=$1`, req.Username).Scan(&passwordHash)
 	if err != nil {
@@ -154,7 +154,7 @@ func (a *AuthService) ChangeEmail(ctx context.Context, req *pb.ChangeEmailReques
 	return &pb.ChangeEmailResponse{Message: "Email changed successfully"}, nil
 }
 
-func (a *AuthService) GetAllUsers(ctx context.Context) (*pb.GetAllUsersResponse, error) {
+func (a *AuthRepository) GetAllUsers(ctx context.Context) (*pb.GetAllUsersResponse, error) {
 	rows, err := a.pgpool.Query(ctx, `SELECT id, username, email, role, created_at, updated_at FROM "users"`)
 	if err != nil {
 		return nil, err
@@ -207,7 +207,7 @@ func (a *AuthService) GetAllUsers(ctx context.Context) (*pb.GetAllUsersResponse,
 	return &pb.GetAllUsersResponse{Users: users}, nil
 }
 
-func (a *AuthService) GetUserByID(ctx context.Context, req *pb.GetUserByIDRequest) (*pb.GetUserByIDResponse, error) {
+func (a *AuthRepository) GetUserByID(ctx context.Context, req *pb.GetUserByIDRequest) (*pb.GetUserByIDResponse, error) {
 	var u pb.User
 	var createdAt time.Time
 	var updatedAt *time.Time
@@ -233,7 +233,7 @@ func (a *AuthService) GetUserByID(ctx context.Context, req *pb.GetUserByIDReques
 	return &pb.GetUserByIDResponse{User: &u}, nil
 }
 
-func (a *AuthService) DeleteUser(ctx context.Context, req *pb.DeleteUserRequest) (*pb.DeleteUserResponse, error) {
+func (a *AuthRepository) DeleteUser(ctx context.Context, req *pb.DeleteUserRequest) (*pb.DeleteUserResponse, error) {
 	// Execute the delete query
 	commandTag, err := a.pgpool.Exec(ctx, `DELETE FROM "users" WHERE user = $1`, req.Id)
 	if err != nil {
@@ -248,7 +248,7 @@ func (a *AuthService) DeleteUser(ctx context.Context, req *pb.DeleteUserRequest)
 	return &pb.DeleteUserResponse{Message: "user deleted successfully"}, nil
 }
 
-func (a *AuthService) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest) (*pb.UpdateUserResponse, error) {
+func (a *AuthRepository) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest) (*pb.UpdateUserResponse, error) {
 	// Execute the update query
 	commandTag, err := a.pgpool.Exec(ctx, `
 		UPDATE "users"
@@ -269,7 +269,7 @@ func (a *AuthService) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest)
 
 // InsertUser change this later
 
-func (a *AuthService) InsertUser(ctx context.Context, req *pb.InsertUserRequest) (*pb.InsertUserResponse, error) {
+func (a *AuthRepository) InsertUser(ctx context.Context, req *pb.InsertUserRequest) (*pb.InsertUserResponse, error) {
 	// Insert the new user
 	_, err := a.pgpool.Exec(ctx, `
 		INSERT INTO "users" (id, username, email, password, role, created_at, updated_at)
