@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -28,6 +29,7 @@ func (s *SessionManager) GenerateSession(data UserSession) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	fmt.Printf("sessionId %s: \n", sessionId)
 	return sessionId, nil
 }
 

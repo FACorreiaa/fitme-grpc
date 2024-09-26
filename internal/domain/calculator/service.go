@@ -2,6 +2,7 @@ package calculator
 
 import (
 	"context"
+	"fmt"
 
 	pb "github.com/FACorreiaa/fitme-protos/modules/calculator/generated"
 	"github.com/jackc/pgx/v5"
@@ -12,8 +13,8 @@ import (
 )
 
 type CalculatorService struct {
-	repo                                    domain.CalculatorRepository
-	pb.UnimplementedCalculatorServiceServer // Required for forward compatibility
+	pb.UnimplementedCalculatorServer // Required for forward compatibilit
+	repo                             domain.CalculatorRepository
 }
 
 func NewCalculatorService(repo domain.CalculatorRepository) *CalculatorService {
@@ -80,49 +81,49 @@ func NewCalculatorService(repo domain.CalculatorRepository) *CalculatorService {
 //
 //		return response, nil
 //	}
-//
-// // GetAllUserMacros implements the GetAllUserMacros gRPC method
-//
-//	func (s *CalculatorService) GetAllUserMacros(ctx context.Context, req *pb.GetAllUserMacrosRequest) (*pb.GetAllUserMacrosResponse, error) {
-//		userMacros, err := s.repo(ctx, req.UserId)
-//		if err != nil {
-//			if errors.Is(err, db.ErrObjectNotFound{}) {
-//				return &pb.GetAllUserMacrosResponse{}, nil
-//			}
-//			return nil, err
-//		}
-//
-//		response := &pb.GetAllUserMacrosResponse{}
-//		for _, macro := range userMacros {
-//			response.UserMacros = append(response.UserMacros, &pb.UserMacroDistribution{
-//				Id:                              macro.ID,
-//				UserId:                          int32(macro.UserID),
-//				Age:                             uint32(macro.Age),
-//				Height:                          uint32(macro.Height),
-//				Weight:                          uint32(macro.Weight),
-//				Gender:                          macro.Gender,
-//				System:                          macro.System,
-//				Activity:                        macro.Activity,
-//				ActivityDescription:             macro.ActivityDescription,
-//				Objective:                       macro.Objective,
-//				ObjectiveDescription:            macro.ObjectiveDescription,
-//				CaloriesDistribution:            macro.CaloriesDistribution,
-//				CaloriesDistributionDescription: macro.CaloriesDistributionDescription,
-//				Protein:                         uint32(macro.Protein),
-//				Fats:                            uint32(macro.Fats),
-//				Carbs:                           uint32(macro.Carbs),
-//				Bmr:                             uint32(macro.BMR),
-//				Tdee:                            uint32(macro.TDEE),
-//				Goal:                            uint32(macro.Goal),
-//				CreatedAt:                       macro.CreatedAt.String(),
-//			})
-//		}
-//
-//		return response, nil
-//	}
-//
 
-// GetUserMacro implements the GetUserMacro gRPC method
+// GetUsersMacros implements the GetAllUserMacros gRPC method
+func (s *CalculatorService) GetUsersMacros(ctx context.Context, req *pb.GetAllUserMacrosRequest) (*pb.GetAllUserMacrosResponse, error) {
+	userMacrosResponse, err := s.repo.GetUsersMacros(ctx, req)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return &pb.GetAllUserMacrosResponse{}, fmt.Errorf("Error ")
+		}
+		return nil, err
+	}
+
+	response := &pb.GetAllUserMacrosResponse{}
+	for _, macro := range userMacrosResponse.UserMacros {
+		response.UserMacros = append(response.UserMacros, &pb.UserMacroDistribution{
+			Id:                              macro.Id,
+			UserId:                          int32(macro.UserId),
+			Age:                             uint32(macro.Age),
+			Height:                          uint32(macro.Height),
+			Weight:                          uint32(macro.Weight),
+			Gender:                          macro.Gender,
+			System:                          macro.System,
+			Activity:                        macro.Activity,
+			ActivityDescription:             macro.ActivityDescription,
+			Objective:                       macro.Objective,
+			ObjectiveDescription:            macro.ObjectiveDescription,
+			CaloriesDistribution:            macro.CaloriesDistribution,
+			CaloriesDistributionDescription: macro.CaloriesDistributionDescription,
+			Protein:                         uint32(macro.Protein),
+			Fats:                            uint32(macro.Fats),
+			Carbs:                           uint32(macro.Carbs),
+			Bmr:                             uint32(macro.Bmr),
+			Tdee:                            uint32(macro.Tdee),
+			Goal:                            uint32(macro.Goal),
+			CreatedAt:                       macro.CreatedAt,
+		})
+	}
+
+	return &pb.GetAllUserMacrosResponse{
+		UserMacros: response.UserMacros,
+	}, nil
+}
+
+// GetUserMacros implements the GetUserMacro gRPC method
 func (s *CalculatorService) GetUserMacros(ctx context.Context, req *pb.GetUserMacroRequest) (*pb.GetUserMacroResponse, error) {
 	macro, err := s.repo.GetUserMacros(ctx, req)
 	if err != nil {
@@ -162,4 +163,12 @@ func (s *CalculatorService) GetUserMacros(ctx context.Context, req *pb.GetUserMa
 	return &pb.GetUserMacroResponse{
 		UserMacro: response.UserMacro,
 	}, nil
+}
+
+func validateUserMacro(macro *pb.UserMacroDistribution) error {
+	if macro.Age < minAge || macro.Age > maxAge {
+		return errors.New("invalid age")
+	}
+	// Add other validation checks
+	return nil
 }

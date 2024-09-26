@@ -13,7 +13,7 @@ var MethodPermissions = map[string]string{
 	"/auth.Auth/ManageClients":  "manage_clients",
 	"/auth.Auth/ViewWorkouts":   "view_workouts",
 	"/auth.Auth/AdminDashboard": "admin_dashboard",
-	"/auth.Auth/GetAllUsers":    "view_all_users",
+	//"/auth.Auth/GetAllUsers":    "view_all_users",
 }
 
 func GetUserPermissions(roles []string) []string {
