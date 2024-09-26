@@ -9,12 +9,11 @@ var rolePermissions = map[string][]string{
 
 // MethodPermissions Define required permissions for each gRPC method
 var MethodPermissions = map[string]string{
-	"/auth.Auth/GetUserInfo":              "view_profile",
-	"/auth.Auth/ManageClients":            "manage_clients",
-	"/auth.Auth/ViewWorkouts":             "view_workouts",
-	"/auth.Auth/AdminDashboard":           "admin_dashboard",
-	"/auth.Auth/GetAllUsers":              "view_all_users",
-	"/CalculatorService/GetAllUserMacros": "calculator_service",
+	"/auth.Auth/GetUserInfo":    "view_profile",
+	"/auth.Auth/ManageClients":  "manage_clients",
+	"/auth.Auth/ViewWorkouts":   "view_workouts",
+	"/auth.Auth/AdminDashboard": "admin_dashboard",
+	"/auth.Auth/GetAllUsers":    "view_all_users",
 }
 
 func GetUserPermissions(roles []string) []string {

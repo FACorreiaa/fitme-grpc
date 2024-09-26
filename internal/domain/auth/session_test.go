@@ -1,5 +1,7 @@
 package auth
 
+import "errors"
+
 // MockSessionManager is a mock implementation of the auth.SessionManager interface for testing.
 type MockSessionManager struct{}
 
