@@ -21,7 +21,7 @@ type ServiceContainer struct {
 
 func NewServiceContainer(pgPool *pgxpool.Pool, redisClient *redis.Client, brokers *container.Brokers) *ServiceContainer {
 	sessionManager := auth.NewSessionManager(pgPool, redisClient)
-	authRepo := repository.NewAuthService(pgPool, redisClient, sessionManager)
+	authRepo := repository.NewAuthRepository(pgPool, redisClient, sessionManager)
 	authService := service.NewAuthService(authRepo, pgPool, redisClient, sessionManager)
 	customerService := domain.NewCustomerService(pgPool, redisClient)
 
