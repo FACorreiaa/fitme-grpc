@@ -110,5 +110,36 @@ func (c *CalculatorRepository) GetUserMacros(ctx context.Context, req *pbc.GetUs
 }
 
 func (c *CalculatorRepository) InsertDietGoals(ctx context.Context, req *pbc.UserMacroDistribution) (*pbc.UserMacroDistribution, error) {
-	return nil, nil
+	query := `INSERT INTO user_macro_distribution (user_id, age, height, weight,
+                                     gender, system, activity, activity_description, objective,
+									objective_description, calories_distribution, calories_distribution_description,
+                                     protein, fats, carbs, bmr, tdee, goal, created_at)
+				VALUES (:user_id, :age, :height, :weight, :gender, :system, :activity,
+				        :activity_description, :objective, :objective_description, :calories_distribution,
+				        :calories_distribution_description, :protein, :fats, :carbs,
+				        :bmr, :tdee, :goal, :created_at)
+				RETURNING *`
+
+	rows, err := c.pgpool.Query(ctx, query,
+		req.UserId, req.Age, req.Height, req.Weight, req.Gender, req.System, req.Activity,
+		req.ActivityDescription, req.Objective, req.ObjectiveDescription, req.CaloriesDistribution,
+		req.CaloriesDistributionDescription, req.Protein, req.Fats, req.Carbs, req.Bmr, req.Tdee,
+		req.Goal, req.CreatedAt,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute query: %w", err)
+	}
+	defer rows.Close()
+
+	accounts, err := pgx.CollectRows(rows, pgx.RowToStructByName[pbc.UserMacroDistribution])
+	if err != nil {
+		return nil, fmt.Errorf("failed collecting rows: %w", err)
+	}
+
+	if len(accounts) == 0 {
+		return nil, fmt.Errorf("no rows returned")
+	}
+
+	return &accounts[0], nil
 }
