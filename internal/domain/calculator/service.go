@@ -3,6 +3,8 @@ package calculator
 import (
 	"context"
 	"fmt"
+	"math"
+	"time"
 
 	pb "github.com/FACorreiaa/fitme-protos/modules/calculator/generated"
 	"github.com/jackc/pgx/v5"
@@ -25,64 +27,308 @@ func NewCalculatorService(repo domain.CalculatorRepository) *CalculatorService {
 	}
 }
 
+func mapActivity(ctx context.Context, activity Activity) (*ActivityList, error) {
+	// Check for context cancellation
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err() // Return if context is done
+	default:
+	}
+
+	description, valid := activityDescriptionMap[activity]
+	if !valid {
+		return nil, errors.New("invalid activity")
+	}
+	return &ActivityList{
+		Activity:    activity,
+		Description: description,
+	}, nil
+}
+
+func mapActivityValues(ctx context.Context, activity Activity) (ActivityValues, error) {
+	// Check for context cancellation
+	select {
+	case <-ctx.Done():
+		return 0, ctx.Err() // Return if context is done
+	default:
+	}
+	value, valid := activityValuesMap[activity]
+	if !valid {
+		return 0, errors.New("invalid activity value")
+	}
+	return value, nil
+}
+
+func mapObjective(ctx context.Context, objective Objective) (*ObjectiveList, error) {
+	// Check for context cancellation
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err() // Return if context is done
+	default:
+	}
+
+	description, valid := objectiveDescriptionMap[objective]
+	if !valid {
+		return nil, errors.New("invalid objective")
+	}
+	return &ObjectiveList{
+		Objective:   objective,
+		Description: description,
+	}, nil
+}
+
+func mapDistribution(ctx context.Context, distribution CaloriesDistribution) (*CaloriesInfo, error) {
+	// Check for context cancellation
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err() // Return if context is done
+	default:
+	}
+
+	description, valid := carbsDistribution[distribution]
+	if !valid {
+		return nil, errors.New("invalid distribution")
+	}
+	return &CaloriesInfo{
+		CaloriesDistribution:            distribution,
+		CaloriesDistributionDescription: description,
+	}, nil
+}
+
+func validateAge(age uint8) (uint8, error) {
+	if age <= minAge || age >= maxAge {
+		return 0, errors.New("invalid age")
+	}
+	return age, nil
+}
+
+func validateWeight(weight uint16) (uint16, error) {
+	if weight <= minWeight || weight > maxWeight {
+		return 0, errors.New("invalid weight")
+	}
+
+	return weight, nil
+}
+
+func validateHeight(height uint8) (uint8, error) {
+	if height <= minHeight || height > maxHeight {
+		return 0, errors.New("invalid height")
+	}
+
+	return height, nil
+}
+func convertWeight(weight uint16, system System) float64 {
+	if system == metric {
+		return float64(weight)
+	}
+	return float64(weight) / 0.453592 // 1 lb = 0.453592 kg
+}
+func convertHeight(height uint8, system System) float64 {
+	if system == metric {
+		return float64(height)
+	}
+	return float64(height) / 2.54 // 1 in = 2.54 cm
+}
+func calculateBMR(userData UserData, system System) float64 {
+	var ageFactor float64
+	weight := convertWeight(userData.Weight, system)
+	height := convertHeight(userData.Height, system)
+	if userData.Gender == m {
+		ageFactor = maleAgeFactor
+	} else {
+		ageFactor = femaleAgeFactor
+	}
+
+	if system == metric {
+		return math.Round((10*weight + 6.25*height - 5.0*(float64(userData.Age))) + ageFactor)
+	} else {
+		return math.Round((4.536*weight + 15.88*height - 5.0*(float64(userData.Age))) + ageFactor)
+	}
+}
+
+func calculateTDEE(bmr float64, activityValue ActivityValues) float64 {
+	return math.Round(bmr * float64(activityValue))
+}
+
+func calculateGoals(tdee float64) Goals {
+	var fatLoss = tdee - caloricDeficit
+	var bulk = tdee + caloricPlus
+	return Goals{
+		Cutting:     uint16(fatLoss),
+		Maintenance: uint16(tdee),
+		Bulking:     uint16(bulk),
+	}
+}
+
+func getGoal(tdeeValue float64, objective Objective) uint16 {
+	goals := calculateGoals(tdeeValue)
+	mapGoals := make(map[Objective]uint16)
+	mapGoals[maintenance] = goals.Maintenance
+	mapGoals[cutting] = goals.Cutting
+	mapGoals[bulking] = goals.Bulking
+	return mapGoals[objective]
+}
+
+func calculateMacroNutrients(calorieGoal float64, distribution CaloriesDistribution) Macros {
+	if ratios, ok := macroRatios[distribution]; ok {
+		protein := calculateMacroDistribution(ratios.ProteinRatio, calorieGoal, proteinGramValue)
+		fats := calculateMacroDistribution(ratios.FatRatio, calorieGoal, fatGramValue)
+		carbs := calculateMacroDistribution(ratios.CarbRatio, calorieGoal, carbGramValue)
+
+		return Macros{
+			Protein: uint16(protein),
+			Fats:    uint16(fats),
+			Carbs:   uint16(carbs),
+		}
+	}
+
+	return Macros{}
+}
+
+func calculateMacroDistribution(calorieFactor float64, calorieGoal float64, caloriesPerGram int) float64 {
+	return math.Round((calorieFactor * calorieGoal) / float64(caloriesPerGram))
+}
+
+func calculateUserPersonalMacros(ctx context.Context, params UserParams) (UserInfo, error) {
+	userData, err := validateUserInput(ctx, params)
+	if err != nil {
+		return UserInfo{}, err
+	}
+
+	bmr := calculateBMR(userData, System(params.System))
+	a, err := mapActivity(ctx, Activity(params.Activity))
+	if err != nil {
+		return UserInfo{}, err
+	}
+
+	o, err := mapObjective(ctx, Objective(params.Objective))
+	if err != nil {
+		return UserInfo{}, err
+	}
+
+	v, err := mapActivityValues(ctx, Activity(params.Activity))
+	if err != nil {
+		return UserInfo{}, err
+	}
+
+	d, err := mapDistribution(ctx, CaloriesDistribution(params.CaloriesDist))
+	if err != nil {
+		return UserInfo{}, err
+	}
+
+	tdee := calculateTDEE(bmr, v)
+	goal := getGoal(tdee, Objective(params.Objective))
+
+	macros := calculateMacroNutrients(tdee, CaloriesDistribution(params.CaloriesDist))
+	return UserInfo{
+		System: params.System,
+		UserData: UserData{
+			Age:    userData.Age,
+			Height: userData.Height,
+			Weight: userData.Weight,
+			Gender: userData.Gender,
+		},
+		ActivityInfo: ActivityInfo{
+			Activity:    a.Activity,
+			Description: a.Description,
+		},
+		ObjectiveInfo: ObjectiveInfo{
+			Objective:   o.Objective,
+			Description: o.Description,
+		},
+		BMR:  uint16(bmr),
+		TDEE: uint16(tdee),
+		MacrosInfo: MacrosInfo{
+			CaloriesInfo: CaloriesInfo{
+				CaloriesDistribution:            d.CaloriesDistribution,
+				CaloriesDistributionDescription: d.CaloriesDistributionDescription,
+			},
+			Macros: macros,
+		},
+		Goal: goal,
+	}, nil
+}
+
 // CreateUserMacro implements the CreateUserMacro gRPC method
-//
-//	func (s *CalculatorService) CreateUserMacro(ctx context.Context, req *pb.CreateUserMacroRequest) (*pb.CreateUserMacroResponse, error) {
-//		userMacro := UserMacroDistribution{
-//			ID:                              req.UserMacro.Id,
-//			UserID:                          int(req.UserMacro.UserId),
-//			Age:                             uint8(req.UserMacro.Age),
-//			Height:                          uint8(req.UserMacro.Height),
-//			Weight:                          uint16(req.UserMacro.Weight),
-//			Gender:                          req.UserMacro.Gender,
-//			System:                          req.UserMacro.System,
-//			Activity:                        req.UserMacro.Activity,
-//			ActivityDescription:             req.UserMacro.ActivityDescription,
-//			Objective:                       req.UserMacro.Objective,
-//			ObjectiveDescription:            req.UserMacro.ObjectiveDescription,
-//			CaloriesDistribution:            req.UserMacro.CaloriesDistribution,
-//			CaloriesDistributionDescription: req.UserMacro.CaloriesDistributionDescription,
-//			Protein:                         uint16(req.UserMacro.Protein),
-//			Fats:                            uint16(req.UserMacro.Fats),
-//			Carbs:                           uint16(req.UserMacro.Carbs),
-//			BMR:                             uint16(req.UserMacro.Bmr),
-//			TDEE:                            uint16(req.UserMacro.Tdee),
-//			Goal:                            uint16(req.UserMacro.Goal),
-//			CreatedAt:                       time.Now(),
-//		}
-//
-//		diet, err := s.repo.InsertDietGoals(userMacro)
-//		if err != nil {
-//			return nil, err
-//		}
-//
-//		response := &pb.CreateUserMacroResponse{
-//			UserMacro: &pb.UserMacroDistribution{
-//				Id:                              diet.ID,
-//				UserId:                          int32(diet.UserID),
-//				Age:                             uint32(diet.Age),
-//				Height:                          uint32(diet.Height),
-//				Weight:                          uint32(diet.Weight),
-//				Gender:                          diet.Gender,
-//				System:                          diet.System,
-//				Activity:                        diet.Activity,
-//				ActivityDescription:             diet.ActivityDescription,
-//				Objective:                       diet.Objective,
-//				ObjectiveDescription:            diet.ObjectiveDescription,
-//				CaloriesDistribution:            diet.CaloriesDistribution,
-//				CaloriesDistributionDescription: diet.CaloriesDistributionDescription,
-//				Protein:                         uint32(diet.Protein),
-//				Fats:                            uint32(diet.Fats),
-//				Carbs:                           uint32(diet.Carbs),
-//				Bmr:                             uint32(diet.BMR),
-//				Tdee:                            uint32(diet.TDEE),
-//				Goal:                            uint32(diet.Goal),
-//				CreatedAt:                       diet.CreatedAt.String(),
-//			},
-//		}
-//
-//		return response, nil
-//	}
+func validateUserInput(ctx context.Context, params UserParams) (UserData, error) {
+	// Check for context cancellation
+	select {
+	case <-ctx.Done():
+		return UserData{}, ctx.Err() // Return if context is done
+	default:
+		// Continue with validation
+		validAge, err := validateAge(params.Age)
+		if err != nil {
+			return UserData{}, err
+		}
+		validHeight, err := validateHeight(params.Height)
+		if err != nil {
+			return UserData{}, err
+		}
+		validWeight, err := validateWeight(params.Weight)
+		if err != nil {
+			return UserData{}, err
+		}
+		userInputData := UserData{
+			Age:    validAge,
+			Height: validHeight,
+			Weight: validWeight,
+			Gender: params.Gender,
+		}
+		return userInputData, nil
+	}
+}
+
+func (s *CalculatorService) CreateUserMacro(ctx context.Context, req *pb.CreateUserMacroRequest) (*pb.CreateUserMacroResponse, error) {
+	// Extracting request data
+	params := UserParams{
+		Age:      uint8(req.UserMacro.Age),
+		Height:   uint8(req.UserMacro.Height),
+		Weight:   uint16(req.UserMacro.Weight),
+		Gender:   req.UserMacro.Gender,
+		System:   req.UserMacro.System,
+		Activity: req.UserMacro.Activity,
+		//ActivityDesc:     req.UserMacro.ActivityDescription,
+		Objective: req.UserMacro.Objective,
+		//ObjectiveDesc:    req.UserMacro.ObjectiveDescription,
+		CaloriesDist: req.UserMacro.CaloriesDistribution,
+		//CaloriesDistDesc: req.UserMacro.CaloriesDistributionDescription,
+	}
+
+	// Perform the offline calculations
+	userInfo, err := calculateUserPersonalMacros(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	// Creating response
+	response := &pb.CreateUserMacroResponse{
+		UserMacro: &pb.UserMacroDistribution{
+			Id:                              req.UserMacro.Id, // Assuming ID is already provided
+			UserId:                          req.UserMacro.UserId,
+			Age:                             uint32(userInfo.UserData.Age),
+			Height:                          uint32(userInfo.UserData.Height),
+			Weight:                          uint32(userInfo.UserData.Weight),
+			Gender:                          req.UserMacro.Gender,
+			System:                          userInfo.System,
+			Activity:                        string(userInfo.ActivityInfo.Activity),
+			ActivityDescription:             string(userInfo.ActivityInfo.Description),
+			Objective:                       string(userInfo.ObjectiveInfo.Objective),
+			ObjectiveDescription:            string(userInfo.ObjectiveInfo.Description),
+			CaloriesDistribution:            string(userInfo.MacrosInfo.CaloriesInfo.CaloriesDistribution),
+			CaloriesDistributionDescription: string(userInfo.MacrosInfo.CaloriesInfo.CaloriesDistributionDescription),
+			Protein:                         uint32(userInfo.MacrosInfo.Macros.Protein),
+			Fats:                            uint32(userInfo.MacrosInfo.Macros.Fats),
+			Carbs:                           uint32(userInfo.MacrosInfo.Macros.Carbs),
+			Bmr:                             uint32(userInfo.BMR),
+			Tdee:                            uint32(userInfo.TDEE),
+			Goal:                            uint32(userInfo.Goal),
+			CreatedAt:                       time.Now().Format(time.RFC3339), // Timestamp for creation
+		},
+	}
+
+	return response, nil
+}
 
 // GetUsersMacros implements the GetAllUserMacros gRPC method
 func (s *CalculatorService) GetUsersMacros(ctx context.Context, req *pb.GetAllUserMacrosRequest) (*pb.GetAllUserMacrosResponse, error) {
@@ -186,4 +432,54 @@ func validateUserMacro(macro *pb.UserMacroDistribution) error {
 	}
 	// Add other validation checks
 	return nil
+}
+
+func (s *CalculatorService) CreateOfflineUserMacro(ctx context.Context, req *pb.CreateOfflineUserMacroRequest) (*pb.CreateOfflineUserMacroResponse, error) {
+	// Extracting request data
+	if req.UserMacro == nil {
+		return nil, status.Error(codes.InvalidArgument, "user macro cannot be nil")
+	}
+
+	params := UserParams{
+		Age:          uint8(req.UserMacro.Age),
+		Height:       uint8(req.UserMacro.Height),
+		Weight:       uint16(req.UserMacro.Weight),
+		Gender:       req.UserMacro.Gender,
+		System:       req.UserMacro.System,
+		Activity:     req.UserMacro.Activity,
+		Objective:    req.UserMacro.Objective,
+		CaloriesDist: req.UserMacro.CaloriesDistribution,
+	}
+
+	// Perform the offline calculations
+	userInfo, err := calculateUserPersonalMacros(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	// Creating response
+	response := &pb.CreateOfflineUserMacroResponse{
+		UserMacro: &pb.OfflineUserMacroDistribution{
+			Age:                             uint32(userInfo.UserData.Age),
+			Height:                          uint32(userInfo.UserData.Height),
+			Weight:                          uint32(userInfo.UserData.Weight),
+			Gender:                          req.UserMacro.Gender,
+			System:                          userInfo.System,
+			Activity:                        string(userInfo.ActivityInfo.Activity),
+			ActivityDescription:             string(userInfo.ActivityInfo.Description),
+			Objective:                       string(userInfo.ObjectiveInfo.Objective),
+			ObjectiveDescription:            string(userInfo.ObjectiveInfo.Description),
+			CaloriesDistribution:            string(userInfo.MacrosInfo.CaloriesInfo.CaloriesDistribution),
+			CaloriesDistributionDescription: string(userInfo.MacrosInfo.CaloriesInfo.CaloriesDistributionDescription),
+			Protein:                         uint32(userInfo.MacrosInfo.Macros.Protein),
+			Fats:                            uint32(userInfo.MacrosInfo.Macros.Fats),
+			Carbs:                           uint32(userInfo.MacrosInfo.Macros.Carbs),
+			Bmr:                             uint32(userInfo.BMR),
+			Tdee:                            uint32(userInfo.TDEE),
+			Goal:                            uint32(userInfo.Goal),
+			CreatedAt:                       time.Now().Format(time.RFC3339), // Timestamp for creation
+		},
+	}
+
+	return response, nil
 }
