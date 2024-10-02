@@ -83,13 +83,13 @@ CREATE TABLE "water_intake_user" (
 
 CREATE TABLE IF NOT EXISTS user_macro_distribution (
                                                        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                                                       user_id INTEGER NOT NULL,
-                                                       age BIGINT NOT NULL,
-                                                       height DOUBLE PRECISION NOT NULL,
-                                                       weight DOUBLE PRECISION NOT NULL,
-                                                       gender VARCHAR NOT NULL,
-                                                       system VARCHAR NOT NULL,
-                                                       activity VARCHAR NOT NULL,
+                                                       user_id UUID NOT NULL,
+                                                       age INTEGER NOT NULL,
+                                                       height FLOAT NOT NULL,
+                                                       weight FLOAT NOT NULL,
+                                                       gender VARCHAR(10) NOT NULL,
+                                                       system VARCHAR(10) NOT NULL,
+                                                       activity VARCHAR(20) NOT NULL,
                                                        activity_description VARCHAR NOT NULL,
                                                        objective VARCHAR NOT NULL,
                                                        objective_description VARCHAR NOT NULL,
@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS user_macro_distribution (
                                                        bmr INTEGER NOT NULL,
                                                        tdee INTEGER NOT NULL,
                                                        goal INTEGER NOT NULL,
-                                                       created_at TIMESTAMP NOT NULL
+                                                       created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 
