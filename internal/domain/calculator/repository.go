@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	pbc "github.com/FACorreiaa/fitme-protos/modules/calculator/generated"
@@ -26,10 +27,6 @@ type CalculatorRepository struct {
 
 func NewCalculatorRepository(db *pgxpool.Pool, redis *redis.Client, sessionManager *auth.SessionManager) *CalculatorRepository {
 	return &CalculatorRepository{pgpool: db, redis: redis, sessionManager: sessionManager}
-}
-
-func (c *CalculatorRepository) CreateUserMacro(ctx context.Context, req *pbc.CreateUserMacroRequest) (*pbc.CreateUserMacroResponse, error) {
-	return nil, nil
 }
 
 func (c *CalculatorRepository) GetUsersMacros(ctx context.Context, req *pbc.GetAllUserMacrosRequest) (*pbc.GetAllUserMacrosResponse, error) {
@@ -109,16 +106,13 @@ func (c *CalculatorRepository) GetUserMacros(ctx context.Context, req *pbc.GetUs
 	return &pbc.GetUserMacroResponse{UserMacro: macroDistribution}, nil
 }
 
-func (c *CalculatorRepository) InsertDietGoals(ctx context.Context, req *pbc.UserMacroDistribution) (*pbc.UserMacroDistribution, error) {
+func (c *CalculatorRepository) CreateUserMacro(ctx context.Context, req *pbc.UserMacroDistribution) (*pbc.UserMacroDistribution, error) {
 	query := `INSERT INTO user_macro_distribution (user_id, age, height, weight,
-                                     gender, system, activity, activity_description, objective,
-									objective_description, calories_distribution, calories_distribution_description,
-                                     protein, fats, carbs, bmr, tdee, goal, created_at)
-				VALUES (:user_id, :age, :height, :weight, :gender, :system, :activity,
-				        :activity_description, :objective, :objective_description, :calories_distribution,
-				        :calories_distribution_description, :protein, :fats, :carbs,
-				        :bmr, :tdee, :goal, :created_at)
-				RETURNING *`
+                                    gender, system, activity, activity_description, objective,
+                                    objective_description, calories_distribution, calories_distribution_description,
+                                    protein, fats, carbs, bmr, tdee, goal, created_at)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+              RETURNING *`
 
 	rows, err := c.pgpool.Query(ctx, query,
 		req.UserId, req.Age, req.Height, req.Weight, req.Gender, req.System, req.Activity,
@@ -128,6 +122,7 @@ func (c *CalculatorRepository) InsertDietGoals(ctx context.Context, req *pbc.Use
 	)
 
 	if err != nil {
+		log.Printf("Query execution error: %v", err) // Log detailed error
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
 	defer rows.Close()

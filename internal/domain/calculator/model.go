@@ -37,8 +37,8 @@ type UserInfo struct {
 }
 
 type UserParams struct {
-	Age          uint8  `json:"age" db:"age"`
-	Height       uint8  `json:"height" db:"height"`
+	Age          uint16 `json:"age" db:"age"`
+	Height       uint16 `json:"height" db:"height"`
 	Weight       uint16 `json:"weight" db:"weight"`
 	Gender       string `json:"gender" db:"gender"`
 	System       string `json:"system" db:"system"`
@@ -68,10 +68,10 @@ type SystemList struct {
 }
 
 type UserData struct {
-	Age    uint8  `json:"age"`
-	Height uint8  `json:"height"`
-	Weight uint16 `json:"weight"`
-	Gender string `json:"gender"`
+	Age    uint16  `json:"age"`
+	Height uint16  `json:"height"`
+	Weight float32 `json:"weight"`
+	Gender string  `json:"gender"`
 }
 
 type ActivityInfo struct {

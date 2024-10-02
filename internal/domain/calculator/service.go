@@ -95,35 +95,43 @@ func mapDistribution(ctx context.Context, distribution CaloriesDistribution) (*C
 	}, nil
 }
 
-func validateAge(age uint8) (uint8, error) {
-	if age <= minAge || age >= maxAge {
-		return 0, errors.New("invalid age")
+func ValidateValues(value, minValue, maxValue uint16, fieldName string) (uint16, error) {
+	if value <= minValue || value >= maxValue {
+		return 0, fmt.Errorf("invalid %s: %d (must be between %d and %d)", fieldName, value, minValue, maxValue)
 	}
-	return age, nil
+	return value, nil
 }
 
-func validateWeight(weight uint16) (uint16, error) {
-	if weight <= minWeight || weight > maxWeight {
-		return 0, errors.New("invalid weight")
+func ValidateWeight(value, minValue, maxValue float32, fieldName string) (float32, error) {
+	if value <= minValue || value >= maxValue {
+		return 0, fmt.Errorf("invalid %s: %f (must be between %f and %f)", fieldName, value, minValue, maxValue)
 	}
-
-	return weight, nil
+	return value, nil
 }
 
-func validateHeight(height uint8) (uint8, error) {
-	if height <= minHeight || height > maxHeight {
-		return 0, errors.New("invalid height")
-	}
+//func validateWeight(weight uint16) (uint16, error) {
+//	if weight <= minWeight || weight > maxWeight {
+//		return 0, errors.New("invalid weight")
+//	}
+//
+//	return weight, nil
+//}
+//
+//func validateHeight(height uint8) (uint8, error) {
+//	if height <= minHeight || height > maxHeight {
+//		return 0, errors.New("invalid height")
+//	}
+//
+//	return height, nil
+//}
 
-	return height, nil
-}
-func convertWeight(weight uint16, system System) float64 {
+func convertWeight(weight float32, system System) float64 {
 	if system == metric {
 		return float64(weight)
 	}
 	return float64(weight) / 0.453592 // 1 lb = 0.453592 kg
 }
-func convertHeight(height uint8, system System) float64 {
+func convertHeight(height uint16, system System) float64 {
 	if system == metric {
 		return float64(height)
 	}
@@ -257,15 +265,15 @@ func validateUserInput(ctx context.Context, params UserParams) (UserData, error)
 		return UserData{}, ctx.Err() // Return if context is done
 	default:
 		// Continue with validation
-		validAge, err := validateAge(params.Age)
+		validAge, err := ValidateValues(params.Age, minAge, maxAge, "age")
 		if err != nil {
 			return UserData{}, err
 		}
-		validHeight, err := validateHeight(params.Height)
+		validHeight, err := ValidateValues(params.Height, minHeight, maxHeight, "height")
 		if err != nil {
 			return UserData{}, err
 		}
-		validWeight, err := validateWeight(params.Weight)
+		validWeight, err := ValidateWeight(float32(params.Weight), minHeight, maxHeight, "weight")
 		if err != nil {
 			return UserData{}, err
 		}
@@ -281,9 +289,13 @@ func validateUserInput(ctx context.Context, params UserParams) (UserData, error)
 
 func (s *CalculatorService) CreateUserMacro(ctx context.Context, req *pb.CreateUserMacroRequest) (*pb.CreateUserMacroResponse, error) {
 	// Extracting request data
+	if req.UserMacro == nil {
+		return nil, status.Error(codes.InvalidArgument, "user macro cannot be nil")
+	}
+
 	params := UserParams{
-		Age:      uint8(req.UserMacro.Age),
-		Height:   uint8(req.UserMacro.Height),
+		Age:      uint16(req.UserMacro.Age),
+		Height:   uint16(req.UserMacro.Height),
 		Weight:   uint16(req.UserMacro.Weight),
 		Gender:   req.UserMacro.Gender,
 		System:   req.UserMacro.System,
@@ -298,33 +310,46 @@ func (s *CalculatorService) CreateUserMacro(ctx context.Context, req *pb.CreateU
 	// Perform the offline calculations
 	userInfo, err := calculateUserPersonalMacros(ctx, params)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("calculate user macro info: %w", err)
 	}
 
 	// Creating response
+	//createdAtStr := createdAt.Format(time.RFC3339)
+	//createdAt, err := time.Parse(time.RFC3339, createdAtStr) // Convert string back to time.Time
+	//if err != nil {
+	//	log.Fatalf("Error parsing date: %v", err)
+	//}
+
+	macroDistribution := &pb.UserMacroDistribution{
+		Id:                              req.UserMacro.Id, // Assuming ID is already provided
+		UserId:                          req.UserMacro.UserId,
+		Age:                             uint32(userInfo.UserData.Age),
+		Height:                          uint32(userInfo.UserData.Height),
+		Weight:                          userInfo.UserData.Weight,
+		Gender:                          req.UserMacro.Gender,
+		System:                          userInfo.System,
+		Activity:                        string(userInfo.ActivityInfo.Activity),
+		ActivityDescription:             string(userInfo.ActivityInfo.Description),
+		Objective:                       string(userInfo.ObjectiveInfo.Objective),
+		ObjectiveDescription:            string(userInfo.ObjectiveInfo.Description),
+		CaloriesDistribution:            string(userInfo.MacrosInfo.CaloriesInfo.CaloriesDistribution),
+		CaloriesDistributionDescription: string(userInfo.MacrosInfo.CaloriesInfo.CaloriesDistributionDescription),
+		Protein:                         uint32(userInfo.MacrosInfo.Macros.Protein),
+		Fats:                            uint32(userInfo.MacrosInfo.Macros.Fats),
+		Carbs:                           uint32(userInfo.MacrosInfo.Macros.Carbs),
+		Bmr:                             uint32(userInfo.BMR),
+		Tdee:                            uint32(userInfo.TDEE),
+		Goal:                            uint32(userInfo.Goal),
+		CreatedAt:                       time.Now(), // Timestamp for creation
+	}
+
+	savedMacro, err := s.repo.CreateUserMacro(ctx, macroDistribution)
+	if err != nil {
+		return nil, fmt.Errorf("failed to insert diet goals: %w", err)
+	}
+
 	response := &pb.CreateUserMacroResponse{
-		UserMacro: &pb.UserMacroDistribution{
-			Id:                              req.UserMacro.Id, // Assuming ID is already provided
-			UserId:                          req.UserMacro.UserId,
-			Age:                             uint32(userInfo.UserData.Age),
-			Height:                          uint32(userInfo.UserData.Height),
-			Weight:                          uint32(userInfo.UserData.Weight),
-			Gender:                          req.UserMacro.Gender,
-			System:                          userInfo.System,
-			Activity:                        string(userInfo.ActivityInfo.Activity),
-			ActivityDescription:             string(userInfo.ActivityInfo.Description),
-			Objective:                       string(userInfo.ObjectiveInfo.Objective),
-			ObjectiveDescription:            string(userInfo.ObjectiveInfo.Description),
-			CaloriesDistribution:            string(userInfo.MacrosInfo.CaloriesInfo.CaloriesDistribution),
-			CaloriesDistributionDescription: string(userInfo.MacrosInfo.CaloriesInfo.CaloriesDistributionDescription),
-			Protein:                         uint32(userInfo.MacrosInfo.Macros.Protein),
-			Fats:                            uint32(userInfo.MacrosInfo.Macros.Fats),
-			Carbs:                           uint32(userInfo.MacrosInfo.Macros.Carbs),
-			Bmr:                             uint32(userInfo.BMR),
-			Tdee:                            uint32(userInfo.TDEE),
-			Goal:                            uint32(userInfo.Goal),
-			CreatedAt:                       time.Now().Format(time.RFC3339), // Timestamp for creation
-		},
+		UserMacro: savedMacro,
 	}
 
 	return response, nil
@@ -360,7 +385,7 @@ func (s *CalculatorService) GetUsersMacros(ctx context.Context, req *pb.GetAllUs
 			UserId:                          macro.UserId,
 			Age:                             uint32(macro.Age),
 			Height:                          uint32(macro.Height),
-			Weight:                          uint32(macro.Weight),
+			Weight:                          macro.Weight,
 			Gender:                          macro.Gender,
 			System:                          macro.System,
 			Activity:                        macro.Activity,
@@ -402,7 +427,7 @@ func (s *CalculatorService) GetUserMacros(ctx context.Context, req *pb.GetUserMa
 			UserId:                          macros.UserId,
 			Age:                             uint32(macros.Age),
 			Height:                          uint32(macros.Height),
-			Weight:                          uint32(macros.Weight),
+			Weight:                          macros.Weight,
 			Gender:                          macros.Gender,
 			System:                          macros.System,
 			Activity:                        macros.Activity,
@@ -426,14 +451,6 @@ func (s *CalculatorService) GetUserMacros(ctx context.Context, req *pb.GetUserMa
 	}, nil
 }
 
-func validateUserMacro(macro *pb.UserMacroDistribution) error {
-	if macro.Age < minAge || macro.Age > maxAge {
-		return errors.New("invalid age")
-	}
-	// Add other validation checks
-	return nil
-}
-
 func (s *CalculatorService) CreateOfflineUserMacro(ctx context.Context, req *pb.CreateOfflineUserMacroRequest) (*pb.CreateOfflineUserMacroResponse, error) {
 	// Extracting request data
 	if req.UserMacro == nil {
@@ -441,8 +458,8 @@ func (s *CalculatorService) CreateOfflineUserMacro(ctx context.Context, req *pb.
 	}
 
 	params := UserParams{
-		Age:          uint8(req.UserMacro.Age),
-		Height:       uint8(req.UserMacro.Height),
+		Age:          uint16(req.UserMacro.Age),
+		Height:       uint16(req.UserMacro.Height),
 		Weight:       uint16(req.UserMacro.Weight),
 		Gender:       req.UserMacro.Gender,
 		System:       req.UserMacro.System,
