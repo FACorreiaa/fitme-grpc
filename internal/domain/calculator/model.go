@@ -70,7 +70,7 @@ type SystemList struct {
 type UserData struct {
 	Age    uint16  `json:"age"`
 	Height uint16  `json:"height"`
-	Weight float32 `json:"weight"`
+	Weight float64 `json:"weight"`
 	Gender string  `json:"gender"`
 }
 

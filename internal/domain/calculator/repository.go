@@ -14,6 +14,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/FACorreiaa/fitme-grpc/internal/domain/auth"
 )
@@ -72,10 +73,6 @@ func (c *CalculatorRepository) GetUsersMacros(ctx context.Context, req *pbc.GetA
 			return nil, status.Error(codes.Internal, "Internal server error")
 		}
 
-		// Convert the timestamp to string for the proto message
-		macro.CreatedAt = createdAt.Format(time.RFC3339)
-
-		// Append the mapped macro to the slice
 		macroDistribution = append(macroDistribution, &macro)
 	}
 
@@ -114,11 +111,14 @@ func (c *CalculatorRepository) CreateUserMacro(ctx context.Context, req *pbc.Use
               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
               RETURNING *`
 
+	var macro pbc.UserMacroDistribution
+	var createdAt time.Time
+
 	rows, err := c.pgpool.Query(ctx, query,
 		req.UserId, req.Age, req.Height, req.Weight, req.Gender, req.System, req.Activity,
 		req.ActivityDescription, req.Objective, req.ObjectiveDescription, req.CaloriesDistribution,
 		req.CaloriesDistributionDescription, req.Protein, req.Fats, req.Carbs, req.Bmr, req.Tdee,
-		req.Goal, req.CreatedAt,
+		req.Goal, createdAt,
 	)
 
 	if err != nil {
@@ -127,14 +127,29 @@ func (c *CalculatorRepository) CreateUserMacro(ctx context.Context, req *pbc.Use
 	}
 	defer rows.Close()
 
-	accounts, err := pgx.CollectRows(rows, pgx.RowToStructByName[pbc.UserMacroDistribution])
-	if err != nil {
-		return nil, fmt.Errorf("failed collecting rows: %w", err)
+	//accounts, err := pgx.CollectRows(rows, pgx.RowToStructByName[pbc.UserMacroDistribution])
+	//if err != nil {
+	//	return nil, fmt.Errorf("failed collecting rows: %w", err)
+	//}
+	//
+	//if len(accounts) == 0 {
+	//	return nil, fmt.Errorf("no rows returned")
+	//}
+	if rows.Next() {
+		err = rows.Scan(
+			&macro.Id, &macro.UserId, &macro.Age, &macro.Height, &macro.Weight, &macro.Gender, &macro.System,
+			&macro.Activity, &macro.ActivityDescription, &macro.Objective, &macro.ObjectiveDescription,
+			&macro.CaloriesDistribution, &macro.CaloriesDistributionDescription, &macro.Protein,
+			&macro.Fats, &macro.Carbs, &macro.Bmr, &macro.Tdee, &macro.Goal, &createdAt,
+		)
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+
+		// Convert `createdAt` (Go time.Time) to Protobuf Timestamp
+		macro.CreatedAt = timestamppb.New(createdAt)
 	}
 
-	if len(accounts) == 0 {
-		return nil, fmt.Errorf("no rows returned")
-	}
-
-	return &accounts[0], nil
+	return &macro, nil
 }
