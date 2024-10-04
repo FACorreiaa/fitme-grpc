@@ -8,7 +8,6 @@ import (
 	"time"
 
 	pbc "github.com/FACorreiaa/fitme-protos/modules/calculator/generated"
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
@@ -30,23 +29,16 @@ func NewCalculatorRepository(db *pgxpool.Pool, redis *redis.Client, sessionManag
 	return &CalculatorRepository{pgpool: db, redis: redis, sessionManager: sessionManager}
 }
 
-func (c *CalculatorRepository) GetUsersMacros(ctx context.Context, req *pbc.GetAllUserMacrosRequest) (*pbc.GetAllUserMacrosResponse, error) {
+func (c *CalculatorRepository) GetUsersMacros(ctx context.Context) (*pbc.GetAllUserMacrosResponse, error) {
 	macroDistribution := make([]*pbc.UserMacroDistribution, 0)
-	query := `SELECT user_id, age, height, weight,
+	query := `SELECT id, user_id, age, height, weight,
                       gender, system, activity, activity_description, objective,
 					  objective_description, calories_distribution, calories_distribution_description,
                       protein, fats, carbs, bmr, tdee, goal, created_at
 				FROM user_macro_distribution
-				WHERE id = $1
 				ORDER BY created_at`
 
-	id, err := uuid.Parse(req.UserId)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument,
-			"invalid UUID format for user ID: %v",
-			err.Error())
-	}
-	rows, err := c.pgpool.Query(ctx, query, id)
+	rows, err := c.pgpool.Query(ctx, query)
 	if err != nil {
 		if errors.Is(rows.Err(), pgx.ErrNoRows) {
 			return nil, status.Error(codes.NotFound, "No user macros found")
@@ -84,8 +76,14 @@ func (c *CalculatorRepository) GetUsersMacros(ctx context.Context, req *pbc.GetA
 }
 
 func (c *CalculatorRepository) GetUserMacros(ctx context.Context, req *pbc.GetUserMacroRequest) (*pbc.GetUserMacroResponse, error) {
-	var macroDistribution *pbc.UserMacroDistribution
+	var macroDistribution pbc.UserMacroDistribution
 	planID := req.PlanId
+	var createdAt time.Time
+
+	if planID == "" {
+		return nil, status.Error(codes.InvalidArgument, "planID is required")
+	}
+
 	query := `SELECT id, user_id, age, height, weight,
                       gender, system, activity, activity_description, objective,
 					  objective_description, calories_distribution, calories_distribution_description,
@@ -94,13 +92,25 @@ func (c *CalculatorRepository) GetUserMacros(ctx context.Context, req *pbc.GetUs
 				WHERE id = $1
 				ORDER BY created_at`
 
-	err := c.pgpool.QueryRow(ctx, query, query, planID)
+	err := c.pgpool.QueryRow(ctx, query, planID).Scan(
+		&macroDistribution.Id, &macroDistribution.UserId, &macroDistribution.Age, &macroDistribution.Height,
+		&macroDistribution.Weight, &macroDistribution.Gender, &macroDistribution.System, &macroDistribution.Activity,
+		&macroDistribution.ActivityDescription, &macroDistribution.Objective, &macroDistribution.ObjectiveDescription,
+		&macroDistribution.CaloriesDistribution, &macroDistribution.CaloriesDistributionDescription, &macroDistribution.Protein,
+		&macroDistribution.Fats, &macroDistribution.Carbs, &macroDistribution.Bmr, &macroDistribution.Tdee,
+		&macroDistribution.Goal, &createdAt,
+	)
 
 	if err != nil {
-		return nil, fmt.Errorf("macro not found: %w", err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, status.Error(codes.NotFound, "macro not found")
+		}
+		return nil, fmt.Errorf("failed to retrieve user macro: %w", err)
 	}
 
-	return &pbc.GetUserMacroResponse{UserMacro: macroDistribution}, nil
+	macroDistribution.CreatedAt = timestamppb.New(createdAt)
+
+	return &pbc.GetUserMacroResponse{UserMacro: &macroDistribution}, nil
 }
 
 func (c *CalculatorRepository) CreateUserMacro(ctx context.Context, req *pbc.UserMacroDistribution) (*pbc.UserMacroDistribution, error) {
