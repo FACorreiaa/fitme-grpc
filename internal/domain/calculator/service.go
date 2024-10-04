@@ -6,12 +6,13 @@ import (
 	"math"
 	"time"
 
+	"errors"
+
 	pb "github.com/FACorreiaa/fitme-protos/modules/calculator/generated"
 	"github.com/jackc/pgx/v5"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	"errors"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/FACorreiaa/fitme-grpc/internal/domain"
 )
@@ -102,7 +103,7 @@ func ValidateValues(value, minValue, maxValue uint16, fieldName string) (uint16,
 	return value, nil
 }
 
-func ValidateWeight(value, minValue, maxValue float32, fieldName string) (float32, error) {
+func ValidateWeight(value, minValue, maxValue float64, fieldName string) (float64, error) {
 	if value <= minValue || value >= maxValue {
 		return 0, fmt.Errorf("invalid %s: %f (must be between %f and %f)", fieldName, value, minValue, maxValue)
 	}
@@ -125,9 +126,9 @@ func ValidateWeight(value, minValue, maxValue float32, fieldName string) (float3
 //	return height, nil
 //}
 
-func convertWeight(weight float32, system System) float64 {
+func convertWeight(weight float64, system System) float64 {
 	if system == metric {
-		return float64(weight)
+		return weight
 	}
 	return float64(weight) / 0.453592 // 1 lb = 0.453592 kg
 }
@@ -259,12 +260,10 @@ func calculateUserPersonalMacros(ctx context.Context, params UserParams) (UserIn
 
 // CreateUserMacro implements the CreateUserMacro gRPC method
 func validateUserInput(ctx context.Context, params UserParams) (UserData, error) {
-	// Check for context cancellation
 	select {
 	case <-ctx.Done():
 		return UserData{}, ctx.Err() // Return if context is done
 	default:
-		// Continue with validation
 		validAge, err := ValidateValues(params.Age, minAge, maxAge, "age")
 		if err != nil {
 			return UserData{}, err
@@ -273,7 +272,7 @@ func validateUserInput(ctx context.Context, params UserParams) (UserData, error)
 		if err != nil {
 			return UserData{}, err
 		}
-		validWeight, err := ValidateWeight(float32(params.Weight), minHeight, maxHeight, "weight")
+		validWeight, err := ValidateWeight(float64(params.Weight), minHeight, maxHeight, "weight")
 		if err != nil {
 			return UserData{}, err
 		}
@@ -312,13 +311,7 @@ func (s *CalculatorService) CreateUserMacro(ctx context.Context, req *pb.CreateU
 	if err != nil {
 		return nil, fmt.Errorf("calculate user macro info: %w", err)
 	}
-
-	// Creating response
-	//createdAtStr := createdAt.Format(time.RFC3339)
-	//createdAt, err := time.Parse(time.RFC3339, createdAtStr) // Convert string back to time.Time
-	//if err != nil {
-	//	log.Fatalf("Error parsing date: %v", err)
-	//}
+	createdAt := timestamppb.New(time.Now())
 
 	macroDistribution := &pb.UserMacroDistribution{
 		Id:                              req.UserMacro.Id, // Assuming ID is already provided
@@ -340,7 +333,7 @@ func (s *CalculatorService) CreateUserMacro(ctx context.Context, req *pb.CreateU
 		Bmr:                             uint32(userInfo.BMR),
 		Tdee:                            uint32(userInfo.TDEE),
 		Goal:                            uint32(userInfo.Goal),
-		CreatedAt:                       time.Now(), // Timestamp for creation
+		CreatedAt:                       createdAt,
 	}
 
 	savedMacro, err := s.repo.CreateUserMacro(ctx, macroDistribution)
