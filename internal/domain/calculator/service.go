@@ -457,11 +457,11 @@ func (s *CalculatorService) CreateOfflineUserMacro(ctx context.Context, req *pb.
 	return response, nil
 }
 
-//func (s *CalculatorService) DeleteUserMacro(ctx context.Context, req *pb.DeleteUserMacroRequest) (*pb.DeleteUserMacroResponse, error) {
-//	_, err := s.repo.DeleteUserMacro(ctx, req.GetMacroId())
-//	if err != nil {
-//		return nil, status.Errorf(codes.Internal, "failed to delete user macro: %v", err)
-//	}
-//
-//	return &pb.DeleteUserMacroResponse{}, nil // Return an empty response on successful deletion
-//}
+func (s *CalculatorService) DeleteUserMacro(ctx context.Context, req *pb.DeleteUserMacroRequest) (*pb.DeleteUserMacroResponse, error) {
+	_, err := s.repo.DeleteUserMacro(ctx, req)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to delete user macro: %v", err)
+	}
+
+	return &pb.DeleteUserMacroResponse{}, nil // Return an empty response on successful deletion
+}
