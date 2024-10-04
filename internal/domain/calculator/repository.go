@@ -163,3 +163,22 @@ func (c *CalculatorRepository) CreateUserMacro(ctx context.Context, req *pbc.Use
 
 	return &macro, nil
 }
+
+func (c *CalculatorRepository) DeleteUserMacro(ctx context.Context, macroID string) error {
+	if macroID == "" {
+		return status.Error(codes.InvalidArgument, "macroID is required")
+	}
+
+	query := `DELETE FROM user_macro_distribution WHERE id = $1`
+
+	cmdTag, err := c.pgpool.Exec(ctx, query, macroID)
+	if err != nil {
+		return fmt.Errorf("failed to delete user macro: %w", err)
+	}
+
+	if cmdTag.RowsAffected() == 0 {
+		return status.Error(codes.NotFound, "macro not found")
+	}
+
+	return nil
+}

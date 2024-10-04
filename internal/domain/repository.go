@@ -26,4 +26,5 @@ type CalculatorRepository interface {
 	CreateUserMacro(ctx context.Context, req *pbc.UserMacroDistribution) (*pbc.UserMacroDistribution, error)
 	GetUsersMacros(ctx context.Context) (*pbc.GetAllUserMacrosResponse, error)
 	GetUserMacros(ctx context.Context, req *pbc.GetUserMacroRequest) (*pbc.GetUserMacroResponse, error)
+	//DeleteUserMacro(ctx context.Context, req *pbc.DeleteUserMacroRequest) (*pbc.DeleteUserMacroResponse, error)
 }
