@@ -29,3 +29,9 @@ update:
 down-dev:
 	docker compose down
 	rm -rf .data
+
+run-test:
+	go test ./...
+
+test-lint:
+	testifylint --fix ./...

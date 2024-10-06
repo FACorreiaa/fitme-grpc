@@ -29,7 +29,7 @@ func NewCalculatorRepository(db *pgxpool.Pool, redis *redis.Client, sessionManag
 	return &CalculatorRepository{pgpool: db, redis: redis, sessionManager: sessionManager}
 }
 
-func (c *CalculatorRepository) GetUsersMacros(ctx context.Context) (*pbc.GetAllUserMacrosResponse, error) {
+func (c *CalculatorRepository) GetUsersMacros(ctx context.Context, req *pbc.GetAllUserMacrosRequest) (*pbc.GetAllUserMacrosResponse, error) {
 	macroDistribution := make([]*pbc.UserMacroDistribution, 0)
 	query := `SELECT id, user_id, age, height, weight,
                       gender, system, activity, activity_description, objective,
@@ -37,6 +37,12 @@ func (c *CalculatorRepository) GetUsersMacros(ctx context.Context) (*pbc.GetAllU
                       protein, fats, carbs, bmr, tdee, goal, created_at
 				FROM user_macro_distribution
 				ORDER BY created_at`
+
+	if req.UserId != "" {
+		query += ` WHERE user_id = $1 ORDER BY created_at`
+	} else {
+		query += ` ORDER BY created_at`
+	}
 
 	rows, err := c.pgpool.Query(ctx, query)
 	if err != nil {

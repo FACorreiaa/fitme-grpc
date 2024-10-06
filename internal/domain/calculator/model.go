@@ -118,8 +118,10 @@ const (
 	bulking     Objective = "Bulking"
 	cutting     Objective = "Cutting"
 
-	m             = "Male"
-	metric System = "Metric"
+	m               = "Male"
+	f               = "Female"
+	Metric   System = "Metric"
+	Imperial System = "Imperial"
 
 	sedentaryActivity  Activity = "Sedentary"
 	lightActivity      Activity = "LightActivity"

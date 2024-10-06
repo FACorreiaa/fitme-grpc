@@ -127,31 +127,37 @@ func ValidateWeight(value, minValue, maxValue float64, fieldName string) (float6
 //}
 
 func convertWeight(weight float64, system System) float64 {
-	if system == metric {
+	if system == Metric {
 		return weight
 	}
 	return float64(weight) / 0.453592 // 1 lb = 0.453592 kg
 }
 func convertHeight(height uint16, system System) float64 {
-	if system == metric {
+	if system == Metric {
 		return float64(height)
 	}
 	return float64(height) / 2.54 // 1 in = 2.54 cm
 }
-func calculateBMR(userData UserData, system System) float64 {
+func CalculateBMR(userData UserData, system System) (float64, error) {
+	if userData.Weight <= 0 || userData.Height <= 0 || userData.Age <= 0 {
+		return 0, errors.New("weight, height, and age must be positive values")
+	}
+
 	var ageFactor float64
 	weight := convertWeight(userData.Weight, system)
 	height := convertHeight(userData.Height, system)
 	if userData.Gender == m {
 		ageFactor = maleAgeFactor
-	} else {
+	} else if userData.Gender == f {
 		ageFactor = femaleAgeFactor
+	} else {
+		return 0, errors.New("gender must be 'male' or 'female'")
 	}
 
-	if system == metric {
-		return math.Round((10*weight + 6.25*height - 5.0*(float64(userData.Age))) + ageFactor)
+	if system == Metric {
+		return math.Round((10*weight + 6.25*height - 5.0*(float64(userData.Age))) + ageFactor), nil
 	} else {
-		return math.Round((4.536*weight + 15.88*height - 5.0*(float64(userData.Age))) + ageFactor)
+		return math.Round((4.536*weight + 15.88*height - 5.0*(float64(userData.Age))) + ageFactor), nil
 	}
 }
 
@@ -204,7 +210,10 @@ func calculateUserPersonalMacros(ctx context.Context, params UserParams) (UserIn
 		return UserInfo{}, err
 	}
 
-	bmr := calculateBMR(userData, System(params.System))
+	bmr, err := CalculateBMR(userData, System(params.System))
+	if err != nil {
+		return UserInfo{}, err
+	}
 	a, err := mapActivity(ctx, Activity(params.Activity))
 	if err != nil {
 		return UserInfo{}, err
@@ -350,7 +359,7 @@ func (s *CalculatorService) CreateUserMacro(ctx context.Context, req *pb.CreateU
 
 // GetUsersMacros implements the GetAllUserMacros gRPC method
 func (s *CalculatorService) GetUsersMacros(ctx context.Context, req *pb.GetAllUserMacrosRequest) (*pb.GetAllUserMacrosResponse, error) {
-	userMacrosResponse, err := s.repo.GetUsersMacros(ctx)
+	userMacrosResponse, err := s.repo.GetUsersMacros(ctx, req)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return &pb.GetAllUserMacrosResponse{}, fmt.Errorf("Error ")
