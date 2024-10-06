@@ -1,6 +1,6 @@
 exporters:
   otlp:
-    endpoint: "localhost:4317"  # Replace with your Grafana Alloy host
+    endpoint: "127.0.0.1:12345"  # Replace with your Grafana Alloy host
     insecure: true  # Use insecure connection
 
 service:

@@ -301,7 +301,7 @@ func (s *CalculatorService) CreateUserMacro(ctx context.Context, req *pb.CreateU
 	// Extracting request data
 	tracer := otel.Tracer("FITDEV")
 
-	ctx, span := tracer.Start(ctx, "/Calculator/CreateUserMacro")
+	ctx, span := tracer.Start(ctx, "CreateUserMacro")
 	defer span.End()
 
 	if req.UserMacro == nil {
