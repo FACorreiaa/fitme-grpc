@@ -38,11 +38,11 @@ func (c *CalculatorRepository) GetUsersMacros(ctx context.Context, req *pbc.GetA
 				FROM user_macro_distribution
 				ORDER BY created_at`
 
-	if req.UserId != "" {
-		query += ` WHERE user_id = $1 ORDER BY created_at`
-	} else {
-		query += ` ORDER BY created_at`
-	}
+	//if req.UserId != "" {
+	//	query += ` WHERE user_id = $1 ORDER BY created_at`
+	//} else {
+	//	query += ` ORDER BY created_at`
+	//}
 
 	rows, err := c.pgpool.Query(ctx, query)
 	if err != nil {

@@ -1,6 +1,8 @@
 package grpc
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel"
@@ -35,6 +37,13 @@ func BootstrapClient(
 
 	// -- Zap logging interceptor setup
 	logInterceptor, _ := grpclog.Interceptors(log)
+
+	// trace to grafana
+	ctx := context.Background()
+	if err := grpcprometheus.SetupTracing(ctx); err != nil {
+		log.Error("Failed to set up trace exporter", zap.Error(err))
+		return nil, errors.Wrap(err, "failed to setup tracing")
+	}
 
 	// -- Prometheus exporter setup
 	prometheusCollectors := grpcprometheus.NewPrometheusMetricsCollectors()

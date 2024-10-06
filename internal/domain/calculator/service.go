@@ -10,6 +10,8 @@ import (
 
 	pb "github.com/FACorreiaa/fitme-protos/modules/calculator/generated"
 	"github.com/jackc/pgx/v5"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -297,6 +299,11 @@ func validateUserInput(ctx context.Context, params UserParams) (UserData, error)
 
 func (s *CalculatorService) CreateUserMacro(ctx context.Context, req *pb.CreateUserMacroRequest) (*pb.CreateUserMacroResponse, error) {
 	// Extracting request data
+	tracer := otel.Tracer("FITDEV")
+
+	ctx, span := tracer.Start(ctx, "/Calculator/CreateUserMacro")
+	defer span.End()
+
 	if req.UserMacro == nil {
 		return nil, status.Error(codes.InvalidArgument, "user macro cannot be nil")
 	}
@@ -323,7 +330,7 @@ func (s *CalculatorService) CreateUserMacro(ctx context.Context, req *pb.CreateU
 	createdAt := timestamppb.New(time.Now())
 
 	macroDistribution := &pb.UserMacroDistribution{
-		Id:                              req.UserMacro.Id, // Assuming ID is already provided
+		Id:                              req.UserMacro.Id,
 		UserId:                          req.UserMacro.UserId,
 		Age:                             uint32(userInfo.UserData.Age),
 		Height:                          uint32(userInfo.UserData.Height),
@@ -347,12 +354,19 @@ func (s *CalculatorService) CreateUserMacro(ctx context.Context, req *pb.CreateU
 
 	savedMacro, err := s.repo.CreateUserMacro(ctx, macroDistribution)
 	if err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.type", fmt.Sprintf("%T", err)))
 		return nil, fmt.Errorf("failed to insert diet goals: %w", err)
 	}
 
 	response := &pb.CreateUserMacroResponse{
 		UserMacro: savedMacro,
 	}
+
+	span.SetAttributes(
+		attribute.String("request.id", req.UserMacro.Id),
+		attribute.String("request.details", req.UserMacro.Id),
+	)
 
 	return response, nil
 }

@@ -45,6 +45,7 @@ func BootstrapServer(
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to register prometheus")
 	}
+
 	_, promInterceptor, err := grpcprometheus.Interceptors(promCollectors)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to create Prometheus interceptors")
