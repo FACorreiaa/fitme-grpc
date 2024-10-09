@@ -42,6 +42,6 @@ type ActivityRepository interface {
 	PauseActivityTracker(ctx context.Context, req *pba.PauseActivityTrackerReq) (*pba.PauseActivityTrackerRes, error)
 	ResumeActivityTracker(ctx context.Context, req *pba.ResumeActivityTrackerReq) (*pba.ResumeActivityTrackerRes, error)
 	StopActivityTracker(ctx context.Context, req *pba.StopActivityTrackerReq) (*pba.StopActivityTrackerRes, error)
-	//DeleteExerciseSession(ctx context.Context, req *pba.DeleteExerciseSessionReq) error
-	//DeleteAllExercisesSession(ctx context.Context, req *pba.DeleteAllExercisesSessionReq) error
+	DeleteExerciseSession(ctx context.Context, req *pba.DeleteExerciseSessionReq) (*pba.NilRes, error)
+	DeleteAllExercisesSession(ctx context.Context, req *pba.DeleteAllExercisesSessionReq) (*pba.NilRes, error)
 }
