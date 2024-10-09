@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 
+	pba "github.com/FACorreiaa/fitme-protos/modules/activity/generated"
 	pbc "github.com/FACorreiaa/fitme-protos/modules/calculator/generated"
 	pb "github.com/FACorreiaa/fitme-protos/modules/user/generated"
 )
@@ -27,4 +28,20 @@ type CalculatorRepository interface {
 	GetUsersMacros(ctx context.Context, req *pbc.GetAllUserMacrosRequest) (*pbc.GetAllUserMacrosResponse, error)
 	GetUserMacros(ctx context.Context, req *pbc.GetUserMacroRequest) (*pbc.GetUserMacroResponse, error)
 	DeleteUserMacro(ctx context.Context, req *pbc.DeleteUserMacroRequest) (*pbc.DeleteUserMacroResponse, error)
+}
+
+type ActivityRepository interface {
+	GetActivity(ctx context.Context, req *pba.GetActivityReq) (*pba.GetActivityRes, error)
+	GetActivitiesByID(ctx context.Context, req *pba.GetActivityIDReq) (*pba.GetActivityIDRes, error)
+	GetActivitiesByName(ctx context.Context, req *pba.GetActivityNameReq) (*pba.GetActivityNameRes, error)
+	GetUserExerciseSession(ctx context.Context, req *pba.GetUserExerciseSessionReq) (*pba.GetUserExerciseSessionRes, error)
+	GetUserExerciseTotalData(ctx context.Context, req *pba.GetUserExerciseTotalDataReq) (*pba.GetUserExerciseTotalDataRes, error)
+	GetUserExerciseSessionStats(ctx context.Context, req *pba.GetUserExerciseSessionStatsReq) (*pba.GetUserExerciseSessionStatsRes, error)
+	GetExerciseSessionStats(ctx context.Context, req *pba.GetExerciseSessionStatsOccurrenceReq) (*pba.GetExerciseSessionStatsOccurrenceRes, error)
+	StartActivityTracker(ctx context.Context, req *pba.StartActivityTrackerReq) (*pba.StartActivityTrackerRes, error)
+	PauseActivityTracker(ctx context.Context, req *pba.PauseActivityTrackerReq) (*pba.PauseActivityTrackerRes, error)
+	ResumeActivityTracker(ctx context.Context, req *pba.ResumeActivityTrackerReq) (*pba.ResumeActivityTrackerRes, error)
+	StopActivityTracker(ctx context.Context, req *pba.StopActivityTrackerReq) (*pba.StopActivityTrackerRes, error)
+	//DeleteExerciseSession(ctx context.Context, req *pba.DeleteExerciseSessionReq) error
+	//DeleteAllExercisesSession(ctx context.Context, req *pba.DeleteAllExercisesSessionReq) error
 }
