@@ -6,7 +6,7 @@ import (
 )
 
 type Activity struct {
-	ID              int            `json:"id,string" db:"id" pg:"default:gen_random_uuid()"`
+	ID              string         `json:"id,string" db:"id" pg:"default:gen_random_uuid()"`
 	UserID          sql.NullString `json:"user_id,string" db:"user_id" swaggertype:"string"`
 	Name            string         `json:"name" db:"name"`
 	CaloriesPerHour float32        `json:"calories_per_hour" db:"calories_per_hour"`
@@ -18,8 +18,8 @@ type Activity struct {
 
 type ExerciseSession struct {
 	ID              string     `json:"id,string" db:"id" pg:"default:gen_random_uuid()"`
-	UserID          int        `json:"user_id" db:"user_id"`
-	ActivityID      int        `json:"activity_id" db:"activity_id"`
+	UserID          string     `json:"user_id" db:"user_id"`
+	ActivityID      string     `json:"activity_id" db:"activity_id"`
 	SessionName     string     `json:"session_name" db:"session_name"`
 	StartTime       time.Time  `json:"start_time" db:"start_time"`
 	EndTime         time.Time  `json:"end_time" db:"end_time"`
@@ -39,8 +39,8 @@ type Duration struct {
 
 type TotalExerciseSession struct {
 	ID                   string    `json:"id,string" db:"id" pg:"default:gen_random_uuid()"`
-	UserID               int       `json:"user_id" db:"user_id"`
-	ActivityID           int       `json:"activity_id" db:"activity_id"`
+	UserID               string    `json:"user_id" db:"user_id"`
+	ActivityID           string    `json:"activity_id" db:"activity_id"`
 	TotalDurationHours   int       `json:"duration_hours" db:"total_duration_hours"`
 	TotalDurationMinutes int       `json:"duration_minutes" db:"total_duration_minutes"`
 	TotalDurationSeconds int       `json:"duration_seconds" db:"total_duration_seconds"`
@@ -66,8 +66,8 @@ type TotalExerciseSession struct {
 
 type ExerciseCountStats struct {
 	ID                           string    `json:"id,string" db:"id" pg:"default:gen_random_uuid()"`
-	ActivityID                   int       `json:"activity_id,string" db:"activity_id"`
-	UserID                       int       `json:"user_id,string" db:"user_id"`
+	ActivityID                   string    `json:"activity_id,string" db:"activity_id"`
+	UserID                       string    `json:"user_id,string" db:"user_id"`
 	SessionName                  string    `json:"session_name" db:"session_name"`
 	NumberOfTimes                int       `json:"number_of_times" db:"number_of_times"`
 	TotalExerciseDurationHours   int       `json:"total_duration_hours" db:"total_duration_hours"`

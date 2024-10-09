@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS "exercise_list" (
-                                             "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   "name" varchar(255),
   "type" varchar(255),
   "muscle" varchar(255),
@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS "exercise_list" (
 
 
 CREATE TABLE IF NOT EXISTS user_exercises (
-                                            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID NOT NULL,
   exercise_id UUID NOT NULL,
   created_at timestamp DEFAULT (now()),
