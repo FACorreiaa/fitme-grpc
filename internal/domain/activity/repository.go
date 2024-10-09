@@ -1,7 +1,7 @@
 package activity
 
 import (
-	pbc "github.com/FACorreiaa/fitme-protos/modules/calculator/generated"
+	pba "github.com/FACorreiaa/fitme-protos/modules/activity/generated"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 
@@ -9,7 +9,7 @@ import (
 )
 
 type ActivityRepository struct {
-	pbc.UnimplementedCalculatorServer
+	pba.UnimplementedActivityServer
 	pgpool         *pgxpool.Pool
 	redis          *redis.Client
 	sessionManager *auth.SessionManager

@@ -1,9 +1,7 @@
 cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
-github.com/FACorreiaa/fitme-protos v0.0.0-20241009173410-a038b4f21c16 h1:xYmK4/9lfdvvg1uvVA69GZFKASbsEvPzbM4BFGGQKGs=
-github.com/FACorreiaa/fitme-protos v0.0.0-20241009173410-a038b4f21c16/go.mod h1:7YYNnd8hPWGzjkkEXiq1WMauTU0M+PWJOwxdx8MbHFY=
-github.com/FACorreiaa/fitme-protos v0.0.0-20241009191605-204b8d177a89 h1:S67oTohh3dlq179DSgGXo3EsE/wfdrooFLGeVdugUHQ=
-github.com/FACorreiaa/fitme-protos v0.0.0-20241009191605-204b8d177a89/go.mod h1:hujvfnC3sNprhecZkEXgFpvDRbIZWDeLzvnrKaUcz/o=
+github.com/FACorreiaa/fitme-protos v0.0.0-20241009195830-61eac9346496 h1:uajvHbfEZytD+RGxEHcabINktMCbOvQcpUgkyazqst8=
+github.com/FACorreiaa/fitme-protos v0.0.0-20241009195830-61eac9346496/go.mod h1:hujvfnC3sNprhecZkEXgFpvDRbIZWDeLzvnrKaUcz/o=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
