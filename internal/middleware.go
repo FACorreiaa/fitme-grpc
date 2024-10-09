@@ -2,6 +2,7 @@ package internal
 
 import (
 	"github.com/FACorreiaa/fitme-protos/container"
+	"github.com/FACorreiaa/fitme-protos/modules/activity"
 	"github.com/FACorreiaa/fitme-protos/modules/calculator"
 	"github.com/FACorreiaa/fitme-protos/modules/customer"
 	"github.com/FACorreiaa/fitme-protos/modules/user"
@@ -46,6 +47,8 @@ func ConfigureUpstreamClients(log *zap.Logger, transport *utils.TransportUtils) 
 		log.Error("failed to create calculator service broker", zap.Error(err))
 		return nil
 	}
+
+	activityBroker, err := activity.NewBroker(cfg.UpstreamServices.Customer)
 
 	brokers.Customer = customerBroker
 	brokers.Auth = authBroker
