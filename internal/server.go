@@ -51,7 +51,7 @@ func ServeGRPC(ctx context.Context, port string, container *ServiceContainer) er
 	if err != nil {
 		return errors.Wrap(err, "failed to configure prometheus registry")
 	}
-	tp, err := otelTraceProvider(ctx)
+	tp, err := otelTraceProvider(ctx, true, "", "", "", "localhost:4317")
 	if err != nil {
 		return errors.Wrap(err, "failed to configure jaeger trace provider")
 	}
@@ -103,6 +103,7 @@ func ServeHTTP(port string) error {
 		log.Error("failed to initialize config", zap.Error(err))
 		return err
 	}
+	//reg := prometheus.NewRegistry()
 
 	server := http.NewServeMux()
 	// Add healthcheck endpoints
@@ -120,6 +121,7 @@ func ServeHTTP(port string) error {
 		w.WriteHeader(http.StatusOK)
 	})
 	server.HandleFunc("/metrics", promhttp.Handler().ServeHTTP)
+	//server.Handle("/prometheus/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
 
 	listener := &http.Server{
 		Addr:              fmt.Sprintf(":%s", port),

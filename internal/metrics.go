@@ -20,6 +20,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/credentials"
 )
 
 const meterName = "github.com/open-telemetry/opentelemetry-go/example/prometheus"
@@ -80,18 +81,32 @@ func setupPrometheusRegistry(ctx context.Context) (*prometheus.Registry, error) 
 	return reg, nil
 }
 
-func otelTraceProvider(ctx context.Context) (*trace.TracerProvider, error) {
+func otelTraceProvider(ctx context.Context, insecure bool, caFile, certFile, keyFile, endpoint string) (*trace.TracerProvider, error) {
 	exp, err := otlptracegrpc.New(ctx)
+
 	if err != nil {
 		zap.Error(err)
 		return nil, err
+	}
+
+	var opts []otlptracegrpc.Option
+
+	if insecure {
+		opts = append(opts, otlptracegrpc.WithInsecure())
+	} else {
+		// Load TLS credentials if provided
+		creds, err := credentials.NewClientTLSFromFile(caFile, "")
+		if err != nil {
+			return nil, err
+		}
+		opts = append(opts, otlptracegrpc.WithTLSCredentials(creds))
 	}
 
 	tp := trace.NewTracerProvider(
 		trace.WithBatcher(exp),
 		trace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
-			semconv.ServiceNameKey.String("todo-service"),
+			semconv.ServiceNameKey.String("FITDEV"),
 			semconv.DeploymentEnvironmentKey.String("production"),
 		)),
 	)

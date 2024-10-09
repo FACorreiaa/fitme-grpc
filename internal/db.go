@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
-	"log"
 	"math"
 	"net/url"
 	"os"
@@ -16,6 +15,8 @@ import (
 
 	"context"
 
+	"go.uber.org/zap"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -23,9 +24,9 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 	"github.com/redis/go-redis/v9"
 	uuid "github.com/vgarvardt/pgx-google-uuid/v5"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
 
 	config "github.com/FACorreiaa/fitme-grpc/config"
 	"github.com/FACorreiaa/fitme-grpc/logger"
@@ -74,15 +75,20 @@ func NewRedisConfig() (*redis.Client, error) {
 }
 
 func NewDatabaseConfig() (*DatabaseConfig, error) {
+	if err := logger.Init(zapcore.InfoLevel); err != nil {
+		fmt.Println("Error initializing logger:", err)
+		os.Exit(1)
+	}
+	log := logger.Log
 	cfg, err := config.InitConfig()
 	if err != nil {
-		log.Println(err)
-		log.Fatal("Failed loading Postgres config")
+		log.Error("Failed loading Postgres config", zap.Error(err))
+		log.Fatal("Error initializing config", zap.Error(err))
 	}
 	err = godotenv.Load(".env")
 	if err != nil {
-		log.Println(err)
-		log.Fatal("Error loading .env file")
+		log.Error("Error loading .env file", zap.Error(err))
+		log.Fatal("Failed to load .env file")
 	}
 
 	query := url.Values{
@@ -99,7 +105,8 @@ func NewDatabaseConfig() (*DatabaseConfig, error) {
 		Path:     cfg.Repositories.Postgres.DB,
 		RawQuery: query.Encode(),
 	}
-	fmt.Printf("#%v", connURL)
+	log.Info("Database connection URL generated", zap.String("connectionURL", connURL.String()))
+
 	return &DatabaseConfig{
 		ConnectionURL: connURL.String(),
 	}, nil
@@ -142,16 +149,16 @@ func hashVal(contents []byte) string {
 func Migrate(conn *pgxpool.Pool) error {
 
 	// migrate db
-	l := logger.Log
-	l.Info("Running migrations")
+	log := logger.Log
+	log.Info("Running migrations")
 	ctx := context.Background()
 	files, err := migrationFS.ReadDir("migrations")
 	if err != nil {
-		zap.Error(err)
+		log.Error("Failed executing migrations", zap.Error(err))
 		return err
 	}
 
-	l.Info("Creating migrations table")
+	log.Info("Creating migrations table")
 	_, err = conn.Exec(ctx, `
 		create table if not exists _migrations (
 			name text primary key,
@@ -160,11 +167,10 @@ func Migrate(conn *pgxpool.Pool) error {
 		);
 	`)
 	if err != nil {
-		zap.Error(err)
-		return err
+		log.Error("Failed loading Postgres config", zap.Error(err))
 	}
 
-	l.Info("Checking applied migrations")
+	log.Info("Checking applied migrations")
 	rows, _ := conn.Query(ctx, `select name, hash from _migrations order by created_at desc`)
 	var name, hash string
 	appliedMigrations := make(map[string]string)
@@ -174,7 +180,7 @@ func Migrate(conn *pgxpool.Pool) error {
 	})
 
 	if err != nil {
-		zap.Error(err)
+		log.Error("Failed loading Postgres config", zap.Error(err))
 		return err
 	}
 
@@ -182,7 +188,6 @@ func Migrate(conn *pgxpool.Pool) error {
 		sort.SliceStable(files, func(i, j int) bool {
 			return files[i].Name() < files[j].Name()
 		})
-		fmt.Printf("files %s \n:", file.Name())
 
 		contents, err := migrationFS.ReadFile("migrations/" + file.Name())
 		if err != nil {
@@ -196,7 +201,7 @@ func Migrate(conn *pgxpool.Pool) error {
 				return errors.New("hash mismatch for")
 			}
 
-			l.Info(file.Name() + " already applied")
+			log.Info(file.Name() + " already applied")
 			continue
 		}
 
@@ -214,13 +219,13 @@ func Migrate(conn *pgxpool.Pool) error {
 		})
 
 		if err != nil {
-			zap.Error(err)
+			log.Error("Failed loading Postgres config", zap.Error(err))
 			return err
 		}
-		l.Info(file.Name() + " applied")
+		log.Info(file.Name() + " applied")
 	}
 
-	l.Info("Migrations finished")
+	log.Info("Migrations finished")
 	return nil
 }
 
@@ -244,7 +249,11 @@ type pgService struct {
 func (s *pgService) Health() map[string]string {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-
+	if err := logger.Init(zapcore.InfoLevel); err != nil {
+		fmt.Println("Error initializing logger:", err)
+		os.Exit(1)
+	}
+	log := logger.Log
 	stats := make(map[string]string)
 
 	// Ping the database
@@ -252,7 +261,7 @@ func (s *pgService) Health() map[string]string {
 	if err != nil {
 		stats["status"] = "down"
 		stats["error"] = fmt.Sprintf("db down: %v", err)
-		log.Fatalf(fmt.Sprintf("db down: %v", err)) // Log the error and terminate the program
+		log.Fatal(fmt.Sprintf("db down: %v", err)) // Log the error and terminate the program
 		return stats
 	}
 
@@ -295,12 +304,17 @@ func (s *pgService) Health() map[string]string {
 // If the connection is successfully closed, it returns nil.
 // If an error occurs while closing the connection, it returns the error.
 func (s *pgService) Close() error {
+	if err := logger.Init(zapcore.InfoLevel); err != nil {
+		fmt.Println("Error initializing logger:", err)
+		os.Exit(1)
+	}
+	log := logger.Log
 	cfg, err := config.InitConfig()
 	if err != nil {
 		return errors.Wrap(err, "error loading Postgres config")
 	}
 	database := host + ":" + cfg.Repositories.Postgres.Port
-	log.Printf("Disconnected from database: %s", database)
+	log.Fatal(fmt.Sprintf("Disconnected from database: %s", database))
 	return s.db.Close()
 }
 
@@ -318,10 +332,12 @@ type redisService struct {
 func (s *redisService) checkRedisHealth(ctx context.Context, stats map[string]string) map[string]string {
 	// Ping the Redis server to check its availability.
 	pong, err := s.db.Ping(ctx).Result()
+	log := logger.Log
+
 	// Note: By extracting and simplifying like this, `log.Fatalf(fmt.Sprintf("db down: %v", err))`
 	// can be changed into a standard error instead of a fatal error.
 	if err != nil {
-		log.Fatalf(fmt.Sprintf("db down: %v", err))
+		log.Fatal(fmt.Sprintf("db down: %v", err))
 	}
 
 	// Redis is up
