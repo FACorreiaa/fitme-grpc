@@ -55,6 +55,7 @@ type Config struct {
 		Customer   string `mapstructure:"customer"`
 		Auth       string `mapstructure:"auth"`
 		Calculator string `mapstructure:"calculator"`
+		Activity   string `mapstructure:"activity"`
 	} `mapstructure:"upstreamServices"`
 }
 

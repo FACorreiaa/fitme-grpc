@@ -16,3 +16,10 @@ CREATE TABLE "activity_user" (
                                  "created_at" timestamp DEFAULT (now()),
                                  "updated_at" timestamp DEFAULT null
 );
+
+CREATE INDEX idx_activity_id ON activity (id);
+CREATE INDEX idx_activity_user_id ON activity (user_id);
+CREATE INDEX idx_activity_name ON activity (name);
+
+CREATE INDEX idx_activity_user_id ON activity_user (id);
+CREATE INDEX idx_activity_user_user_id ON activity_user (user_id);
