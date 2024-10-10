@@ -48,10 +48,15 @@ func ConfigureUpstreamClients(log *zap.Logger, transport *utils.TransportUtils) 
 		return nil
 	}
 
-	activityBroker, err := activity.NewBroker(cfg.UpstreamServices.Customer)
+	activityBroker, err := activity.NewBroker(cfg.UpstreamServices.Activity)
+	if err != nil {
+		log.Error("failed to create activity service broker", zap.Error(err))
+		return nil
+	}
 
 	brokers.Customer = customerBroker
 	brokers.Auth = authBroker
 	brokers.Calculator = calculatorBroker
+	brokers.Activity = activityBroker
 	return brokers
 }

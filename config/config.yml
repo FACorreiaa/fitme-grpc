@@ -49,7 +49,9 @@ server:
   GRPCPort: "8000"
   HTTPTimeout: 15s
 
-upstreamServices:
-  customer: "example.com:1234"
-  auth: "example.com:1234"
+UpstreamServices:
+  Customer: "http://customer-service:8080"
+  Auth: "http://auth-service:8080"
+  Activity: "http://activity-service:8080"
+  Calculator: "http://calculator-service:8080"
 

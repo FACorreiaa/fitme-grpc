@@ -19,6 +19,6 @@ vendor/
 
 # Go workspace file
 go.work
-.env
 .data
 tmp
+.env.dev
