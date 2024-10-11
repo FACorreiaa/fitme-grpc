@@ -618,3 +618,29 @@ func (a *ActivityRepository) GetUserExerciseSessionStats(ctx context.Context, re
 //		},
 //	}, nil
 //}
+
+func (a *ActivityRepository) DeleteExerciseSession(ctx context.Context, req *pba.DeleteExerciseSessionReq) (*pba.NilRes, error) {
+	if req.PublicId == "" {
+		return nil, status.Error(codes.InvalidArgument, "public_id is required")
+	}
+
+	query := `DELETE FROM exercise_session WHERE id = $1`
+
+	_, err := a.pgpool.Exec(ctx, query, req.PublicId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to delete exercise session: %w", err)
+	}
+
+	return &pba.NilRes{}, nil
+}
+
+func (a *ActivityRepository) DeleteAllExercisesSession(ctx context.Context, req *pba.DeleteAllExercisesSessionReq) (*pba.NilRes, error) {
+	query := `DELETE FROM exercise_session WHERE user_id = $1`
+
+	_, err := a.pgpool.Exec(ctx, query, req.PublicId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to delete all exercise sessions for user: %w", err)
+	}
+
+	return &pba.NilRes{}, nil
+}

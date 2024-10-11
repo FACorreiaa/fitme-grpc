@@ -439,9 +439,24 @@ func (a *ActivityService) StopActivityTracker(ctx context.Context, req *pba.Stop
 }
 
 func (a *ActivityService) DeleteExerciseSession(ctx context.Context, req *pba.DeleteExerciseSessionReq) (*pba.NilRes, error) {
-	return nil, nil
+	sessionID := req.PublicId
+
+	if sessionID == "" {
+		return nil, status.Error(codes.InvalidArgument, "Session ID is required")
+	}
+
+	_, err := a.repo.DeleteExerciseSession(ctx, req)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Error deleting exercise session: %v", err)
+	}
+
+	return &pba.NilRes{}, nil
 }
 
-func (a ActivityService) DeleteAllExercisesSession(ctx context.Context, req *pba.DeleteAllExercisesSessionReq) (*pba.NilRes, error) {
-	return nil, nil
+func (a *ActivityService) DeleteAllExercisesSession(ctx context.Context, req *pba.DeleteAllExercisesSessionReq) (*pba.NilRes, error) {
+	_, err := a.repo.DeleteAllExercisesSession(ctx, req)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Error deleting exercise session: %v", err)
+	}
+	return &pba.NilRes{}, nil
 }
