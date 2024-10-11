@@ -143,14 +143,6 @@ func (c *CalculatorRepository) CreateUserMacro(ctx context.Context, req *pbc.Use
 	}
 	defer rows.Close()
 
-	//accounts, err := pgx.CollectRows(rows, pgx.RowToStructByName[pbc.UserMacroDistribution])
-	//if err != nil {
-	//	return nil, fmt.Errorf("failed collecting rows: %w", err)
-	//}
-	//
-	//if len(accounts) == 0 {
-	//	return nil, fmt.Errorf("no rows returned")
-	//}
 	if rows.Next() {
 		err = rows.Scan(
 			&macro.Id, &macro.UserId, &macro.Age, &macro.Height, &macro.Weight, &macro.Gender, &macro.System,

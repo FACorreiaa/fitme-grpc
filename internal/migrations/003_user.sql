@@ -6,7 +6,7 @@ CREATE TYPE "user_gender" AS ENUM ('MALE', 'FEMALE');
 -- start_time, end_time, duration, calories_burned, created_at
 CREATE TABLE "user_personal_data" (
                                       "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                                      "user_id" integer,
+                                      "user_id" UUID,
                                       "firstname" varchar(255),
                                       "lastname" varchar(255),
                                       "gender" user_gender DEFAULT 'MALE',
@@ -15,7 +15,7 @@ CREATE TABLE "user_personal_data" (
 );
 CREATE TABLE "user_bio_data" (
                                  "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                                 "user_id" integer,
+                                 "user_id" UUID,
                                  "weight" float(8),
                                  "height" float(8),
                                  "created_at" timestamp DEFAULT (now()),
@@ -23,7 +23,7 @@ CREATE TABLE "user_bio_data" (
 );
 CREATE TABLE "account" (
                            "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                           "user_id" integer,
+                           "user_id" UUID,
                            "type" varchar(255),
                            "provider" varchar(255),
                            "providerAccountId" varchar(255),
