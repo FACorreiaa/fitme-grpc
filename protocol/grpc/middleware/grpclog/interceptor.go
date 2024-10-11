@@ -16,6 +16,36 @@ func Interceptors(instance *zap.Logger) (middleware.ClientInterceptor, middlewar
 
 	grpcZap.ReplaceGrpcLoggerV2WithVerbosity(instance, int(zap.WarnLevel))
 
+	//serverUnaryInterceptor := grpc.UnaryServerInterceptor(func(
+	//	ctx context.Context,
+	//	req interface{},
+	//	info *grpc.UnaryServerInfo,
+	//	handler grpc.UnaryHandler,
+	//) (interface{}, error) {
+	//	// Log request size
+	//	requestSize := proto.Size(req.(proto.Message))
+	//	instance.Info("Received request",
+	//		zap.String("method", info.FullMethod),
+	//		zap.Int("request_size_bytes", requestSize),
+	//	)
+	//
+	//	// Handle the request
+	//	res, err := handler(ctx, req)
+	//
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//
+	//	// Log response size
+	//	responseSize := proto.Size(res.(proto.Message))
+	//	instance.Info("Sending response",
+	//		zap.String("method", info.FullMethod),
+	//		zap.Int("response_size_bytes", responseSize),
+	//	)
+	//
+	//	return res, nil
+	//})
+
 	clientInterceptor := middleware.ClientInterceptor{
 		Unary:  grpcZap.UnaryClientInterceptor(instance, opt...),
 		Stream: grpcZap.StreamClientInterceptor(instance, opt...),

@@ -17,8 +17,8 @@ CREATE TABLE "food" (
 );
 CREATE TABLE "meal_type" (
                              "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                             "user_id" integer UNIQUE,
-                             "food_id" integer UNIQUE,
+                             "user_id" UUID UNIQUE,
+                             "food_id" UUID UNIQUE,
                              "meal_number" integer,
                              "meal_description" varchar(255),
                              "created_at" timestamp DEFAULT (now()),
@@ -26,8 +26,8 @@ CREATE TABLE "meal_type" (
 );
 CREATE TABLE "meal_plan" (
                              "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                             "user_id" integer UNIQUE,
-                             "meal_type_id" integer UNIQUE,
+                             "user_id" UUID UNIQUE,
+                             "meal_type_id" UUID UNIQUE,
                              "description" varchar(255),
                              "notes" varchar(255),
                              "total_calories" float(8),
@@ -37,47 +37,47 @@ CREATE TABLE "meal_plan" (
 );
 CREATE TABLE "favourite" (
                              "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                             "user_id" integer UNIQUE,
-                             "exercise_id" integer UNIQUE,
-                             "activity_id" integer UNIQUE,
-                             "food_id" integer UNIQUE,
+                             "user_id" UUID UNIQUE,
+                             "exercise_id" UUID UNIQUE,
+                             "activity_id" UUID UNIQUE,
+                             "food_id" UUID UNIQUE,
                              "created_at" timestamp DEFAULT (now()),
                              "updated_at" timestamp DEFAULT null
 );
 CREATE TABLE "recipe" (
                           "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                          "user_id" integer UNIQUE,
-                          "food_id" integer UNIQUE,
+                          "user_id" UUID UNIQUE,
+                          "food_id" UUID UNIQUE,
                           "description" varchar(255),
                           "created_at" timestamp DEFAULT (now()),
                           "updated_at" timestamp DEFAULT null
 );
 CREATE TABLE "recipe_user" (
                                "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                               "recipe_id" integer UNIQUE,
-                               "user_id" integer UNIQUE,
+                               "recipe_id" UUID UNIQUE,
+                               "user_id" UUID UNIQUE,
                                "created_at" timestamp DEFAULT (now()),
                                "updated_at" timestamp DEFAULT null
 );
 
 CREATE TABLE "meal_plan_meal_type" (
                                        "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                                       "meal_plan_id" integer UNIQUE,
-                                       "meal_type_id" integer UNIQUE,
+                                       "meal_plan_id" UUID UNIQUE,
+                                       "meal_type_id" UUID UNIQUE,
                                        "created_at" timestamp DEFAULT (now()),
                                        "updated_at" timestamp DEFAULT null
 );
 CREATE TABLE "meal_plan_user" (
                                   "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                                  "meal_plan_id" integer UNIQUE,
-                                  "user_id" integer UNIQUE,
+                                  "meal_plan_id" UUID UNIQUE,
+                                  "user_id" UUID UNIQUE,
                                   "created_at" timestamp DEFAULT (now()),
                                   "updated_at" timestamp DEFAULT null
 );
 
 CREATE TABLE "water_intake_user" (
                                      "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                                     "water_intake_id" integer UNIQUE,
+                                     "water_intake_id" UUID UNIQUE,
                                      "user_id" integer UNIQUE
 );
 

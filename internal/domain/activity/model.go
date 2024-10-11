@@ -32,9 +32,10 @@ type ExerciseSession struct {
 }
 
 type Duration struct {
-	Hours   int
-	Minutes int
-	Seconds int
+	Hours       int
+	Minutes     int
+	Seconds     int
+	SessionName string
 }
 
 type TotalExerciseSession struct {
