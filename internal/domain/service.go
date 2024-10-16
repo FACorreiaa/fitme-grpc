@@ -13,13 +13,14 @@ import (
 // CustomerService implements the Customer gRPC server
 type CustomerService struct {
 	pb.UnimplementedCustomerServer
+	ctx    context.Context
 	pgpool *pgxpool.Pool
 	redis  *redis.Client
 }
 
 // NewCustomerService creates a new CustomerService
-func NewCustomerService(db *pgxpool.Pool, redis *redis.Client) *CustomerService {
-	return &CustomerService{pgpool: db, redis: redis}
+func NewCustomerService(ctx context.Context, db *pgxpool.Pool, redis *redis.Client) *CustomerService {
+	return &CustomerService{ctx: ctx, pgpool: db, redis: redis}
 }
 
 func (s *CustomerService) GetCustomer(ctx context.Context, req *pb.GetCustomerReq) (*pb.GetCustomerRes, error) {

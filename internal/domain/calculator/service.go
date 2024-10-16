@@ -20,12 +20,14 @@ import (
 )
 
 type CalculatorService struct {
-	pb.UnimplementedCalculatorServer // Required for forward compatibilit
-	repo                             domain.CalculatorRepository
+	pb.UnimplementedCalculatorServer
+	ctx  context.Context
+	repo domain.CalculatorRepository
 }
 
-func NewCalculatorService(repo domain.CalculatorRepository) *CalculatorService {
+func NewCalculatorService(ctx context.Context, repo domain.CalculatorRepository) *CalculatorService {
 	return &CalculatorService{
+		ctx:  ctx,
 		repo: repo,
 	}
 }

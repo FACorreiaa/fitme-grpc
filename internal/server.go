@@ -70,7 +70,7 @@ func ServeGRPC(ctx context.Context, port string, container *ServiceContainer) er
 	cpb.RegisterCustomerServer(server, container.CustomerService)
 	upb.RegisterAuthServer(server, container.AuthService)
 	ccpb.RegisterCalculatorServer(server, container.CalculatorService)
-	apb.RegisterActivityServer(server, container.ActivityService)
+	apb.RegisterActivityServer(server, container.ServiceActivity)
 	// Enable reflection to be able to use grpcui or insomnia without
 	// having to manually maintain .proto files
 

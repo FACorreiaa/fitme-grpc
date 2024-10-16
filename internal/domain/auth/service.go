@@ -12,17 +12,18 @@ import (
 
 type AuthService struct {
 	pb.UnimplementedAuthServer
+	ctx            context.Context
 	repo           domain.AuthRepository
 	pgpool         *pgxpool.Pool
 	redis          *redis.Client
 	SessionManager *SessionManager
 }
 
-func NewAuthService(repo domain.AuthRepository,
+func NewAuthService(ctx context.Context, repo domain.AuthRepository,
 	db *pgxpool.Pool,
 	redis *redis.Client,
 	sessionManager *SessionManager) *AuthService {
-	return &AuthService{repo: repo, pgpool: db, redis: redis, SessionManager: sessionManager}
+	return &AuthService{ctx: ctx, repo: repo, pgpool: db, redis: redis, SessionManager: sessionManager}
 }
 
 func (s *AuthService) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
