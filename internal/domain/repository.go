@@ -30,7 +30,7 @@ type CalculatorRepository interface {
 	DeleteUserMacro(ctx context.Context, req *pbc.DeleteUserMacroRequest) (*pbc.DeleteUserMacroResponse, error)
 }
 
-type ActivityRepository interface {
+type RepositoryActivity interface {
 	GetActivity(ctx context.Context, req *pba.GetActivityReq) (*pba.GetActivityRes, error)                                                         // done
 	GetActivitiesByID(ctx context.Context, req *pba.GetActivityIDReq) (*pba.GetActivityIDRes, error)                                               // done
 	GetActivitiesByName(ctx context.Context, req *pba.GetActivityNameReq) (*pba.GetActivityNameRes, error)                                         // done

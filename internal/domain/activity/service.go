@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	pba "github.com/FACorreiaa/fitme-protos/modules/activity/generated"
@@ -18,20 +19,26 @@ import (
 	"github.com/FACorreiaa/fitme-grpc/internal/domain"
 )
 
-type ActivityService struct {
-	pba.UnimplementedActivityServer // Required for forward compatibilit
-	repo                            domain.ActivityRepository
-	exerciseSessions                map[string]*pba.XExerciseSession // Map to store exercise sessions for each user
-	pausedTimers                    map[string]time.Time
+var mu sync.Mutex
+
+type ServiceActivity struct {
+	pba.UnimplementedActivityServer
+	ctx              context.Context
+	repo             domain.RepositoryActivity
+	exerciseSessions map[string]*pba.XExerciseSession
+	pausedTimers     map[string]time.Time
 }
 
-func NewCalculatorService(repo domain.ActivityRepository) *ActivityService {
-	return &ActivityService{
-		repo: repo,
+func NewCalculatorService(ctx context.Context, repo domain.RepositoryActivity) *ServiceActivity {
+	return &ServiceActivity{
+		ctx:              ctx,
+		repo:             repo,
+		exerciseSessions: make(map[string]*pba.XExerciseSession),
+		pausedTimers:     make(map[string]time.Time),
 	}
 }
 
-func (a *ActivityService) GetActivity(ctx context.Context, req *pba.GetActivityReq) (*pba.GetActivityRes, error) {
+func (a *ServiceActivity) GetActivity(ctx context.Context, req *pba.GetActivityReq) (*pba.GetActivityRes, error) {
 	tracer := otel.Tracer("FITDEV")
 	ctx, span := tracer.Start(ctx, "GetActivity")
 	defer span.End()
@@ -81,7 +88,7 @@ func (a *ActivityService) GetActivity(ctx context.Context, req *pba.GetActivityR
 	}, nil
 }
 
-func (a *ActivityService) GetActivitiesByID(ctx context.Context, req *pba.GetActivityIDReq) (*pba.GetActivityIDRes, error) {
+func (a *ServiceActivity) GetActivitiesByID(ctx context.Context, req *pba.GetActivityIDReq) (*pba.GetActivityIDRes, error) {
 	tracer := otel.Tracer("FITDEV")
 	ctx, span := tracer.Start(ctx, "GetActivitiesByID")
 	defer span.End()
@@ -126,7 +133,7 @@ func (a *ActivityService) GetActivitiesByID(ctx context.Context, req *pba.GetAct
 
 }
 
-func (a *ActivityService) GetActivitiesByName(ctx context.Context, req *pba.GetActivityNameReq) (*pba.GetActivityNameRes, error) {
+func (a *ServiceActivity) GetActivitiesByName(ctx context.Context, req *pba.GetActivityNameReq) (*pba.GetActivityNameRes, error) {
 	tracer := otel.Tracer("FITDEV")
 	ctx, span := tracer.Start(ctx, "GetActivitiesByName")
 	defer span.End()
@@ -175,7 +182,7 @@ func (a *ActivityService) GetActivitiesByName(ctx context.Context, req *pba.GetA
 // an user can only see its own sessions
 // so the userID comes from a session
 // but a PT can search and select several userID on its network
-func (a *ActivityService) GetUserExerciseSession(ctx context.Context, req *pba.GetUserExerciseSessionReq) (*pba.GetUserExerciseSessionRes, error) {
+func (a *ServiceActivity) GetUserExerciseSession(ctx context.Context, req *pba.GetUserExerciseSessionReq) (*pba.GetUserExerciseSessionRes, error) {
 	tracer := otel.Tracer("FITDEV")
 	ctx, span := tracer.Start(ctx, "GetActivitiesByName")
 	defer span.End()
@@ -217,7 +224,7 @@ func (a *ActivityService) GetUserExerciseSession(ctx context.Context, req *pba.G
 
 }
 
-func (a *ActivityService) GetUserExerciseTotalData(ctx context.Context, req *pba.GetUserExerciseTotalDataReq) (*pba.GetUserExerciseTotalDataRes, error) {
+func (a *ServiceActivity) GetUserExerciseTotalData(ctx context.Context, req *pba.GetUserExerciseTotalDataReq) (*pba.GetUserExerciseTotalDataRes, error) {
 	//userSession, ok := ctx.Value(auth.SessionManagerKey{}).(*auth.UserSession)
 	//if !ok || userSession == nil {
 	//	return nil, status.Error(codes.Unauthenticated, "failed to retrieve user session")
@@ -250,7 +257,7 @@ func (a *ActivityService) GetUserExerciseTotalData(ctx context.Context, req *pba
 	}, nil
 }
 
-func (a *ActivityService) GetUserExerciseSessionStats(ctx context.Context, req *pba.GetUserExerciseSessionStatsReq) (*pba.GetUserExerciseSessionStatsRes, error) {
+func (a *ServiceActivity) GetUserExerciseSessionStats(ctx context.Context, req *pba.GetUserExerciseSessionStatsReq) (*pba.GetUserExerciseSessionStatsRes, error) {
 	tracer := otel.Tracer("FITDEV")
 	ctx, span := tracer.Start(ctx, "GetActivitiesByName")
 	defer span.End()
@@ -293,11 +300,11 @@ func (a *ActivityService) GetUserExerciseSessionStats(ctx context.Context, req *
 }
 
 // GetExerciseSessionStats maybe delete later
-func (a *ActivityService) GetExerciseSessionStats(ctx context.Context, req *pba.GetExerciseSessionStatsOccurrenceReq) (*pba.GetExerciseSessionStatsOccurrenceRes, error) {
+func (a *ServiceActivity) GetExerciseSessionStats(ctx context.Context, req *pba.GetExerciseSessionStatsOccurrenceReq) (*pba.GetExerciseSessionStatsOccurrenceRes, error) {
 	return nil, nil
 }
 
-func (a *ActivityService) StartActivityTracker(ctx context.Context, req *pba.StartActivityTrackerReq) (*pba.StartActivityTrackerRes, error) {
+func (a *ServiceActivity) StartActivityTracker(ctx context.Context, req *pba.StartActivityTrackerReq) (*pba.StartActivityTrackerRes, error) {
 	activityID := req.ActivityId
 	userID := req.UserId
 
@@ -312,7 +319,9 @@ func (a *ActivityService) StartActivityTracker(ctx context.Context, req *pba.Sta
 		return nil, status.Error(codes.InvalidArgument, "User ID is required")
 	}
 
+	mu.Lock()
 	_, found := a.exerciseSessions[userID]
+	mu.Unlock()
 	if found {
 		return nil, status.Error(codes.FailedPrecondition, "activity tracker already started")
 	}
@@ -328,11 +337,11 @@ func (a *ActivityService) StartActivityTracker(ctx context.Context, req *pba.Sta
 		UserId:            userID,
 		ActivityId:        activityRes.Activity.ActivityId,
 		SessionName:       activityRes.Activity.Name,
-		StartTime:         currentTime.Format("2006-01-02 15:04:05"),
-		CreatedAt:         activityRes.Activity.CreatedAt,
+		StartTime:         timestamppb.New(time.Now()),
+		CreatedAt:         timestamppb.New(currentTime),
 	}
 
-	a.exerciseSessions[userID] = exerciseSession
+	a.exerciseSessions[exerciseSession.ExerciseSessionId] = exerciseSession
 
 	span.SetAttributes(
 		attribute.String("request.id", req.ActivityId),
@@ -346,7 +355,7 @@ func (a *ActivityService) StartActivityTracker(ctx context.Context, req *pba.Sta
 	}, nil
 }
 
-func (a *ActivityService) PauseActivityTracker(ctx context.Context, req *pba.PauseActivityTrackerReq) (*pba.PauseActivityTrackerRes, error) {
+func (a *ServiceActivity) PauseActivityTracker(ctx context.Context, req *pba.PauseActivityTrackerReq) (*pba.PauseActivityTrackerRes, error) {
 	// this is the user session! change after
 	sessionID := req.SessionId
 
@@ -354,37 +363,55 @@ func (a *ActivityService) PauseActivityTracker(ctx context.Context, req *pba.Pau
 		return nil, status.Error(codes.InvalidArgument, "Session ID is required")
 	}
 
+	mu.Lock()
 	a.pausedTimers[sessionID] = time.Now()
+	mu.Unlock()
 	return &pba.PauseActivityTrackerRes{
 		Success: true,
 		Message: "Activity tracker paused",
 	}, nil
 }
 
-func (a *ActivityService) ResumeActivityTracker(ctx context.Context, req *pba.ResumeActivityTrackerReq) (*pba.ResumeActivityTrackerRes, error) {
+func (a *ServiceActivity) ResumeActivityTracker(ctx context.Context, req *pba.ResumeActivityTrackerReq) (*pba.ResumeActivityTrackerRes, error) {
 	sessionID := req.SessionId
 	if sessionID == "" {
 		return nil, status.Error(codes.InvalidArgument, "Session ID is required")
 	}
 
+	//for id, session := range a.exerciseSessions {
+	//	fmt.Printf("Exercise Session ID: %s\n", id)
+	//	fmt.Printf("Session Name: %s\n", session.SessionName)
+	//	fmt.Printf("ExerciseSessionId: %s\n", session.ExerciseSessionId)
+	//}
+
+	mu.Lock()
 	session, found := a.exerciseSessions[sessionID]
+	mu.Unlock()
+
 	if !found {
 		return nil, status.Error(codes.FailedPrecondition, "activity tracker session not found")
 	}
+
+	if sessionID != session.ExerciseSessionId {
+		return nil, status.Error(codes.FailedPrecondition, "activity tracker session not found")
+	}
+
+	//session, _ := a.exerciseSessions[sessionID]
+	//if !found {
+	//	return nil, status.Error(codes.FailedPrecondition, "activity tracker session not found")
+	//}
 
 	pausedTime, found := a.pausedTimers[sessionID]
 	if !found {
 		return nil, status.Error(codes.FailedPrecondition, "activity tracker was not paused")
 	}
 
-	startTime, err := time.Parse(time.RFC3339, session.StartTime)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to parse start time: %v", err)
-	}
+	startTime := session.StartTime.AsTime()
 
 	pausedDuration := time.Since(pausedTime)
 	adjustedStartTime := startTime.Add(pausedDuration)
-	session.StartTime = adjustedStartTime.Format(time.RFC3339)
+
+	session.StartTime = timestamppb.New(adjustedStartTime)
 	delete(a.pausedTimers, sessionID)
 
 	return &pba.ResumeActivityTrackerRes{
@@ -394,13 +421,15 @@ func (a *ActivityService) ResumeActivityTracker(ctx context.Context, req *pba.Re
 	}, nil
 }
 
-func (a *ActivityService) StopActivityTracker(ctx context.Context, req *pba.StopActivityTrackerReq) (*pba.StopActivityTrackerRes, error) {
+func (a *ServiceActivity) StopActivityTracker(ctx context.Context, req *pba.StopActivityTrackerReq) (*pba.StopActivityTrackerRes, error) {
 	// review protos.
-	userID := req.SessionId
-	if userID == "" {
+	sessionID := req.SessionId
+	if sessionID == "" {
 		return nil, status.Error(codes.InvalidArgument, "Session ID is required")
 	}
-	session, found := a.exerciseSessions[userID]
+	mu.Lock()
+	session, found := a.exerciseSessions[sessionID]
+	mu.Unlock()
 	if !found {
 		return nil, status.Error(codes.FailedPrecondition, "activity tracker session not found")
 	}
@@ -410,10 +439,7 @@ func (a *ActivityService) StopActivityTracker(ctx context.Context, req *pba.Stop
 		return nil, status.Errorf(codes.Internal, "Error getting activity: %v", err)
 	}
 
-	startUpTime, err := time.Parse(time.RFC3339, session.StartTime)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Error parsing start time: %v", err)
-	}
+	startUpTime := session.StartTime.AsTime()
 
 	totalDurationSeconds := int(time.Since(startUpTime).Seconds())
 	session.DurationHours = uint32(totalDurationSeconds / 3600)
@@ -423,12 +449,12 @@ func (a *ActivityService) StopActivityTracker(ctx context.Context, req *pba.Stop
 	caloriesPerSecond := activityRes.Activity.CaloriesPerHour / 3600
 	session.CaloriesBurned = uint32(caloriesPerSecond * float32(totalDurationSeconds))
 	//session.EndTime = timestamppb.New(time.Now()) // change protobuf generation
-	session.EndTime = time.Now().Format(time.RFC3339)
+	session.EndTime = timestamppb.New(time.Now())
 	err = a.repo.SaveSession(ctx, session)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Error saving exercise session to DB: %v", err)
 	}
-	delete(a.exerciseSessions, userID)
+	delete(a.exerciseSessions, sessionID)
 
 	return &pba.StopActivityTrackerRes{
 		Success:         true,
@@ -438,7 +464,7 @@ func (a *ActivityService) StopActivityTracker(ctx context.Context, req *pba.Stop
 
 }
 
-func (a *ActivityService) DeleteExerciseSession(ctx context.Context, req *pba.DeleteExerciseSessionReq) (*pba.NilRes, error) {
+func (a *ServiceActivity) DeleteExerciseSession(ctx context.Context, req *pba.DeleteExerciseSessionReq) (*pba.NilRes, error) {
 	sessionID := req.PublicId
 
 	if sessionID == "" {
@@ -453,7 +479,7 @@ func (a *ActivityService) DeleteExerciseSession(ctx context.Context, req *pba.De
 	return &pba.NilRes{}, nil
 }
 
-func (a *ActivityService) DeleteAllExercisesSession(ctx context.Context, req *pba.DeleteAllExercisesSessionReq) (*pba.NilRes, error) {
+func (a *ServiceActivity) DeleteAllExercisesSession(ctx context.Context, req *pba.DeleteAllExercisesSessionReq) (*pba.NilRes, error) {
 	_, err := a.repo.DeleteAllExercisesSession(ctx, req)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Error deleting exercise session: %v", err)

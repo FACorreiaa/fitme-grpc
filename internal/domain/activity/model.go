@@ -6,18 +6,18 @@ import (
 )
 
 type Activity struct {
-	ID              string         `json:"id,string" db:"id" pg:"default:gen_random_uuid()"`
-	UserID          sql.NullString `json:"user_id,string" db:"user_id" swaggertype:"string"`
-	Name            string         `json:"name" db:"name"`
-	CaloriesPerHour float32        `json:"calories_per_hour" db:"calories_per_hour"`
-	DurationMinutes float32        `json:"duration_minutes" db:"duration_minutes"`
-	TotalCalories   float32        `json:"total_calories" db:"total_calories"`
-	CreatedAt       time.Time      `json:"created_at" db:"created_at"`
-	UpdatedAt       *time.Time     `json:"updated_at" db:"updated_at"`
+	ID              sql.NullString  `json:"id,string" db:"id" pg:"default:gen_random_uuid()" protobuf:"bytes,1,opt,name=activity_id,proto3"`
+	UserID          sql.NullString  `json:"user_id,string" db:"user_id" protobuf:"bytes,1,opt,name=user_id,proto3"`
+	Name            sql.NullString  `json:"name" db:"name" protobuf:"bytes,1,opt,name=name,proto3"`
+	CaloriesPerHour sql.NullFloat64 `json:"calories_per_hour" db:"calories_per_hour" protobuf:"bytes,1,opt,name=calories_per_hour,proto3"`
+	DurationMinutes sql.NullFloat64 `json:"duration_minutes" db:"duration_minutes" protobuf:"bytes,1,opt,name=duration_in_minutes,proto3"`
+	TotalCalories   sql.NullFloat64 `json:"total_calories" db:"total_calories" protobuf:"bytes,1,opt,name=total_calories,proto3"`
+	CreatedAt       time.Time       `json:"created_at" db:"created_at" protobuf:"bytes,1,opt,name=created_at,proto3"`
+	UpdatedAt       sql.NullTime    `json:"updated_at" db:"updated_at" protobuf:"bytes,1,opt,name=updated_at,proto3"`
 }
 
 type ExerciseSession struct {
-	ID              string     `json:"id,string" db:"id" pg:"default:gen_random_uuid()"`
+	ID              string     `json:"id,string" db:"id" pg:"default:gen_random_uuid()" `
 	UserID          string     `json:"user_id" db:"user_id"`
 	ActivityID      string     `json:"activity_id" db:"activity_id"`
 	SessionName     string     `json:"session_name" db:"session_name"`
