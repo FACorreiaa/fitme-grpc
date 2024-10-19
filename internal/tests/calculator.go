@@ -10,6 +10,7 @@ import (
 	pbc "github.com/FACorreiaa/fitme-protos/modules/calculator/generated"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/FACorreiaa/fitme-grpc/internal/domain/calculator"
@@ -18,6 +19,19 @@ import (
 // Mock repository to simulate database interactions
 type MockCalculatorRepository struct {
 	mock.Mock
+}
+
+type ServiceCalculatorTestSuite struct {
+	suite.Suite
+	ctx      context.Context
+	mockRepo *MockCalculatorRepository
+	service  *calculator.CalculatorService
+}
+
+func (suite *ServiceCalculatorTestSuite) SetupTest() {
+	suite.ctx = context.Background()
+	suite.mockRepo = new(MockCalculatorRepository)
+	suite.service = calculator.NewCalculatorService(suite.ctx, suite.mockRepo)
 }
 
 func (m *MockCalculatorRepository) CreateUserMacro(ctx context.Context, macro *pbc.UserMacroDistribution) (*pbc.UserMacroDistribution, error) {
@@ -39,6 +53,8 @@ func (m *MockCalculatorRepository) DeleteUserMacro(ctx context.Context, req *pbc
 	args := m.Called(ctx, req)
 	return args.Get(0).(*pbc.DeleteUserMacroResponse), args.Error(1)
 }
+
+// setup to complete after the workout rewrite
 
 func TestCreateUserMacro(t *testing.T) {
 	mockRepo := new(MockCalculatorRepository)
