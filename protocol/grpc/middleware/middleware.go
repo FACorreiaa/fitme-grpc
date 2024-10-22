@@ -7,6 +7,7 @@ import (
 
 	"context"
 
+	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
@@ -62,11 +63,19 @@ func (cl *ClientInterceptor) UnaryClientInterceptor(
 	// Logic before invoking the invoker
 	start := time.Now()
 	// Calls the invoker to execute RPC
+
+	//reqSize := getMessageSize(req)
+
 	err := invoker(ctx, method, req, reply, cc, opts...)
 	// Logic after invoking the invoker
+
+	//respSize := getMessageSize(reply)
+
 	Log.Info("Invoked RPC method",
 		zap.String("method", method),
 		zap.Duration("duration", time.Since(start)),
+		//zap.Int("request_size", reqSize),
+		//zap.Int("response_size", respSize),
 		zap.Error(err),
 	)
 	return err
@@ -83,4 +92,19 @@ func (si *ServerInterceptor) UnaryServerInterceptor(ctx context.Context, req int
 	// TODO fill logic
 	resp, err := handler(ctx, req)
 	return resp, err
+}
+
+func getMessageSize(msg interface{}) int {
+	// Check if the message can be marshaled to proto
+	if protoMsg, ok := msg.(proto.Message); ok {
+		// Marshal the proto message and measure its size
+		data, err := proto.Marshal(protoMsg)
+		if err == nil {
+			return len(data)
+		}
+		// Log error if marshalling fails
+		Log.Warn("Failed to marshal proto message", zap.Error(err))
+	}
+	// Return 0 if the message isn't a proto message or failed to marshal
+	return 0
 }

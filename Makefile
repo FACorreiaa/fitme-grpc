@@ -35,3 +35,7 @@ run-test:
 
 test-lint:
 	testifylint --fix ./...
+
+profile:
+	go build -o pprofbin .
+	go tool pprof -http=":6969" pprofbin ./cpu.pprof

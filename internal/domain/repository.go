@@ -6,6 +6,7 @@ import (
 	pba "github.com/FACorreiaa/fitme-protos/modules/activity/generated"
 	pbc "github.com/FACorreiaa/fitme-protos/modules/calculator/generated"
 	pb "github.com/FACorreiaa/fitme-protos/modules/user/generated"
+	pbw "github.com/FACorreiaa/fitme-protos/modules/workout/generated"
 )
 
 type AuthRepository interface {
@@ -45,4 +46,8 @@ type RepositoryActivity interface {
 	DeleteExerciseSession(ctx context.Context, req *pba.DeleteExerciseSessionReq) (*pba.NilRes, error)
 	DeleteAllExercisesSession(ctx context.Context, req *pba.DeleteAllExercisesSessionReq) (*pba.NilRes, error)
 	SaveSession(ctx context.Context, req *pba.XExerciseSession) error
+}
+
+type RepositoryWorkout interface {
+	GetExercises(ctx context.Context, req *pbw.GetExercisesReq) (*pbw.GetExercisesRes, error)
 }

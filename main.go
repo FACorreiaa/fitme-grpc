@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"log"
 	"os"
+	"runtime/pprof"
 
 	"github.com/FACorreiaa/fitme-protos/utils"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -61,7 +63,17 @@ func run() (*pgxpool.Pool, *redis.Client, error) {
 }
 
 func main() {
+	f, perf := os.Create("cpu.pprof")
+	if perf != nil {
+		log.Fatal(perf)
+	}
 	ctx := context.Background()
+
+	err := pprof.StartCPUProfile(f)
+	if err != nil {
+		return
+	}
+	defer pprof.StopCPUProfile()
 
 	cfg, err := config.InitConfig()
 	if err != nil {
