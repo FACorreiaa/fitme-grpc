@@ -156,8 +156,6 @@ func (a *RepositoryActivity) GetActivitiesByName(ctx context.Context, req *pba.G
 	nameReq := req.PublicId
 	ac := &Activity{}
 
-	log.Printf("Searching for activity with name: '%s'", nameReq)
-
 	if nameReq == "" {
 		return nil, status.Error(codes.InvalidArgument, "activity ID is required")
 	}

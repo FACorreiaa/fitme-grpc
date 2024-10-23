@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 
-	pba "github.com/FACorreiaa/fitme-protos/modules/activity/generated"
 	pbw "github.com/FACorreiaa/fitme-protos/modules/workout/generated"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -20,7 +19,7 @@ import (
 )
 
 type RepositoryWorkout struct {
-	pba.UnimplementedActivityServer
+	pbw.UnimplementedWorkoutServer
 	pgpool         *pgxpool.Pool
 	redis          *redis.Client
 	sessionManager *auth.SessionManager
@@ -135,6 +134,72 @@ func (r *RepositoryWorkout) GetExercises(ctx context.Context, req *pbw.GetExerci
 		Success:  true,
 		Message:  "Exercises retrieved successfully",
 		Exercise: exercises,
+		Response: &pbw.BaseResponse{
+			Upstream:  "workout-service",
+			RequestId: domain.GenerateRequestID(ctx),
+		},
+	}, nil
+
+}
+
+func (r *RepositoryWorkout) GetExerciseID(ctx context.Context, req *pbw.GetExerciseIDReq) (*pbw.GetExerciseIDRes, error) {
+	exerciseProto := &pbw.XExercises{}
+	exercise := &Exercises{}
+	id := req.ExerciseId
+
+	if id == "" {
+		return &pbw.GetExerciseIDRes{}, status.Error(codes.InvalidArgument, "workout ID is required")
+	}
+
+	query := `SELECT 	id, name, type, muscle, equipment, difficulty,
+						instructions, video, custom_created, created_at, updated_at
+			   FROM exercise_list
+			   WHERE id = $1`
+
+	err := r.pgpool.QueryRow(ctx, query, id).Scan(
+		&exercise.ID, &exercise.Name, &exercise.ExerciseType, &exercise.MuscleGroup, &exercise.Equipment,
+		&exercise.Difficulty, &exercise.Instructions, &exercise.Video, &exercise.CustomCreated, &exercise.CreatedAt,
+		&exercise.UpdatedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return &pbw.GetExerciseIDRes{
+				Success: false,
+				Message: "No exercises found",
+				Response: &pbw.BaseResponse{
+					Upstream:  "workout-service",
+					RequestId: domain.GenerateRequestID(ctx),
+				},
+			}, status.Error(codes.NotFound, "workout ID not found")
+		}
+		return nil, status.Errorf(codes.Internal, "failed to query exercise: %v", err)
+	}
+
+	createdAt := timestamppb.New(exercise.CreatedAt)
+	var updatedAt sql.NullTime
+
+	if exercise.UpdatedAt.Valid {
+		updatedAt = exercise.UpdatedAt
+	} else {
+		updatedAt = sql.NullTime{Valid: false}
+	}
+
+	exerciseProto.ExerciseId = exercise.ID
+	exerciseProto.Name = exercise.Name
+	exerciseProto.MuscleGroup = exercise.MuscleGroup
+	exerciseProto.Equipment = exercise.Equipment
+	exerciseProto.Difficulty = exercise.Difficulty
+	exerciseProto.Instruction = exercise.Instructions
+	exerciseProto.Video = exercise.Video
+	exerciseProto.CustomCreated = exercise.CustomCreated
+	exerciseProto.CreatedAt = createdAt
+	exerciseProto.UpdatedAt = nullTimeToTimestamppb(updatedAt)
+
+	return &pbw.GetExerciseIDRes{
+		Success:  true,
+		Message:  "Exercise retrieved successfully",
+		Exercise: exerciseProto,
 		Response: &pbw.BaseResponse{
 			Upstream:  "workout-service",
 			RequestId: domain.GenerateRequestID(ctx),

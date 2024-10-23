@@ -50,4 +50,5 @@ type RepositoryActivity interface {
 
 type RepositoryWorkout interface {
 	GetExercises(ctx context.Context, req *pbw.GetExercisesReq) (*pbw.GetExercisesRes, error)
+	GetExerciseID(ctx context.Context, req *pbw.GetExerciseIDReq) (*pbw.GetExerciseIDRes, error)
 }

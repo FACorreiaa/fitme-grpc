@@ -2,14 +2,18 @@ package workout
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	"github.com/FACorreiaa/fitme-protos/modules/workout/generated"
 	pbw "github.com/FACorreiaa/fitme-protos/modules/workout/generated"
+	"github.com/jackc/pgx/v5"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/FACorreiaa/fitme-grpc/internal/domain"
 )
@@ -27,7 +31,7 @@ func NewServiceWorkout(ctx context.Context, repo domain.RepositoryWorkout) *Serv
 	}
 }
 
-func (s ServiceWorkout) GetExercises(ctx context.Context, req *generated.GetExercisesReq) (*generated.GetExercisesRes, error) {
+func (s ServiceWorkout) GetExercises(ctx context.Context, req *pbw.GetExercisesReq) (*pbw.GetExercisesRes, error) {
 	tracer := otel.Tracer("FITDEV")
 	ctx, span := tracer.Start(ctx, "Workout/GetExercises")
 	defer span.End()
@@ -83,9 +87,48 @@ func (s ServiceWorkout) GetExercises(ctx context.Context, req *generated.GetExer
 	}, nil
 }
 
-func (s ServiceWorkout) GetExerciseID(ctx context.Context, req *generated.GetExerciseIDReq) (*generated.GetExerciseIDRes, error) {
-	//TODO implement me
-	panic("implement me")
+func (s ServiceWorkout) GetExerciseID(ctx context.Context, req *pbw.GetExerciseIDReq) (*pbw.GetExerciseIDRes, error) {
+	tracer := otel.Tracer("FITDEV")
+	ctx, span := tracer.Start(ctx, "Workout/GetExerciseID")
+	defer span.End()
+
+	if req.ExerciseId == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "req id is required")
+	}
+
+	exercise, err := s.repo.GetExerciseID(ctx, req)
+
+	createdAt := timestamppb.New(time.Now())
+
+	exercise.Exercise.CreatedAt = createdAt
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, status.Error(codes.NotFound, "macro not found")
+		}
+		return &pbw.GetExerciseIDRes{
+			Success:  false,
+			Message:  "Failed to retrieve activity by name",
+			Exercise: exercise.Exercise,
+			Response: &pbw.BaseResponse{
+				Upstream:  "activity-service",
+				RequestId: domain.GenerateRequestID(ctx),
+			},
+		}, nil
+	}
+	span.SetAttributes(
+		attribute.String("request.id", req.ExerciseId),
+		attribute.String("request.details", req.String()),
+	)
+
+	return &pbw.GetExerciseIDRes{
+		Success:  true,
+		Message:  "Activity retrieved successfully",
+		Exercise: exercise.Exercise,
+		Response: &pbw.BaseResponse{
+			Upstream:  "activity-service",
+			RequestId: domain.GenerateRequestID(ctx),
+		},
+	}, nil
 }
 
 func (s ServiceWorkout) CreateExercise(ctx context.Context, req *generated.CreateExerciseReq) (*generated.CreateExerciseRes, error) {
