@@ -22,3 +22,4 @@ go.work
 .data
 tmp
 .env.dev
+.env
