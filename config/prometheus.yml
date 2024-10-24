@@ -24,6 +24,10 @@ scrape_configs:
 
     # metrics_path defaults to '/metrics'
     # scheme defaults to 'http'.
-
     static_configs:
-      - targets: ["localhost:6969"]
+      - targets: ["localhost:9090"]
+
+  - job_name: "fitme-dev"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["host.docker.internal:7077"]

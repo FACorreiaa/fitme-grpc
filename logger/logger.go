@@ -19,7 +19,7 @@ func Init(level zapcore.Level, meta ...zap.Field) error {
 
 		// attach the additional meta fields to the logger before committing to global instance
 		instance = instance.With(meta...)
-		//instance = instance.With(zap.String("line", "42"))
+		instance = instance.With(zap.String("line", "42"))
 
 		Log = zap.New(instance.Core(), zap.AddCaller())
 	})
@@ -35,7 +35,10 @@ func configure(level zapcore.Level) zap.Config {
 	encoder := zap.NewProductionEncoderConfig()
 	encoder.TimeKey = "timestamp"
 	encoder.EncodeTime = zapcore.ISO8601TimeEncoder
-	encoder.EncodeLevel = zapcore.CapitalColorLevelEncoder // add colors
+	encoder.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	encoder.EncodeCaller = zapcore.ShortCallerEncoder
+	encoder.EncodeDuration = zapcore.SecondsDurationEncoder
+	encoder.EncodeName = zapcore.FullNameEncoder
 	encoder.CallerKey = "caller"
 	return zap.Config{
 		Level:             zap.NewAtomicLevelAt(level),

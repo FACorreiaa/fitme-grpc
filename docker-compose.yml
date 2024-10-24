@@ -109,19 +109,18 @@ services:
 #      options:
 #        loki-url: 'http://localhost:3100/api/prom/push'
 #
-#  prometheus:
-#    image: cstyan/prometheus:exemplars-64206a
-#    platform: linux/amd64
-#    volumes:
-#      - ./config/prometheus.yaml:/etc/prometheus.yaml
-#    entrypoint:
-#      - /bin/prometheus
-#      - --config.file=/etc/prometheus.yaml
-#    ports:
-#      - "9090:9090"
-#
-#    networks:
-#      - fit-me
+  prometheus:
+    image: cstyan/prometheus:exemplars-64206a
+    platform: linux/amd64
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus.yml
+    entrypoint:
+      - /bin/prometheus
+      - --config.file=/etc/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - fit-me
 
 networks:
   fit-me:
