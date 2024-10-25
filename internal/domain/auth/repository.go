@@ -42,9 +42,9 @@ func (a *AuthRepository) Register(ctx context.Context, req *pb.RegisterRequest) 
 }
 
 func (a *AuthRepository) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResponse, error) {
-	var passwordHash string
-	var email string
-	err := a.pgpool.QueryRow(ctx, `SELECT password, email FROM "users" WHERE username=$1`, req.Username).Scan(&passwordHash, &email)
+	var passwordHash, email, userID string
+	err := a.pgpool.QueryRow(ctx, `SELECT id, password, email FROM "users" WHERE username=$1`, req.Username).Scan(
+		&userID, &passwordHash, &email)
 	if err != nil {
 		return nil, errors.New("user not found")
 	}
@@ -55,6 +55,7 @@ func (a *AuthRepository) Login(ctx context.Context, req *pb.LoginRequest) (*pb.L
 	}
 
 	sessionID, err := a.sessionManager.GenerateSession(UserSession{
+		ID:       userID,
 		Email:    req.Email,
 		Username: req.Username,
 	})

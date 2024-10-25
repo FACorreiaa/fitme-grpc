@@ -22,9 +22,9 @@ func NewSessionManager(pgpool *pgxpool.Pool, redis *redis.Client) *SessionManage
 	return &SessionManager{PgPool: pgpool, Redis: redis}
 }
 
-func (s *SessionManager) GenerateSession(data UserSession) (string, error) {
+func (s *SessionManager) GenerateSession(userSession UserSession) (string, error) {
 	sessionId := uuid.NewString()
-	jsonData, _ := json.Marshal(data)
+	jsonData, _ := json.Marshal(userSession)
 	err := s.Redis.Set(context.Background(), sessionId, string(jsonData), 24*time.Hour).Err()
 	if err != nil {
 		return "", err
@@ -36,7 +36,7 @@ func (s *SessionManager) GenerateSession(data UserSession) (string, error) {
 func (s *SessionManager) SignIn(ctx context.Context, email, password string) (string, error) {
 	// check if the user exists
 	var user User
-	err := s.PgPool.QueryRow(ctx, "select id, username, email, password from users where email = $1", email).Scan(&user.Id, &user.Username, &user.Email, &user.Password)
+	err := s.PgPool.QueryRow(ctx, "select id, username, email, password from users where email = $1", email).Scan(&user.ID, &user.Username, &user.Email, &user.Password)
 	if err != nil {
 		return "", err
 	}
@@ -50,7 +50,7 @@ func (s *SessionManager) SignIn(ctx context.Context, email, password string) (st
 	// create the session
 	sessionId := uuid.NewString()
 	jsonData, _ := json.Marshal(UserSession{
-		Id:       user.Id,
+		ID:       user.ID,
 		Username: user.Username,
 		Email:    user.Email,
 	})

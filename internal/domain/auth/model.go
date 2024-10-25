@@ -3,14 +3,14 @@ package auth
 type SessionManagerKey struct{}
 
 type UserSession struct {
-	Id       int
+	ID       string `json:"id"`
 	Username string `json:"username"`
 	Email    string `json:"email"`
 	Role     string `json:"role"`
 }
 
 type User struct {
-	Id       int
+	ID       string
 	Username string
 	Email    string
 	Password string

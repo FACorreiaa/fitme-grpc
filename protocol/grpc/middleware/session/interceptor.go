@@ -50,6 +50,10 @@ func InterceptorSession(sessionManager *auth.SessionManager) grpc.UnaryServerInt
 			return nil, status.Error(codes.Unauthenticated, "invalid session token")
 		}
 
+		userID := userSession.ID
+		ctx = context.WithValue(ctx, "userSession", userSession)
+		ctx = context.WithValue(ctx, "userID", userID)
+
 		// TODO handle permissions later
 
 		//requiredPermission, ok := MethodPermissions[info.FullMethod]
@@ -64,7 +68,6 @@ func InterceptorSession(sessionManager *auth.SessionManager) grpc.UnaryServerInt
 		//}
 
 		// Pass user session in context
-		ctx = context.WithValue(ctx, "userSession", userSession)
 		return handler(ctx, req)
 	}
 }

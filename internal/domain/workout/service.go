@@ -136,26 +136,21 @@ func (s ServiceWorkout) CreateExercise(ctx context.Context, req *generated.Creat
 	ctx, span := tracer.Start(ctx, "Workout/GetExercises")
 	defer span.End()
 
-	//md, ok := metadata.FromIncomingContext(ctx)
-	//if !ok {
-	//	return nil, status.Error(codes.InvalidArgument, "no metadata provided")
-	//}
-	//
-	//userID := md.Get("user_id")
-	//if len(userID) == 0 {
-	//	return nil, status.Error(codes.Unauthenticated, "userID is missing in metadata")
-	//}
-
-	if req.UserId == "" {
-		return nil, status.Error(codes.InvalidArgument, "user_id is required")
+	userID := ctx.Value("userID").(string)
+	if userID == "" {
+		return nil, status.Error(codes.Unauthenticated, "userID is missing in metadata")
 	}
 
-	fmt.Printf("Received request: %+v\n", req)
-
-	response, err := s.repo.CreateExercise(ctx, &pbw.CreateExerciseReq{
+	request := &pbw.CreateExerciseReq{
 		Exercise: req.Exercise,
-		UserId:   req.UserId,
-	})
+		UserId:   userID,
+		Request: &pbw.BaseRequest{
+			Downstream: "workout-service",
+			RequestId:  domain.GenerateRequestID(ctx),
+		},
+	}
+
+	response, err := s.repo.CreateExercise(ctx, request)
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

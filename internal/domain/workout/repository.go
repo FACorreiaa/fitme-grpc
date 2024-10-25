@@ -225,10 +225,11 @@ func (r *RepositoryWorkout) CreateExercise(ctx context.Context, req *pbw.CreateE
                                    instructions, video,
                                    created_at, updated_at)
         		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                RETURNING *`
+                RETURNING id`
 
 	currentTime := time.Now()
 
+	var exerciseID string
 	err = tx.QueryRow(ctx, createdExerciseListQuery,
 		req.Exercise.Name,
 		req.Exercise.ExerciseType,
@@ -239,12 +240,16 @@ func (r *RepositoryWorkout) CreateExercise(ctx context.Context, req *pbw.CreateE
 		req.Exercise.Video,
 		currentTime,
 		currentTime,
-	).Scan(&req.Exercise.ExerciseId)
+	).Scan(&exerciseID)
+
+	fmt.Println(exerciseID)
 
 	setExerciseToUserQuery := `
 				INSERT INTO user_exercises (user_id, exercise_id)
 				VALUES ($1, $2)
 				RETURNING user_id, exercise_id`
+
+	req.Exercise.ExerciseId = exerciseID
 
 	var userID, associatedExerciseID string
 
@@ -258,6 +263,7 @@ func (r *RepositoryWorkout) CreateExercise(ctx context.Context, req *pbw.CreateE
 	}
 
 	exerciseProto := &pbw.XExercises{
+		ExerciseId:    exerciseID,
 		Name:          req.Exercise.Name,
 		ExerciseType:  req.Exercise.ExerciseType,
 		MuscleGroup:   req.Exercise.MuscleGroup,
