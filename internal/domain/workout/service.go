@@ -12,7 +12,6 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -137,56 +136,55 @@ func (s ServiceWorkout) CreateExercise(ctx context.Context, req *generated.Creat
 	ctx, span := tracer.Start(ctx, "Workout/GetExercises")
 	defer span.End()
 
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return nil, status.Error(codes.InvalidArgument, "no metadata provided")
+	//md, ok := metadata.FromIncomingContext(ctx)
+	//if !ok {
+	//	return nil, status.Error(codes.InvalidArgument, "no metadata provided")
+	//}
+	//
+	//userID := md.Get("user_id")
+	//if len(userID) == 0 {
+	//	return nil, status.Error(codes.Unauthenticated, "userID is missing in metadata")
+	//}
+
+	if req.UserId == "" {
+		return nil, status.Error(codes.InvalidArgument, "user_id is required")
 	}
 
-	userID := md.Get("user_id")
-	if len(userID) == 0 {
-		return nil, status.Error(codes.Unauthenticated, "userID is missing in metadata")
-	}
+	fmt.Printf("Received request: %+v\n", req)
 
 	response, err := s.repo.CreateExercise(ctx, &pbw.CreateExerciseReq{
 		Exercise: req.Exercise,
-		UserId:   userID[0],
+		UserId:   req.UserId,
 	})
 
 	if err != nil {
-		return nil, nil
+		if errors.Is(err, pgx.ErrNoRows) {
+			return &pbw.CreateExerciseRes{
+				Success:  false,
+				Message:  "Exercises creation failed",
+				Exercise: response.Exercise,
+				Response: &pbw.BaseResponse{
+					Upstream:  "workout-service",
+					RequestId: domain.GenerateRequestID(ctx),
+				},
+			}, nil
+		}
+		return nil, status.Errorf(codes.Internal, "failed to create exercise: %v", err)
 	}
-
-	//if err != nil {
-	//	if errors.Is(err, pgx.ErrNoRows) {
-	//		return &pbw.CreateExerciseRes{
-	//			Success:  false,
-	//			Message:  "Exercises creation failed",
-	//			Exercise: response.Exercise,
-	//			Response: &pbw.BaseResponse{
-	//				Upstream:  "workout-service",
-	//				RequestId: domain.GenerateRequestID(ctx),
-	//			},
-	//		}, nil
-	//	}
-	//	return nil, status.Errorf(codes.Internal, "failed to create exercise: %v", err)
-	//}
 	span.SetAttributes(
 		attribute.String("request.id", req.Exercise.ExerciseId),
 		attribute.String("request.details", req.String()),
 	)
 
-	//return &pbw.CreateExerciseRes{
-	//	Success:  true,
-	//	Message:  "Exercises created successfully",
-	//	Exercise: response.Exercise,
-	//	Response: &pbw.BaseResponse{
-	//		Upstream:  "workout-service",
-	//		RequestId: domain.GenerateRequestID(ctx),
-	//	},
-	//}, nil
-
-	fmt.Println(response)
-	return nil, nil
+	return &pbw.CreateExerciseRes{
+		Success:  true,
+		Message:  "Exercises created successfully",
+		Exercise: response.Exercise,
+		Response: &pbw.BaseResponse{
+			Upstream:  "workout-service",
+			RequestId: domain.GenerateRequestID(ctx),
+		},
+	}, nil
 }
 
 func (s ServiceWorkout) UpdateExercice(ctx context.Context, req *generated.UpdateExerciseReq) (*generated.UpdateExerciseRes, error) {

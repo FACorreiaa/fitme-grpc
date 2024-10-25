@@ -209,23 +209,23 @@ func (r *RepositoryWorkout) GetExerciseID(ctx context.Context, req *pbw.GetExerc
 }
 
 func (r *RepositoryWorkout) CreateExercise(ctx context.Context, req *pbw.CreateExerciseReq) (*pbw.CreateExerciseRes, error) {
+	fmt.Printf("User id: %s", req.UserId)
 	tx, err := r.pgpool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to start transaction")
 	}
-	defer func(tx pgx.Tx, ctx context.Context) {
-		err = tx.Rollback(ctx)
+	defer func() {
 		if err != nil {
-			return
+			_ = tx.Rollback(ctx)
 		}
-	}(tx, ctx)
+	}()
 
 	createdExerciseListQuery := `
 				INSERT INTO exercise_list (name, type, muscle, equipment, difficulty,
                                    instructions, video,
                                    created_at, updated_at)
         		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                RETURNING id`
+                RETURNING *`
 
 	currentTime := time.Now()
 
@@ -237,7 +237,6 @@ func (r *RepositoryWorkout) CreateExercise(ctx context.Context, req *pbw.CreateE
 		req.Exercise.Difficulty,
 		req.Exercise.Instruction,
 		req.Exercise.Video,
-		req.Exercise.CustomCreated,
 		currentTime,
 		currentTime,
 	).Scan(&req.Exercise.ExerciseId)
@@ -249,7 +248,7 @@ func (r *RepositoryWorkout) CreateExercise(ctx context.Context, req *pbw.CreateE
 
 	var userID, associatedExerciseID string
 
-	err = tx.QueryRow(ctx, setExerciseToUserQuery, userID, associatedExerciseID).Scan(&userID, &associatedExerciseID)
+	err = tx.QueryRow(ctx, setExerciseToUserQuery, req.UserId, req.Exercise.ExerciseId).Scan(&userID, &associatedExerciseID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to associate exercise with user: %v", err)
 	}
@@ -266,7 +265,7 @@ func (r *RepositoryWorkout) CreateExercise(ctx context.Context, req *pbw.CreateE
 		Difficulty:    req.Exercise.Difficulty,
 		Instruction:   req.Exercise.Instruction,
 		Video:         req.Exercise.Video,
-		CustomCreated: req.Exercise.CustomCreated,
+		CustomCreated: true,
 		CreatedAt:     timestamppb.New(currentTime), // Proto timestamp for created_at fix later
 		UpdatedAt:     timestamppb.New(currentTime), // Proto timestamp for updated_at fix later
 	}
@@ -275,7 +274,7 @@ func (r *RepositoryWorkout) CreateExercise(ctx context.Context, req *pbw.CreateE
 		Success:  true,
 		Message:  "Exercise created and associated with user successfully",
 		Exercise: exerciseProto,
-		Res: &pbw.BaseResponse{
+		Response: &pbw.BaseResponse{
 			Upstream:  "workout-service",
 			RequestId: domain.GenerateRequestID(ctx),
 		},
