@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	pbw "github.com/FACorreiaa/fitme-protos/modules/workout/generated"
 	"github.com/jackc/pgx/v5"
@@ -37,7 +38,7 @@ func nullTimeToTimestamppb(nt sql.NullTime) *timestamppb.Timestamp {
 }
 
 func (r *RepositoryWorkout) GetExercises(ctx context.Context, req *pbw.GetExercisesReq) (*pbw.GetExercisesRes, error) {
-	exercises := make([]*pbw.XExercises, 0)
+	exercisesProtoList := make([]*pbw.XExercises, 0)
 	query := `SELECT DISTINCT
     			id, name, type, muscle, equipment, difficulty,
 				instructions, video, custom_created, created_at, updated_at
@@ -60,7 +61,7 @@ func (r *RepositoryWorkout) GetExercises(ctx context.Context, req *pbw.GetExerci
 	defer rows.Close()
 
 	for rows.Next() {
-		exercise := pbw.XExercises{}
+		exerciseProto := pbw.XExercises{}
 		e := &Exercises{}
 
 		err := rows.Scan(
@@ -90,36 +91,36 @@ func (r *RepositoryWorkout) GetExercises(ctx context.Context, req *pbw.GetExerci
 			updatedAt = sql.NullTime{Valid: false}
 		}
 
-		exercise.ExerciseId = e.ID
-		exercise.Name = e.Name
-		exercise.ExerciseType = e.ExerciseType
-		exercise.MuscleGroup = e.MuscleGroup
-		exercise.Equipment = e.Equipment
-		exercise.Difficulty = e.Difficulty
-		exercise.Instruction = e.Instructions
-		exercise.Video = e.Video
-		exercise.CustomCreated = e.CustomCreated
-		exercise.CreatedAt = createdAt
-		exercise.UpdatedAt = nullTimeToTimestamppb(updatedAt)
+		exerciseProto.ExerciseId = e.ID
+		exerciseProto.Name = e.Name
+		exerciseProto.ExerciseType = e.ExerciseType
+		exerciseProto.MuscleGroup = e.MuscleGroup
+		exerciseProto.Equipment = e.Equipment
+		exerciseProto.Difficulty = e.Difficulty
+		exerciseProto.Instruction = e.Instructions
+		exerciseProto.Video = e.Video
+		exerciseProto.CustomCreated = e.CustomCreated
+		exerciseProto.CreatedAt = createdAt
+		exerciseProto.UpdatedAt = nullTimeToTimestamppb(updatedAt)
 
-		exerciseProto := &pbw.XExercises{
-			ExerciseId:    exercise.ExerciseId,
-			Name:          exercise.Name,
-			ExerciseType:  exercise.ExerciseType,
-			MuscleGroup:   exercise.MuscleGroup,
-			Equipment:     exercise.Equipment,
-			Difficulty:    exercise.Difficulty,
-			Instruction:   exercise.Instruction,
-			Video:         exercise.Video,
-			CustomCreated: exercise.CustomCreated,
-			CreatedAt:     exercise.CreatedAt,
-			UpdatedAt:     exercise.UpdatedAt,
+		newProtoExerciseList := &pbw.XExercises{
+			ExerciseId:    exerciseProto.ExerciseId,
+			Name:          exerciseProto.Name,
+			ExerciseType:  exerciseProto.ExerciseType,
+			MuscleGroup:   exerciseProto.MuscleGroup,
+			Equipment:     exerciseProto.Equipment,
+			Difficulty:    exerciseProto.Difficulty,
+			Instruction:   exerciseProto.Instruction,
+			Video:         exerciseProto.Video,
+			CustomCreated: exerciseProto.CustomCreated,
+			CreatedAt:     exerciseProto.CreatedAt,
+			UpdatedAt:     exerciseProto.UpdatedAt,
 		}
 
-		exercises = append(exercises, exerciseProto)
+		exercisesProtoList = append(exercisesProtoList, newProtoExerciseList)
 	}
 
-	if len(exercises) == 0 {
+	if len(exercisesProtoList) == 0 {
 		return &pbw.GetExercisesRes{
 			Success: false,
 			Message: "No exercises found",
@@ -133,7 +134,7 @@ func (r *RepositoryWorkout) GetExercises(ctx context.Context, req *pbw.GetExerci
 	return &pbw.GetExercisesRes{
 		Success:  true,
 		Message:  "Exercises retrieved successfully",
-		Exercise: exercises,
+		Exercise: exercisesProtoList,
 		Response: &pbw.BaseResponse{
 			Upstream:  "workout-service",
 			RequestId: domain.GenerateRequestID(ctx),
@@ -205,5 +206,78 @@ func (r *RepositoryWorkout) GetExerciseID(ctx context.Context, req *pbw.GetExerc
 			RequestId: domain.GenerateRequestID(ctx),
 		},
 	}, nil
+}
 
+func (r *RepositoryWorkout) CreateExercise(ctx context.Context, req *pbw.CreateExerciseReq) (*pbw.CreateExerciseRes, error) {
+	tx, err := r.pgpool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to start transaction")
+	}
+	defer func(tx pgx.Tx, ctx context.Context) {
+		err = tx.Rollback(ctx)
+		if err != nil {
+			return
+		}
+	}(tx, ctx)
+
+	createdExerciseListQuery := `
+				INSERT INTO exercise_list (name, type, muscle, equipment, difficulty,
+                                   instructions, video,
+                                   created_at, updated_at)
+        		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                RETURNING id`
+
+	currentTime := time.Now()
+
+	err = tx.QueryRow(ctx, createdExerciseListQuery,
+		req.Exercise.Name,
+		req.Exercise.ExerciseType,
+		req.Exercise.MuscleGroup,
+		req.Exercise.Equipment,
+		req.Exercise.Difficulty,
+		req.Exercise.Instruction,
+		req.Exercise.Video,
+		req.Exercise.CustomCreated,
+		currentTime,
+		currentTime,
+	).Scan(&req.Exercise.ExerciseId)
+
+	setExerciseToUserQuery := `
+				INSERT INTO user_exercises (user_id, exercise_id)
+				VALUES ($1, $2)
+				RETURNING user_id, exercise_id`
+
+	var userID, associatedExerciseID string
+
+	err = tx.QueryRow(ctx, setExerciseToUserQuery, userID, associatedExerciseID).Scan(&userID, &associatedExerciseID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to associate exercise with user: %v", err)
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to commit transaction: %v", err)
+	}
+
+	exerciseProto := &pbw.XExercises{
+		Name:          req.Exercise.Name,
+		ExerciseType:  req.Exercise.ExerciseType,
+		MuscleGroup:   req.Exercise.MuscleGroup,
+		Equipment:     req.Exercise.Equipment,
+		Difficulty:    req.Exercise.Difficulty,
+		Instruction:   req.Exercise.Instruction,
+		Video:         req.Exercise.Video,
+		CustomCreated: req.Exercise.CustomCreated,
+		CreatedAt:     timestamppb.New(currentTime), // Proto timestamp for created_at fix later
+		UpdatedAt:     timestamppb.New(currentTime), // Proto timestamp for updated_at fix later
+	}
+
+	return &pbw.CreateExerciseRes{
+		Success:  true,
+		Message:  "Exercise created and associated with user successfully",
+		Exercise: exerciseProto,
+		Res: &pbw.BaseResponse{
+			Upstream:  "workout-service",
+			RequestId: domain.GenerateRequestID(ctx),
+		},
+	}, nil
 }

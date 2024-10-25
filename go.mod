@@ -3,7 +3,7 @@ module github.com/FACorreiaa/fitme-grpc
 go 1.23.1
 
 require (
-	github.com/FACorreiaa/fitme-protos v0.0.0-20241022212533-35e0f0ba7eeb
+	github.com/FACorreiaa/fitme-protos v0.0.0-20241024223507-c125f646723d
 	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
@@ -52,7 +52,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
-	github.com/prometheus/common v0.60.0 // indirect
+	github.com/prometheus/common v0.60.1 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/sagikazarmark/locafero v0.6.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
