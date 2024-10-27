@@ -13,13 +13,13 @@ import (
 	cpb "github.com/FACorreiaa/fitme-protos/modules/customer/generated"
 	upb "github.com/FACorreiaa/fitme-protos/modules/user/generated"
 	wpb "github.com/FACorreiaa/fitme-protos/modules/workout/generated"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	config "github.com/FACorreiaa/fitme-grpc/config"
 	"github.com/FACorreiaa/fitme-grpc/logger"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc"
 
 	"github.com/pkg/errors"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/reflection"
 )
@@ -51,7 +51,7 @@ func ServeGRPC(ctx context.Context, port string, container *ServiceContainer) er
 	if err != nil {
 		return errors.Wrap(err, "failed to configure prometheus registry")
 	}
-	tp, err := otelTraceProvider(ctx, true, "", "", "", "localhost:7077/metrics")
+	tp, err := otelTraceProvider(ctx, true, "", "", "", "localhost:4317")
 	if err != nil {
 		return errors.Wrap(err, "failed to configure jaeger trace provider")
 	}
@@ -122,7 +122,10 @@ func ServeHTTP(port string) error {
 		// Respond with appropriate status code
 		w.WriteHeader(http.StatusOK)
 	})
-	server.HandleFunc("/metrics", promhttp.Handler().ServeHTTP)
+	server.HandleFunc("/metrics", promhttp.Handler().ServeHTTP) // This should use the correct registry.
+
+	//reg, _ := setupPrometheusRegistry(ctx)
+
 	//server.Handle("/prometheus/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
 
 	listener := &http.Server{

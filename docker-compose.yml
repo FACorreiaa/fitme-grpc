@@ -122,5 +122,17 @@ services:
     networks:
       - fit-me
 
+#  otel-collector:
+#    image: otel/opentelemetry-collector:latest
+#    ports:
+#      - "4317:4317"    # For OTLP/gRPC receiver (traces and metrics)
+#      - "4318:4318"    # For OTLP/HTTP receiver
+#      - "8888:8888"    # For Prometheus metrics scraping
+#    volumes:
+#      - ./config/otel-config.yaml:/etc/otel-config.yaml
+#    command: [ "--config", "/etc/otel-config.yaml" ]
+#    networks:
+#      - fit-me
+
 networks:
   fit-me:

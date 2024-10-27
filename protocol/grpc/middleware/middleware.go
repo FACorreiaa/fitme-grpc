@@ -60,6 +60,14 @@ func (cl *ClientInterceptor) UnaryClientInterceptor(
 ) error {
 	onceInit.Do(initializeLogger)
 
+	opts = append(opts,
+		grpc.MaxCallRecvMsgSize(1024*1024*4), // 4 MB max receive size
+		grpc.MaxCallSendMsgSize(1024*1024*4), // 4 MB max send size
+		grpc.UseCompressor("gzip"),           // Enable gzip compression
+		grpc.WaitForReady(true),              // Wait for server to be ready
+		// grpc.PerRPCCredentials(creds),      // Uncomment for per-RPC credentials
+	)
+
 	// Logic before invoking the invoker
 	start := time.Now()
 	// Calls the invoker to execute RPC

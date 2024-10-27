@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	pbw "github.com/FACorreiaa/fitme-protos/modules/workout/generated"
@@ -295,4 +296,81 @@ func (r *RepositoryWorkout) DeleteExercise(ctx context.Context, req *pbw.DeleteE
 		return nil, fmt.Errorf("failed to delete exercise: %w", err)
 	}
 	return &pbw.NilRes{}, nil
+}
+
+func (r *RepositoryWorkout) UpdateExercise(ctx context.Context, req *pbw.UpdateExerciseReq) (*pbw.UpdateExerciseRes, error) {
+	query := `UPDATE exercise_list SET `
+	var setClauses []string
+	var args []interface{}
+	argIndex := 1
+	updatedExercise := &pbw.XExercises{}
+
+	for _, update := range req.Updates {
+		switch update.Field {
+		case "name":
+			setClauses = append(setClauses, fmt.Sprintf("name = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedExercise.Name = update.NewValue
+		case "muscle_group":
+			setClauses = append(setClauses, fmt.Sprintf("muscle_group = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+		case "equipment":
+			setClauses = append(setClauses, fmt.Sprintf("equipment = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+		case "difficulty":
+			setClauses = append(setClauses, fmt.Sprintf("difficulty = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+		case "instruction":
+			setClauses = append(setClauses, fmt.Sprintf("instruction = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+		case "video":
+			setClauses = append(setClauses, fmt.Sprintf("video = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+		default:
+			return nil, fmt.Errorf("unsupported update field: %s", update.Field)
+		}
+	}
+
+	if len(setClauses) == 0 {
+		return nil, fmt.Errorf("no updates provided")
+	}
+
+	// Complete the SQL query and add the WHERE clause
+	query += strings.Join(setClauses, ", ")
+	query += ` WHERE id = $` + fmt.Sprintf("%d", argIndex)
+	args = append(args, req.ExerciseId)
+
+	// Execute the update query
+	_, err := r.pgpool.Exec(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update exercise: %w", err)
+	}
+
+	// Retrieve updated exercise information for the response
+	updatedExercise.ExerciseId = req.ExerciseId
+	getQuery := `SELECT id, name, muscle, equipment, difficulty, instructions, video FROM exercise_list WHERE id = $1`
+	err = r.pgpool.QueryRow(ctx, getQuery, req.ExerciseId).Scan(
+		&updatedExercise.ExerciseId,
+		&updatedExercise.Name,
+		&updatedExercise.MuscleGroup, // Make sure to add these fields in the XExercises struct
+		&updatedExercise.Equipment,
+		&updatedExercise.Difficulty,
+		&updatedExercise.Instruction,
+		&updatedExercise.Video,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch updated exercise: %w", err)
+	}
+
+	return &pbw.UpdateExerciseRes{
+		Success:  true,
+		Message:  "Exercise updated successfully",
+		Exercise: updatedExercise,
+	}, nil
 }

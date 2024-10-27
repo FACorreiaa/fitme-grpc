@@ -11,12 +11,15 @@ import (
 	"github.com/jackc/pgx/v5"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/FACorreiaa/fitme-grpc/internal/domain"
 )
+
+var logger *zap.Logger
 
 type ServiceWorkout struct {
 	pbw.UnimplementedWorkoutServer
@@ -195,11 +198,39 @@ func (s ServiceWorkout) DeleteExercise(ctx context.Context, req *pbw.DeleteExerc
 		return nil, status.Errorf(codes.Internal, "Error deleting exercise session: %v", err)
 	}
 
+	// change later
+	span.SetAttributes(
+		attribute.String("request.id", req.ExerciseId),
+		attribute.String("request.details", req.String()),
+	)
+
 	return &pbw.NilRes{}, nil
 }
-func (s ServiceWorkout) UpdateExercice(ctx context.Context, req *generated.UpdateExerciseReq) (*generated.UpdateExerciseRes, error) {
-	//TODO implement me
-	panic("implement me")
+
+func (s ServiceWorkout) UpdateExercise(ctx context.Context, req *pbw.UpdateExerciseReq) (*pbw.UpdateExerciseRes, error) {
+	if req.ExerciseId == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "req id is required")
+	}
+	res, err := s.repo.UpdateExercise(ctx, req)
+	tracer := otel.Tracer("FITDEV")
+	ctx, span := tracer.Start(ctx, "Workout/UpdateExercise")
+	defer span.End()
+
+	if err != nil {
+		logger.Error("failed to update exercise", zap.Error(err))
+		return &generated.UpdateExerciseRes{
+			Success: false,
+			Message: "failed to update exercise: " + err.Error(),
+		}, nil
+	}
+
+	// change later
+	span.SetAttributes(
+		attribute.String("request.id", req.ExerciseId),
+		attribute.String("request.details", req.String()),
+	)
+
+	return res, nil
 }
 
 func (s ServiceWorkout) GetWorkoutPlanExercises(ctx context.Context, req *generated.GetWorkoutPlanExercisesReq) (*generated.GetWorkoutPlanExercisesRes, error) {

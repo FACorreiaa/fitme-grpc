@@ -1,0 +1,33 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: "otel-collector"
+          scrape_interval: 15s
+          static_configs:
+            - targets: ["localhost:8888"]
+
+exporters:
+  prometheus:
+    endpoint: "0.0.0.0:8888" # OpenTelemetry Collector will expose metrics here for Prometheus scraping
+
+  logging:
+    log_level: debug
+
+  otlp:
+    endpoint: "tempo:4317" # Configure to send to Tempo for tracing data, if using Tempo for traces
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp, prometheus]
+      exporters: [prometheus, logging]
+    traces:
+      receivers: [otlp]
+      exporters: [logging, otlp] # Send traces to Tempo, or replace with another endpoint if needed
