@@ -32,8 +32,6 @@ var isReady atomic.Value
 
 func ServeGRPC(ctx context.Context, port string, container *ServiceContainer) error {
 	log := logger.Log
-
-	fmt.Printf("PORTPORT %s", port)
 	// dependencies
 
 	//customerService := domain.NewCustomerService(pgPool, redisClient)
@@ -53,7 +51,7 @@ func ServeGRPC(ctx context.Context, port string, container *ServiceContainer) er
 	if err != nil {
 		return errors.Wrap(err, "failed to configure prometheus registry")
 	}
-	tp, err := otelTraceProvider(ctx, true, "", "", "", "localhost:4317")
+	tp, err := otelTraceProvider(ctx, true, "", "", "", "localhost:7077/metrics")
 	if err != nil {
 		return errors.Wrap(err, "failed to configure jaeger trace provider")
 	}

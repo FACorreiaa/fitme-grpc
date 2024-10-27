@@ -1,0 +1,5 @@
+grpc.WaitForReady(true): Waits until the server is ready before sending the request.
+grpc.MaxCallRecvMsgSize(n): Sets the maximum response message size in bytes.
+grpc.MaxCallSendMsgSize(n): Sets the maximum request message size in bytes.
+grpc.UseCompressor("gzip"): Compresses the request data.
+grpc.PerRPCCredentials(creds): Passes per-RPC credentials, often used for authentication.

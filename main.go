@@ -5,13 +5,14 @@ import (
 	"log"
 	"os"
 	"runtime/pprof"
+	"time"
 
 	"github.com/FACorreiaa/fitme-protos/utils"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 
-	config "github.com/FACorreiaa/fitme-grpc/config"
+	"github.com/FACorreiaa/fitme-grpc/config"
 	"github.com/FACorreiaa/fitme-grpc/internal"
 	"github.com/FACorreiaa/fitme-grpc/internal/metrics"
 	"github.com/FACorreiaa/fitme-grpc/logger"
@@ -27,33 +28,33 @@ func run() (*pgxpool.Pool, *redis.Client, error) {
 		return nil, nil, err
 	}
 
-	log := logger.Log
+	zapLogger := logger.Log
 
 	dbConfig, err := internal.NewDatabaseConfig()
 	if err != nil {
-		log.Error("failed to initialize database configuration", zap.Error(err))
+		zapLogger.Error("failed to initialize database configuration", zap.Error(err))
 		return nil, nil, err
 	}
 
 	pool, err := internal.Init(dbConfig.ConnectionURL)
 	if err != nil {
-		log.Error("failed to initialize database pool", zap.Error(err))
+		zapLogger.Error("failed to initialize database pool", zap.Error(err))
 		return nil, nil, err
 	}
 	internal.WaitForDB(pool)
-	log.Info("Connected to Postgres", zap.String("host", os.Getenv("DB_HOST")), zap.String("port", os.Getenv("DB_PORT")))
+	zapLogger.Info("Connected to Postgres", zap.String("host", os.Getenv("DB_HOST")), zap.String("port", os.Getenv("DB_PORT")))
 
 	redisClient, err := internal.NewRedisConfig()
 	if err != nil {
-		log.Error("failed to initialize Redis configuration", zap.Error(err))
+		zapLogger.Error("failed to initialize Redis configuration", zap.Error(err))
 		pool.Close()
 		return nil, nil, err
 	}
 
-	log.Info("Connected to Redis", zap.String("host", cfg.Repositories.Redis.Host), zap.String("port", cfg.Repositories.Redis.Port))
+	zapLogger.Info("Connected to Redis", zap.String("host", cfg.Repositories.Redis.Host), zap.String("port", cfg.Repositories.Redis.Port))
 
 	if err = internal.Migrate(pool); err != nil {
-		log.Error("failed to migrate database", zap.Error(err))
+		zapLogger.Error("failed to migrate database", zap.Error(err))
 		pool.Close()
 		redisClient.Close()
 		return nil, nil, err
@@ -67,7 +68,8 @@ func main() {
 	if perf != nil {
 		log.Fatal(perf)
 	}
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
 
 	err := pprof.StartCPUProfile(f)
 	if err != nil {
@@ -90,11 +92,11 @@ func main() {
 		panic("failed to initialize logging")
 	}
 
-	log := logger.Log
+	zapLogger := logger.Log
 
 	pool, redisClient, err := run()
 	if err != nil {
-		log.Error("failed to run the application", zap.Error(err))
+		zapLogger.Error("failed to run the application", zap.Error(err))
 		return
 	}
 	defer pool.Close()
@@ -102,9 +104,9 @@ func main() {
 
 	tu := new(utils.TransportUtils)
 
-	brokers := internal.ConfigureUpstreamClients(log, tu)
+	brokers := internal.ConfigureUpstreamClients(zapLogger, tu)
 	if brokers == nil {
-		log.Error("failed to configure brokers")
+		zapLogger.Error("failed to configure brokers")
 		return
 	}
 
@@ -113,14 +115,14 @@ func main() {
 	container := internal.NewServiceContainer(ctx, pool, redisClient, brokers)
 
 	go func() {
-		if err := internal.ServeGRPC(ctx, cfg.Server.GrpcPort, container); err != nil {
-			log.Error("failed to serve grpc", zap.Error(err))
+		if err = internal.ServeGRPC(ctx, cfg.Server.GrpcPort, container); err != nil {
+			zapLogger.Error("failed to serve grpc", zap.Error(err))
 			return
 		}
 	}()
 
-	if err := internal.ServeHTTP(cfg.Server.HTTPPort); err != nil {
-		log.Error("failed to serve http", zap.Error(err))
+	if err = internal.ServeHTTP(cfg.Server.HTTPPort); err != nil {
+		zapLogger.Error("failed to serve http", zap.Error(err))
 		return
 	}
 }

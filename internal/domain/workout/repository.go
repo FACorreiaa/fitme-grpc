@@ -286,3 +286,13 @@ func (r *RepositoryWorkout) CreateExercise(ctx context.Context, req *pbw.CreateE
 		},
 	}, nil
 }
+
+func (r *RepositoryWorkout) DeleteExercise(ctx context.Context, req *pbw.DeleteExerciseReq) (*pbw.NilRes, error) {
+	query := `DELETE FROM exercise_list WHERE id = $1
+ 			  AND exercise_list.custom_created = true`
+	_, err := r.pgpool.Exec(ctx, query, req.ExerciseId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to delete exercise: %w", err)
+	}
+	return &pbw.NilRes{}, nil
+}

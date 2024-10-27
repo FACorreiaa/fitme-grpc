@@ -19,6 +19,6 @@ CREATE TABLE IF NOT EXISTS user_exercises (
   exercise_id UUID NOT NULL,
   created_at timestamp DEFAULT (now()),
   FOREIGN KEY (user_id) REFERENCES users(id),
-  FOREIGN KEY (exercise_id) REFERENCES exercise_list(id)
+  FOREIGN KEY (exercise_id) REFERENCES exercise_list(id) ON DELETE CASCADE
   );
 

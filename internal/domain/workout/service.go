@@ -131,7 +131,7 @@ func (s ServiceWorkout) GetExerciseID(ctx context.Context, req *pbw.GetExerciseI
 	}, nil
 }
 
-func (s ServiceWorkout) CreateExercise(ctx context.Context, req *generated.CreateExerciseReq) (*generated.CreateExerciseRes, error) {
+func (s ServiceWorkout) CreateExercise(ctx context.Context, req *pbw.CreateExerciseReq) (*pbw.CreateExerciseRes, error) {
 	tracer := otel.Tracer("FITDEV")
 	ctx, span := tracer.Start(ctx, "Workout/GetExercises")
 	defer span.End()
@@ -182,6 +182,21 @@ func (s ServiceWorkout) CreateExercise(ctx context.Context, req *generated.Creat
 	}, nil
 }
 
+func (s ServiceWorkout) DeleteExercise(ctx context.Context, req *pbw.DeleteExerciseReq) (*pbw.NilRes, error) {
+	tracer := otel.Tracer("FITDEV")
+	ctx, span := tracer.Start(ctx, "Workout/DeleteExercise")
+	defer span.End()
+	if req.ExerciseId == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "req id is required")
+	}
+
+	_, err := s.repo.DeleteExercise(ctx, req)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Error deleting exercise session: %v", err)
+	}
+
+	return &pbw.NilRes{}, nil
+}
 func (s ServiceWorkout) UpdateExercice(ctx context.Context, req *generated.UpdateExerciseReq) (*generated.UpdateExerciseRes, error) {
 	//TODO implement me
 	panic("implement me")
