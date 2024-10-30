@@ -12,5 +12,14 @@ TODO
  - Fix Prometheus
  - Loki
  - Complete Grafana
+ - Complete:
+   - Traces
+      Exporters: Stdout, Jaeger, Zipkin, Datadog and OpenTelemetry (OTLP) collector
+      Importers: OpenTracingShim
+     - Metrics
+        Exporters: Prometheus, Datadog, and OpenTelemetry (OTLP) collector
+        Importers: SwiftMetricsShim
+       - Logs
+        Exporters: OpenTelemetry (OTLP) collector
  - K8s deployment
  - Where to deploy ?

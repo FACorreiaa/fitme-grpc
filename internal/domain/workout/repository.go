@@ -47,17 +47,10 @@ func (r *RepositoryWorkout) GetExercises(ctx context.Context, req *pbw.GetExerci
 
 	rows, err := r.pgpool.Query(ctx, query)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return &pbw.GetExercisesRes{
-				Success: false,
-				Message: "No exercises found",
-				Response: &pbw.BaseResponse{
-					Upstream:  "workout-service",
-					RequestId: domain.GenerateRequestID(ctx),
-				},
-			}, fmt.Errorf("exercises not found %w", err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("no exercises found: %w", err)
 		}
-		return nil, status.Errorf(codes.Internal, "failed to query exercises: %v", err)
+		return nil, fmt.Errorf("failed to fetch workout exercises: %w", err)
 	}
 	defer rows.Close()
 
@@ -165,17 +158,10 @@ func (r *RepositoryWorkout) GetExerciseID(ctx context.Context, req *pbw.GetExerc
 	)
 
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return &pbw.GetExerciseIDRes{
-				Success: false,
-				Message: "No exercises found",
-				Response: &pbw.BaseResponse{
-					Upstream:  "workout-service",
-					RequestId: domain.GenerateRequestID(ctx),
-				},
-			}, status.Error(codes.NotFound, "workout ID not found")
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("no exercises found: %w", err)
 		}
-		return nil, status.Errorf(codes.Internal, "failed to query exercise: %v", err)
+		return nil, fmt.Errorf("failed to fetch workout exercises: %w", err)
 	}
 
 	createdAt := timestamppb.New(exercise.CreatedAt)
@@ -210,7 +196,6 @@ func (r *RepositoryWorkout) GetExerciseID(ctx context.Context, req *pbw.GetExerc
 }
 
 func (r *RepositoryWorkout) CreateExercise(ctx context.Context, req *pbw.CreateExerciseReq) (*pbw.CreateExerciseRes, error) {
-	fmt.Printf("User id: %s", req.UserId)
 	tx, err := r.pgpool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to start transaction")
@@ -242,8 +227,6 @@ func (r *RepositoryWorkout) CreateExercise(ctx context.Context, req *pbw.CreateE
 		currentTime,
 		currentTime,
 	).Scan(&exerciseID)
-
-	fmt.Println(exerciseID)
 
 	setExerciseToUserQuery := `
 				INSERT INTO user_exercises (user_id, exercise_id)
@@ -316,22 +299,27 @@ func (r *RepositoryWorkout) UpdateExercise(ctx context.Context, req *pbw.UpdateE
 			setClauses = append(setClauses, fmt.Sprintf("muscle_group = $%d", argIndex))
 			args = append(args, update.NewValue)
 			argIndex++
+			updatedExercise.MuscleGroup = update.NewValue
 		case "equipment":
 			setClauses = append(setClauses, fmt.Sprintf("equipment = $%d", argIndex))
 			args = append(args, update.NewValue)
 			argIndex++
+			updatedExercise.Equipment = update.NewValue
 		case "difficulty":
 			setClauses = append(setClauses, fmt.Sprintf("difficulty = $%d", argIndex))
 			args = append(args, update.NewValue)
 			argIndex++
+			updatedExercise.Difficulty = update.NewValue
 		case "instruction":
 			setClauses = append(setClauses, fmt.Sprintf("instruction = $%d", argIndex))
 			args = append(args, update.NewValue)
 			argIndex++
+			updatedExercise.Instruction = update.NewValue
 		case "video":
 			setClauses = append(setClauses, fmt.Sprintf("video = $%d", argIndex))
 			args = append(args, update.NewValue)
 			argIndex++
+			updatedExercise.Video = update.NewValue
 		default:
 			return nil, fmt.Errorf("unsupported update field: %s", update.Field)
 		}
@@ -341,24 +329,21 @@ func (r *RepositoryWorkout) UpdateExercise(ctx context.Context, req *pbw.UpdateE
 		return nil, fmt.Errorf("no updates provided")
 	}
 
-	// Complete the SQL query and add the WHERE clause
 	query += strings.Join(setClauses, ", ")
 	query += ` WHERE id = $` + fmt.Sprintf("%d", argIndex)
 	args = append(args, req.ExerciseId)
 
-	// Execute the update query
 	_, err := r.pgpool.Exec(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update exercise: %w", err)
 	}
 
-	// Retrieve updated exercise information for the response
 	updatedExercise.ExerciseId = req.ExerciseId
 	getQuery := `SELECT id, name, muscle, equipment, difficulty, instructions, video FROM exercise_list WHERE id = $1`
 	err = r.pgpool.QueryRow(ctx, getQuery, req.ExerciseId).Scan(
 		&updatedExercise.ExerciseId,
 		&updatedExercise.Name,
-		&updatedExercise.MuscleGroup, // Make sure to add these fields in the XExercises struct
+		&updatedExercise.MuscleGroup,
 		&updatedExercise.Equipment,
 		&updatedExercise.Difficulty,
 		&updatedExercise.Instruction,
@@ -373,4 +358,165 @@ func (r *RepositoryWorkout) UpdateExercise(ctx context.Context, req *pbw.UpdateE
 		Message:  "Exercise updated successfully",
 		Exercise: updatedExercise,
 	}, nil
+}
+
+// GetWorkoutPlanExercises verify later
+func (r *RepositoryWorkout) GetWorkoutPlanExercises(ctx context.Context, req *pbw.GetWorkoutPlanExercisesReq) (*pbw.GetWorkoutPlanExercisesRes, error) {
+	workoutProtoList := make([]*pbw.XWorkoutExerciseDay, 0)
+	//workoutList := make([]WorkoutExerciseDay, 0)
+	query := `SELECT el.id, el.name, el.type, el.muscle, el.equipment, el.difficulty, el.instructions,
+       				el.video, el.custom_created, el.created_at, el.updated_at, wpd.day
+					FROM workout_plan_detail wpd
+					JOIN exercise_list el ON el.id = ANY(wpd.exercises)`
+	rows, err := r.pgpool.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch workout exercises: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		workoutProto := pbw.XWorkoutExerciseDay{}
+		workoutList := &WorkoutExerciseDay{}
+
+		err := rows.Scan(
+			workoutList.ID, workoutList.Name, workoutList.ExerciseType, workoutList.MuscleGroup, workoutList.Equipment,
+			workoutList.Difficulty, workoutList.Instructions, workoutList.Video, workoutList.CustomCreated,
+			workoutList.CreatedAt, workoutList.UpdatedAt)
+
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, fmt.Errorf("no exercises found: %w", err)
+			}
+			return nil, fmt.Errorf("failed to fetch workout exercises: %w", err)
+		}
+
+		createdAt := timestamppb.New(workoutList.CreatedAt)
+		var updatedAt sql.NullTime
+		if workoutList.UpdatedAt.Valid {
+			updatedAt = workoutList.UpdatedAt
+		} else {
+			updatedAt = sql.NullTime{Valid: false}
+		}
+		workoutProto.WorkoutExerciseDay = workoutList.Day
+		workoutProto.Name = workoutList.Name
+		workoutProto.ExerciseType = workoutList.ExerciseType
+		workoutProto.MuscleGroup = workoutList.MuscleGroup
+		workoutProto.Equipment = workoutList.Equipment
+		workoutProto.Difficulty = workoutList.Difficulty
+		workoutProto.Instruction = workoutList.Instructions
+		workoutProto.Video = workoutList.Video
+		workoutProto.CustomCreated = workoutList.CustomCreated
+		workoutProto.CreatedAt = createdAt
+		workoutProto.UpdatedAt = nullTimeToTimestamppb(updatedAt)
+		workoutProto.Day = workoutList.Day
+
+		newProtoWorkoutList := &pbw.XWorkoutExerciseDay{
+			WorkoutExerciseDay: workoutProto.WorkoutExerciseDay,
+			Name:               workoutProto.Name,
+			ExerciseType:       workoutProto.ExerciseType,
+			MuscleGroup:        workoutProto.MuscleGroup,
+			Equipment:          workoutProto.Equipment,
+			Difficulty:         workoutProto.Difficulty,
+			Instruction:        workoutProto.Instruction,
+			Video:              workoutProto.Video,
+			CustomCreated:      workoutProto.CustomCreated,
+			CreatedAt:          workoutProto.CreatedAt,
+			UpdatedAt:          workoutProto.UpdatedAt,
+			Day:                workoutProto.Day,
+		}
+
+		workoutProtoList = append(workoutProtoList, newProtoWorkoutList)
+	}
+	if len(workoutProtoList) == 0 {
+		return nil, fmt.Errorf("no exercises found: %w", err)
+	}
+
+	return &pbw.GetWorkoutPlanExercisesRes{
+		Success:            true,
+		Message:            "workouts retrieved successfully",
+		WorkoutExerciseDay: workoutProtoList,
+		Response: &pbw.BaseResponse{
+			Upstream:  "workout-service",
+			RequestId: domain.GenerateRequestID(ctx),
+		},
+	}, nil
+}
+
+// GetWorkoutPlanExercisesByID verify later
+func (r *RepositoryWorkout) GetWorkoutPlanExercisesByID(ctx context.Context, req *pbw.GetExerciseByIdWorkoutPlanReq) (*pbw.GetExerciseByIdWorkoutPlanRes, error) {
+	workoutProto := &pbw.XWorkoutExerciseDay{}
+	workout := &WorkoutExerciseDay{}
+	exerciseID := req.ExerciseWorkoutPlan
+
+	if exerciseID == "" {
+		return &pbw.GetExerciseByIdWorkoutPlanRes{}, status.Error(codes.InvalidArgument, "workout ID is required")
+	}
+
+	query := `SELECT el.id, el.name, el.type, el.muscle, el.equipment, el.difficulty, el.instructions,
+       				el.video, el.custom_created, el.created_at, el.updated_at, wpd.day
+					FROM workout_plan_detail wpd
+					JOIN exercise_list el ON el.id = ANY(wpd.exercises)
+					WHERE wpd.workout_plan_id = $1`
+	err := r.pgpool.QueryRow(ctx, query, &exerciseID).Scan(&exerciseID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch workout exercises: %w", err)
+	}
+
+	createdAt := timestamppb.New(workout.CreatedAt)
+	var updatedAt sql.NullTime
+	if workout.UpdatedAt.Valid {
+		updatedAt = workout.UpdatedAt
+	} else {
+		updatedAt = sql.NullTime{Valid: false}
+	}
+	workoutProto.WorkoutExerciseDay = workout.Day
+	workoutProto.Name = workout.Name
+	workoutProto.ExerciseType = workout.ExerciseType
+	workoutProto.MuscleGroup = workout.MuscleGroup
+	workoutProto.Equipment = workout.Equipment
+	workoutProto.Difficulty = workout.Difficulty
+	workoutProto.Instruction = workout.Instructions
+	workoutProto.Video = workout.Video
+	workoutProto.CustomCreated = workout.CustomCreated
+	workoutProto.CreatedAt = createdAt
+	workoutProto.UpdatedAt = nullTimeToTimestamppb(updatedAt)
+	workoutProto.Day = workout.Day
+
+	return &pbw.GetExerciseByIdWorkoutPlanRes{
+		Success:            true,
+		Message:            "workout successfully",
+		WorkoutExerciseDay: workoutProto,
+		Response: &pbw.BaseResponse{
+			Upstream:  "workout-service",
+			RequestId: domain.GenerateRequestID(ctx),
+		},
+	}, nil
+}
+
+func (r *RepositoryWorkout) InsertExerciseWorkoutPlan(ctx context.Context, req *pbw.InsertExerciseWorkoutPlanReq) (*pbw.NilRes, error) {
+	tx, err := r.pgpool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to start transaction")
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback(ctx)
+		}
+	}()
+
+	exerciseID := req.ExerciseId
+	workoutPlanID := req.WorkoutPlanId
+	workoutDay := req.WorkoutDay
+
+	query := `
+		UPDATE workout_plan_detail
+		SET exercises = array_append(exercises, $1)
+		WHERE workout_plan_id = $2 AND day = $3
+	`
+
+	_, err = tx.Exec(ctx, query, exerciseID, workoutPlanID, workoutDay)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to insert workout plan")
+	}
+
+	return &pbw.NilRes{}, nil
 }

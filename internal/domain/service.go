@@ -29,7 +29,6 @@ func (s *CustomerService) GetCustomer(ctx context.Context, req *pb.GetCustomerRe
 }
 
 func (s *CustomerService) CreateCustomer(ctx context.Context, req *pb.CreateCustomerReq) (*pb.CreateCustomerRes, error) {
-	// Implementation of CreateCustomer
 	return &pb.CreateCustomerRes{}, nil
 }
 
@@ -43,8 +42,11 @@ func (s *CustomerService) DeleteCustomer(ctx context.Context, req *pb.DeleteCust
 	return &pb.NilRes{}, nil
 }
 
+// GenerateRequestID TODO
 func GenerateRequestID(ctx context.Context) string {
-	// Generate a new UUID (version 4)
+	if reqID, ok := ctx.Value("requestID").(string); ok {
+		return reqID
+	}
 	return uuid.New().String()
 }
 

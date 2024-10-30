@@ -42,7 +42,14 @@ func (s ServiceWorkout) GetExercises(ctx context.Context, req *pbw.GetExercisesR
 	exercisesResponse, err := s.repo.GetExercises(ctx, req)
 
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return &pbw.GetExercisesRes{
+			Success: false,
+			Message: "No exercises found",
+			Response: &pbw.BaseResponse{
+				Upstream:  "workout-service",
+				RequestId: domain.GenerateRequestID(ctx),
+			},
+		}, fmt.Errorf("exercises not found %w", err)
 	}
 
 	response := &pbw.GetExercisesRes{}
@@ -234,13 +241,69 @@ func (s ServiceWorkout) UpdateExercise(ctx context.Context, req *pbw.UpdateExerc
 }
 
 func (s ServiceWorkout) GetWorkoutPlanExercises(ctx context.Context, req *generated.GetWorkoutPlanExercisesReq) (*generated.GetWorkoutPlanExercisesRes, error) {
-	//TODO implement me
-	panic("implement me")
+	tracer := otel.Tracer("FITDEV")
+	ctx, span := tracer.Start(ctx, "Workout/UpdateExercise")
+	defer span.End()
+
+	res, err := s.repo.GetWorkoutPlanExercises(ctx, req)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return &pbw.GetWorkoutPlanExercisesRes{
+				Success: false,
+				Message: "No exercises found",
+				Response: &pbw.BaseResponse{
+					Upstream:  "workout-service",
+					RequestId: domain.GenerateRequestID(ctx),
+				},
+			}, nil
+		}
+		return nil, status.Errorf(codes.Internal, "failed to get exercises: %v", err)
+	}
+
+	span.SetAttributes(
+		attribute.String("request.id", req.Response.RequestId),
+		attribute.String("request.details", req.String()),
+	)
+	return res, nil
 }
 
 func (s ServiceWorkout) GetExerciseByIdWorkoutPlan(ctx context.Context, req *generated.GetExerciseByIdWorkoutPlanReq) (*generated.GetExerciseByIdWorkoutPlanRes, error) {
-	//TODO implement me
-	panic("implement me")
+	exerciseID := req.ExerciseWorkoutPlan
+	tracer := otel.Tracer("FITDEV")
+	ctx, span := tracer.Start(ctx, "Workout/UpdateExercise")
+	defer span.End()
+	if exerciseID == "" {
+		return &pbw.GetExerciseByIdWorkoutPlanRes{
+			Success: false,
+			Message: "No exercises found",
+			Response: &pbw.BaseResponse{
+				Upstream:  "workout-service",
+				RequestId: domain.GenerateRequestID(ctx),
+			},
+		}, status.Errorf(codes.InvalidArgument, "req id is required")
+	}
+
+	workout, err := s.repo.GetWorkoutPlanExercisesByID(ctx, req)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return &pbw.GetExerciseByIdWorkoutPlanRes{
+				Success: false,
+				Message: "No exercises found",
+				Response: &pbw.BaseResponse{
+					Upstream:  "workout-service",
+					RequestId: domain.GenerateRequestID(ctx),
+				},
+			}, status.Errorf(codes.InvalidArgument, "no rows found")
+		}
+		return nil, status.Errorf(codes.Internal, "failed to get exercises: %v", err)
+	}
+
+	span.SetAttributes(
+		attribute.String("request.id", req.Request.RequestId),
+		attribute.String("request.details", req.String()),
+	)
+
+	return workout, nil
 }
 
 func (s ServiceWorkout) DeleteExerciseByIdWorkoutPlan(ctx context.Context, req *generated.DeleteExerciseByIdWorkoutPlanReq) (*generated.NilRes, error) {
@@ -254,8 +317,21 @@ func (s ServiceWorkout) UpdateExerciseByIdWorkoutPlan(ctx context.Context, req *
 }
 
 func (s ServiceWorkout) InsertExerciseWorkoutPlan(ctx context.Context, req *generated.InsertExerciseWorkoutPlanReq) (*generated.NilRes, error) {
-	//TODO implement me
-	panic("implement me")
+	tracer := otel.Tracer("FITDEV")
+	ctx, span := tracer.Start(ctx, "Workout/UpdateExercise")
+	defer span.End()
+
+	_, err := s.repo.InsertExerciseWorkoutPlan(ctx, req)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to insert exercise_workout_plan: %v", err)
+	}
+
+	span.SetAttributes(
+		attribute.String("request.id", req.Request.RequestId),
+		attribute.String("request.details", req.String()),
+	)
+
+	return &pbw.NilRes{}, nil
 }
 
 func (s ServiceWorkout) GetWorkoutPlans(ctx context.Context, req *generated.GetWorkoutPlansReq) (*generated.GetWorkoutPlansRes, error) {
