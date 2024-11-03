@@ -4,7 +4,6 @@ import (
 	"context"
 
 	pb "github.com/FACorreiaa/fitme-protos/modules/customer/generated"
-	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -40,14 +39,6 @@ func (s *CustomerService) UpdateCustomer(ctx context.Context, req *pb.UpdateCust
 func (s *CustomerService) DeleteCustomer(ctx context.Context, req *pb.DeleteCustomerReq) (*pb.NilRes, error) {
 	// Implementation of DeleteCustomer
 	return &pb.NilRes{}, nil
-}
-
-// GenerateRequestID TODO
-func GenerateRequestID(ctx context.Context) string {
-	if reqID, ok := ctx.Value("requestID").(string); ok {
-		return reqID
-	}
-	return uuid.New().String()
 }
 
 // AuthService

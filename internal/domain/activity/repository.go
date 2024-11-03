@@ -17,7 +17,6 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/FACorreiaa/fitme-grpc/internal/domain"
 	"github.com/FACorreiaa/fitme-grpc/internal/domain/auth"
 )
 
@@ -64,14 +63,7 @@ func (a *RepositoryActivity) GetActivity(ctx context.Context, req *pba.GetActivi
 	rows, err := a.pgpool.Query(ctx, query)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return &pba.GetActivityRes{
-				Success: false,
-				Message: "No activities found",
-				Response: &pba.BaseResponse{
-					Upstream:  "activity-service",
-					RequestId: domain.GenerateRequestID(ctx),
-				},
-			}, fmt.Errorf("activities not found %w", err)
+			return nil, status.Error(codes.NotFound, "activity not found")
 		}
 		return nil, status.Errorf(codes.Internal, "failed to query activities: %v", err)
 	}
@@ -87,14 +79,7 @@ func (a *RepositoryActivity) GetActivity(ctx context.Context, req *pba.GetActivi
 		)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				return &pba.GetActivityRes{
-					Success: false,
-					Message: "No activities found",
-					Response: &pba.BaseResponse{
-						Upstream:  "activity-service",
-						RequestId: domain.GenerateRequestID(ctx),
-					},
-				}, fmt.Errorf("activities not found: %w", err)
+				return nil, status.Error(codes.NotFound, "activity not found")
 			}
 			return nil, status.Error(codes.Internal, "Internal server error")
 		}
@@ -130,14 +115,7 @@ func (a *RepositoryActivity) GetActivity(ctx context.Context, req *pba.GetActivi
 	}
 
 	if len(activities) == 0 {
-		return &pba.GetActivityRes{
-			Success: false,
-			Message: "No activities found",
-			Response: &pba.BaseResponse{
-				Upstream:  "activity-service",
-				RequestId: domain.GenerateRequestID(ctx),
-			},
-		}, nil
+		return nil, status.Error(codes.NotFound, "activity not found")
 	}
 
 	return &pba.GetActivityRes{
@@ -145,8 +123,7 @@ func (a *RepositoryActivity) GetActivity(ctx context.Context, req *pba.GetActivi
 		Message:  "Activities retrieved successfully",
 		Activity: activities,
 		Response: &pba.BaseResponse{
-			Upstream:  "activity-service",
-			RequestId: domain.GenerateRequestID(ctx),
+			Upstream: "activity-service",
 		},
 	}, nil
 }
@@ -173,14 +150,7 @@ func (a *RepositoryActivity) GetActivitiesByName(ctx context.Context, req *pba.G
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return &pba.GetActivityNameRes{
-				Success: false,
-				Message: "No activities found",
-				Response: &pba.BaseResponse{
-					Upstream:  "activity-service",
-					RequestId: domain.GenerateRequestID(ctx),
-				},
-			}, fmt.Errorf("activities not found: %w", err)
+			return nil, status.Error(codes.NotFound, "activity not found")
 		}
 		return nil, status.Error(codes.Internal, "Internal server error")
 	}
@@ -207,8 +177,7 @@ func (a *RepositoryActivity) GetActivitiesByName(ctx context.Context, req *pba.G
 		Message:  "Activity retrieved successfully",
 		Activity: activity,
 		Response: &pba.BaseResponse{
-			Upstream:  "activity-service",
-			RequestId: domain.GenerateRequestID(ctx),
+			Upstream: "activity-service",
 		},
 	}, nil
 }
@@ -235,14 +204,7 @@ func (a *RepositoryActivity) GetActivitiesByID(ctx context.Context, req *pba.Get
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return &pba.GetActivityIDRes{
-				Success: false,
-				Message: "No activities found",
-				Response: &pba.BaseResponse{
-					Upstream:  "activity-service",
-					RequestId: domain.GenerateRequestID(ctx),
-				},
-			}, fmt.Errorf("activities not found: %w", err)
+			return nil, status.Error(codes.NotFound, "activity not found")
 		}
 		return nil, status.Error(codes.Internal, "Internal server error")
 	}
@@ -269,8 +231,7 @@ func (a *RepositoryActivity) GetActivitiesByID(ctx context.Context, req *pba.Get
 		Message:  "Activity retrieved successfully",
 		Activity: activity,
 		Response: &pba.BaseResponse{
-			Upstream:  "activity-service",
-			RequestId: domain.GenerateRequestID(ctx),
+			Upstream: "activity-service",
 		},
 	}, nil
 }
@@ -391,14 +352,7 @@ func (a *RepositoryActivity) GetUserExerciseSession(ctx context.Context, req *pb
 			return nil, status.Error(codes.NotFound, "no exercise sessions found for the user")
 		}
 		if errors.Is(err, pgx.ErrNoRows) {
-			return &pba.GetUserExerciseSessionRes{
-				Success: false,
-				Message: "No exercise session found",
-				Response: &pba.BaseResponse{
-					Upstream:  "activity-service",
-					RequestId: domain.GenerateRequestID(ctx),
-				},
-			}, fmt.Errorf("exercise session not found: %w", err)
+			return nil, status.Error(codes.NotFound, "activity not found")
 		}
 		return nil, status.Errorf(codes.Internal, "failed to retrieve exercise session: %v", err)
 	}
@@ -418,8 +372,7 @@ func (a *RepositoryActivity) GetUserExerciseSession(ctx context.Context, req *pb
 		Message: "Activity retrieved successfully",
 		Session: sessionStat,
 		Response: &pba.BaseResponse{
-			Upstream:  "activity-service",
-			RequestId: domain.GenerateRequestID(ctx),
+			Upstream: "activity-service",
 		},
 	}, nil
 }
@@ -472,8 +425,7 @@ func (a *RepositoryActivity) GetUserExerciseTotalData(ctx context.Context, req *
 			SessionName:          exerciseSessions[0].SessionName,
 		},
 		Response: &pba.BaseResponse{
-			Upstream:  "activity-service",
-			RequestId: domain.GenerateRequestID(ctx),
+			Upstream: "activity-service",
 		},
 	}, nil
 }
@@ -574,8 +526,7 @@ func (a *RepositoryActivity) GetUserExerciseSessionStats(ctx context.Context, re
 		Message:       "Get user exercise session stats successful",
 		ExerciseCount: pbSessionStats,
 		Response: &pba.BaseResponse{
-			Upstream:  "activity-service",
-			RequestId: domain.GenerateRequestID(ctx),
+			Upstream: "activity-service",
 		},
 	}, nil
 }

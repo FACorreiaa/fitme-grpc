@@ -17,6 +17,7 @@ import (
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpclog"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpcprometheus"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpcrecovery"
+	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpcrequest"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpcspan"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/session"
 )
@@ -68,6 +69,8 @@ func BootstrapServer(
 	// session
 	sessionInterceptor := session.InterceptorSession(sessionManager)
 
+	requestGeneratorSession := grpcrequest.RequestIDMiddleware()
+
 	// Configure server options from our base configuration
 	serverOptions := []grpc.ServerOption{
 		grpc.KeepaliveEnforcementPolicy(middleware.KeepaliveEnforcementPolicy()),
@@ -84,6 +87,7 @@ func BootstrapServer(
 			logInterceptor.Unary,
 			recoveryInterceptor.Unary,
 			sessionInterceptor,
+			requestGeneratorSession,
 		),
 
 		// Add the stream interceptors

@@ -18,7 +18,6 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/FACorreiaa/fitme-grpc/internal/domain"
 	"github.com/FACorreiaa/fitme-grpc/internal/domain/auth"
 )
 
@@ -67,14 +66,7 @@ func (r *RepositoryWorkout) GetExercises(ctx context.Context, req *pbw.GetExerci
 
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				return &pbw.GetExercisesRes{
-					Success: false,
-					Message: "No exercises found",
-					Response: &pbw.BaseResponse{
-						Upstream:  "workout-service",
-						RequestId: domain.GenerateRequestID(ctx),
-					},
-				}, fmt.Errorf("exercises not found: %w", err)
+				return nil, fmt.Errorf("no exercises found: %w", err)
 			}
 			return nil, status.Error(codes.Internal, "Internal server error")
 		}
@@ -117,14 +109,7 @@ func (r *RepositoryWorkout) GetExercises(ctx context.Context, req *pbw.GetExerci
 	}
 
 	if len(exercisesProtoList) == 0 {
-		return &pbw.GetExercisesRes{
-			Success: false,
-			Message: "No exercises found",
-			Response: &pbw.BaseResponse{
-				Upstream:  "workout-service",
-				RequestId: domain.GenerateRequestID(ctx),
-			},
-		}, nil
+		return nil, fmt.Errorf("no exercises found")
 	}
 
 	return &pbw.GetExercisesRes{
@@ -132,8 +117,7 @@ func (r *RepositoryWorkout) GetExercises(ctx context.Context, req *pbw.GetExerci
 		Message:  "Exercises retrieved successfully",
 		Exercise: exercisesProtoList,
 		Response: &pbw.BaseResponse{
-			Upstream:  "workout-service",
-			RequestId: domain.GenerateRequestID(ctx),
+			Upstream: "workout-service",
 		},
 	}, nil
 
@@ -191,8 +175,7 @@ func (r *RepositoryWorkout) GetExerciseID(ctx context.Context, req *pbw.GetExerc
 		Message:  "Exercise retrieved successfully",
 		Exercise: exerciseProto,
 		Response: &pbw.BaseResponse{
-			Upstream:  "workout-service",
-			RequestId: domain.GenerateRequestID(ctx),
+			Upstream: "workout-service",
 		},
 	}, nil
 }
@@ -267,8 +250,7 @@ func (r *RepositoryWorkout) CreateExercise(ctx context.Context, req *pbw.CreateE
 		Message:  "Exercise created and associated with user successfully",
 		Exercise: exerciseProto,
 		Response: &pbw.BaseResponse{
-			Upstream:  "workout-service",
-			RequestId: domain.GenerateRequestID(ctx),
+			Upstream: "workout-service",
 		},
 	}, nil
 }
@@ -457,17 +439,21 @@ func (r *RepositoryWorkout) CreateWorkoutPlan(ctx context.Context, req *pbw.Inse
 		}
 	}()
 
-	query := `
-       INSERT INTO workout_plan (id, user_id, description, notes, rating, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6)
-   `
-	_, err = tx.Exec(ctx, query, newWorkoutPlan.WorkoutId, newWorkoutPlan.UserId, newWorkoutPlan.Description, newWorkoutPlan.Notes, newWorkoutPlan.Rating, time.Now())
+	var workoutPlanID string
+	insertWorkoutPlanQuery := `
+       INSERT INTO workout_plan (user_id, description, notes, rating, created_at)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id`
+
+	err = tx.QueryRow(ctx, insertWorkoutPlanQuery, newWorkoutPlan.UserId,
+		newWorkoutPlan.Description, newWorkoutPlan.Notes, newWorkoutPlan.Rating, time.Now()).Scan(&workoutPlanID)
+
 	if err != nil {
 		logger.Error("Failed to insert workout plan", zap.Error(err))
 		return &pbw.InsertWorkoutPlanRes{}, status.Error(codes.Internal, "failed to insert workout plan")
 	}
 
-	row := tx.QueryRow(ctx, "SELECT id, user_id, description, notes, rating, created_at, updated_at FROM workout_plan WHERE id = $1", newWorkoutPlan.WorkoutId)
+	row := tx.QueryRow(ctx, "SELECT id, user_id, description, notes, rating, created_at, updated_at FROM workout_plan WHERE id = $1", workoutPlanID)
 	insertedPlan := &pbw.XWorkoutPlan{}
 	createdAt := time.Time{}
 	updatedAt := sql.NullTime{}
@@ -475,7 +461,7 @@ func (r *RepositoryWorkout) CreateWorkoutPlan(ctx context.Context, req *pbw.Inse
 	err = row.Scan(&insertedPlan.WorkoutId, &insertedPlan.UserId, &insertedPlan.Description, &insertedPlan.Notes, &insertedPlan.Rating,
 		&createdAt, &updatedAt)
 	if err != nil {
-		logger.Error("Failed to insert workout days", zap.Error(err))
+		logger.Error("no rows found on workout", zap.Error(err))
 		return &pbw.InsertWorkoutPlanRes{}, status.Error(codes.Internal, "failed to fetch inserted workout plan")
 	}
 	insertedPlan.CreatedAt = timestamppb.New(createdAt)
@@ -489,19 +475,13 @@ func (r *RepositoryWorkout) CreateWorkoutPlan(ctx context.Context, req *pbw.Inse
 	for _, day := range plan {
 		createdAt = time.Now()
 		workDayID := uuid.NewString()
-		workoutDay := &pbw.XWorkoutDay{
-			WorkoutDayId:  workDayID,
-			WorkoutPlanId: newWorkoutPlan.UserId,
-			Day:           day.Day,
-			CreatedAt:     timestamppb.New(createdAt),
-		}
-		// continue later
+
 		workoutDayQuery := `
-           INSERT INTO workout_day (id, workout_plan_id, day, created_at)
-           VALUES ($1, $2, $3, $4)
-       `
-		workoutDayQueryResult, err := tx.Exec(ctx, workoutDayQuery, workoutDay.WorkoutDayId, workoutDay.WorkoutPlanId, workoutDay.Day, createdAt)
-		fmt.Printf("Workout day result %+v", workoutDayQueryResult)
+       INSERT INTO workout_day (id, workout_plan_id, day, created_at)
+       VALUES ($1, $2, $3, $4)
+   `
+		_, err := tx.Exec(ctx, workoutDayQuery, workDayID, workoutPlanID, day.Day, createdAt)
+
 		if err != nil {
 			logger.Error("Failed to insert workout plan details", zap.Error(err))
 			return &pbw.InsertWorkoutPlanRes{}, status.Error(codes.Internal, "failed to insert workout day")
@@ -517,23 +497,35 @@ func (r *RepositoryWorkout) CreateWorkoutPlan(ctx context.Context, req *pbw.Inse
 
 		// Insert workout plan details
 		workoutPlanDetailQuery := `
-           INSERT INTO workout_plan_detail (id, workout_plan_id, day, exercises, created_at)
-           VALUES ($1, $2, $3, $4, $5)
-       `
-		workoutPlanDetailQueryResult, err := tx.Exec(ctx, workoutPlanDetailQuery, workoutPlanDetail)
-		fmt.Printf("Workout plan detail result %+v", workoutPlanDetailQueryResult)
+       INSERT INTO workout_plan_detail (id, workout_plan_id, day, exercises, created_at)
+       VALUES ($1, $2, $3, $4, $5)
+   `
+		_, err = tx.Exec(ctx, workoutPlanDetailQuery, workoutPlanDetail.WorkoutPlanDetailId,
+			workoutPlanID,
+			workoutPlanDetail.Day,
+			workoutPlanDetail.Exercises,
+			createdAt)
+
 		if err != nil {
+			logger.Error("Failed to insert workout plan detail", zap.Error(err))
 			return &pbw.InsertWorkoutPlanRes{}, status.Error(codes.Internal, "failed to insert workout plan detail")
 		}
 	}
 
+	// Commit the transaction
 	err = tx.Commit(ctx)
 	if err != nil {
 		logger.Error("Failed to commit transaction", zap.Error(err))
 		return &pbw.InsertWorkoutPlanRes{}, status.Error(codes.Internal, "failed to commit transaction")
 	}
 
-	logger.Info("Workout plan created successfully", zap.String("workout_id", newWorkoutPlan.WorkoutId))
+	//logger.Info("Workout plan created successfully", zap.String("workout_id", newWorkoutPlan.WorkoutId))
+
+	// Ensure insertedPlan is not nil before returning
+	//if insertedPlan == nil {
+	//	logger.Error("Inserted plan is nil after successful commit")
+	//	return &pbw.InsertWorkoutPlanRes{}, status.Error(codes.Internal, "inserted workout plan is nil")
+	//}
 
 	return &pbw.InsertWorkoutPlanRes{
 		Success: true,
@@ -617,8 +609,7 @@ func (r *RepositoryWorkout) GetWorkoutPlanExercises(ctx context.Context, req *pb
 		Message:            "workouts retrieved successfully",
 		WorkoutExerciseDay: workoutProtoList,
 		Response: &pbw.BaseResponse{
-			Upstream:  "workout-service",
-			RequestId: domain.GenerateRequestID(ctx),
+			Upstream: "workout-service",
 		},
 	}, nil
 }
@@ -668,8 +659,7 @@ func (r *RepositoryWorkout) GetWorkoutPlanExercisesByID(ctx context.Context, req
 		Message:            "workout successfully",
 		WorkoutExerciseDay: workoutProto,
 		Response: &pbw.BaseResponse{
-			Upstream:  "workout-service",
-			RequestId: domain.GenerateRequestID(ctx),
+			Upstream: "workout-service",
 		},
 	}, nil
 }

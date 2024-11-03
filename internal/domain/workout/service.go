@@ -18,6 +18,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/FACorreiaa/fitme-grpc/internal/domain"
+	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpcrequest"
 )
 
 var logger *zap.Logger
@@ -40,6 +41,17 @@ func (s ServiceWorkout) GetExercises(ctx context.Context, req *pbw.GetExercisesR
 	ctx, span := tracer.Start(ctx, "Workout/GetExercises")
 	defer span.End()
 
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pbw.BaseRequest{}
+	}
+
+	req.Request.RequestId = requestID
+
 	exercisesResponse, err := s.repo.GetExercises(ctx, req)
 
 	if err != nil {
@@ -48,7 +60,7 @@ func (s ServiceWorkout) GetExercises(ctx context.Context, req *pbw.GetExercisesR
 			Message: "No exercises found",
 			Response: &pbw.BaseResponse{
 				Upstream:  "workout-service",
-				RequestId: domain.GenerateRequestID(ctx),
+				RequestId: requestID,
 			},
 		}, fmt.Errorf("exercises not found %w", err)
 	}
@@ -93,7 +105,7 @@ func (s ServiceWorkout) GetExercises(ctx context.Context, req *pbw.GetExercisesR
 		Exercise: response.Exercise,
 		Response: &pbw.BaseResponse{
 			Upstream:  "workout-service",
-			RequestId: domain.GenerateRequestID(ctx),
+			RequestId: requestID,
 		},
 	}, nil
 }
@@ -102,6 +114,17 @@ func (s ServiceWorkout) GetExerciseID(ctx context.Context, req *pbw.GetExerciseI
 	tracer := otel.Tracer("FITDEV")
 	ctx, span := tracer.Start(ctx, "Workout/GetExerciseID")
 	defer span.End()
+
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pbw.BaseRequest{}
+	}
+
+	req.Request.RequestId = requestID
 
 	if req.ExerciseId == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "req id is required")
@@ -122,12 +145,12 @@ func (s ServiceWorkout) GetExerciseID(ctx context.Context, req *pbw.GetExerciseI
 			Exercise: exercise.Exercise,
 			Response: &pbw.BaseResponse{
 				Upstream:  "activity-service",
-				RequestId: domain.GenerateRequestID(ctx),
+				RequestId: requestID,
 			},
 		}, nil
 	}
 	span.SetAttributes(
-		attribute.String("request.id", req.ExerciseId),
+		attribute.String("request.id", req.Request.RequestId),
 		attribute.String("request.details", req.String()),
 	)
 
@@ -137,7 +160,7 @@ func (s ServiceWorkout) GetExerciseID(ctx context.Context, req *pbw.GetExerciseI
 		Exercise: exercise.Exercise,
 		Response: &pbw.BaseResponse{
 			Upstream:  "activity-service",
-			RequestId: domain.GenerateRequestID(ctx),
+			RequestId: requestID,
 		},
 	}, nil
 }
@@ -146,6 +169,17 @@ func (s ServiceWorkout) CreateExercise(ctx context.Context, req *pbw.CreateExerc
 	tracer := otel.Tracer("FITDEV")
 	ctx, span := tracer.Start(ctx, "Workout/GetExercises")
 	defer span.End()
+
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pbw.BaseRequest{}
+	}
+
+	req.Request.RequestId = requestID
 
 	userID := ctx.Value("userID").(string)
 	if userID == "" {
@@ -157,7 +191,7 @@ func (s ServiceWorkout) CreateExercise(ctx context.Context, req *pbw.CreateExerc
 		UserId:   userID,
 		Request: &pbw.BaseRequest{
 			Downstream: "workout-service",
-			RequestId:  domain.GenerateRequestID(ctx),
+			RequestId:  requestID,
 		},
 	}
 
@@ -171,14 +205,14 @@ func (s ServiceWorkout) CreateExercise(ctx context.Context, req *pbw.CreateExerc
 				Exercise: response.Exercise,
 				Response: &pbw.BaseResponse{
 					Upstream:  "workout-service",
-					RequestId: domain.GenerateRequestID(ctx),
+					RequestId: requestID,
 				},
 			}, nil
 		}
 		return nil, status.Errorf(codes.Internal, "failed to create exercise: %v", err)
 	}
 	span.SetAttributes(
-		attribute.String("request.id", req.Exercise.ExerciseId),
+		attribute.String("request.id", req.Request.RequestId),
 		attribute.String("request.details", req.String()),
 	)
 
@@ -188,7 +222,7 @@ func (s ServiceWorkout) CreateExercise(ctx context.Context, req *pbw.CreateExerc
 		Exercise: response.Exercise,
 		Response: &pbw.BaseResponse{
 			Upstream:  "workout-service",
-			RequestId: domain.GenerateRequestID(ctx),
+			RequestId: requestID,
 		},
 	}, nil
 }
@@ -246,6 +280,17 @@ func (s ServiceWorkout) GetWorkoutPlanExercises(ctx context.Context, req *genera
 	ctx, span := tracer.Start(ctx, "Workout/UpdateExercise")
 	defer span.End()
 
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pbw.BaseRequest{}
+	}
+
+	req.Request.RequestId = requestID
+
 	res, err := s.repo.GetWorkoutPlanExercises(ctx, req)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -254,7 +299,7 @@ func (s ServiceWorkout) GetWorkoutPlanExercises(ctx context.Context, req *genera
 				Message: "No exercises found",
 				Response: &pbw.BaseResponse{
 					Upstream:  "workout-service",
-					RequestId: domain.GenerateRequestID(ctx),
+					RequestId: requestID,
 				},
 			}, nil
 		}
@@ -262,7 +307,7 @@ func (s ServiceWorkout) GetWorkoutPlanExercises(ctx context.Context, req *genera
 	}
 
 	span.SetAttributes(
-		attribute.String("request.id", req.Response.RequestId),
+		attribute.String("request.id", req.Request.RequestId),
 		attribute.String("request.details", req.String()),
 	)
 	return res, nil
@@ -274,27 +319,13 @@ func (s ServiceWorkout) GetExerciseByIdWorkoutPlan(ctx context.Context, req *gen
 	ctx, span := tracer.Start(ctx, "Workout/UpdateExercise")
 	defer span.End()
 	if exerciseID == "" {
-		return &pbw.GetExerciseByIdWorkoutPlanRes{
-			Success: false,
-			Message: "No exercises found",
-			Response: &pbw.BaseResponse{
-				Upstream:  "workout-service",
-				RequestId: domain.GenerateRequestID(ctx),
-			},
-		}, status.Errorf(codes.InvalidArgument, "req id is required")
+		return nil, status.Errorf(codes.InvalidArgument, "req id is required")
 	}
 
 	workout, err := s.repo.GetWorkoutPlanExercisesByID(ctx, req)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return &pbw.GetExerciseByIdWorkoutPlanRes{
-				Success: false,
-				Message: "No exercises found",
-				Response: &pbw.BaseResponse{
-					Upstream:  "workout-service",
-					RequestId: domain.GenerateRequestID(ctx),
-				},
-			}, status.Errorf(codes.InvalidArgument, "no rows found")
+			return nil, status.Errorf(codes.NotFound, "no exercise with id %s found", exerciseID)
 		}
 		return nil, status.Errorf(codes.Internal, "failed to get exercises: %v", err)
 	}
@@ -360,6 +391,17 @@ func (s ServiceWorkout) InsertWorkoutPlan(ctx context.Context, req *generated.In
 	ctx, span := tracer.Start(ctx, "Workout/GetExercises")
 	defer span.End()
 
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pbw.BaseRequest{}
+	}
+
+	req.Request.RequestId = requestID
+
 	userID := ctx.Value("userID").(string)
 	if userID == "" {
 		return nil, status.Error(codes.Unauthenticated, "userID is missing in metadata")
@@ -412,7 +454,7 @@ func (s ServiceWorkout) InsertWorkoutPlan(ctx context.Context, req *generated.In
 			Message: "Workout creation failed",
 			Response: &pbw.BaseResponse{
 				Upstream:  "workout-service",
-				RequestId: domain.GenerateRequestID(ctx),
+				RequestId: requestID,
 			},
 		}, status.Errorf(codes.Internal, "failed to insert workout: %v", err)
 	}
@@ -421,5 +463,13 @@ func (s ServiceWorkout) InsertWorkoutPlan(ctx context.Context, req *generated.In
 		attribute.String("request.id", req.Request.RequestId),
 		attribute.String("request.details", req.String()),
 	)
-	return response, nil
+	return &pbw.InsertWorkoutPlanRes{
+		Success: false,
+		Message: "Workout creation failed",
+		Workout: response.Workout,
+		Response: &pbw.BaseResponse{
+			Upstream:  "workout-service",
+			RequestId: requestID,
+		},
+	}, nil
 }

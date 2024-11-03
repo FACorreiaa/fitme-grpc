@@ -17,6 +17,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/FACorreiaa/fitme-grpc/internal/domain"
+	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpcrequest"
 )
 
 var mu sync.Mutex
@@ -42,6 +43,17 @@ func (a *ServiceActivity) GetActivity(ctx context.Context, req *pba.GetActivityR
 	tracer := otel.Tracer("FITDEV")
 	ctx, span := tracer.Start(ctx, "Activity/GetActivity")
 	defer span.End()
+
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pba.BaseRequest{}
+	}
+
+	req.Request.RequestId = requestID
 
 	if req.PublicId == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "req PublicId is required")
@@ -73,7 +85,7 @@ func (a *ServiceActivity) GetActivity(ctx context.Context, req *pba.GetActivityR
 	}
 
 	span.SetAttributes(
-		attribute.String("request.id", req.PublicId),
+		attribute.String("request.id", req.Request.RequestId),
 		attribute.String("request.details", req.String()),
 	)
 
@@ -83,7 +95,7 @@ func (a *ServiceActivity) GetActivity(ctx context.Context, req *pba.GetActivityR
 		Activity: response.Activity,
 		Response: &pba.BaseResponse{
 			Upstream:  "activity-service",
-			RequestId: domain.GenerateRequestID(ctx),
+			RequestId: requestID,
 		},
 	}, nil
 }
@@ -92,6 +104,17 @@ func (a *ServiceActivity) GetActivitiesByID(ctx context.Context, req *pba.GetAct
 	tracer := otel.Tracer("FITDEV")
 	ctx, span := tracer.Start(ctx, "Activity/GetActivitiesByID")
 	defer span.End()
+
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pba.BaseRequest{}
+	}
+
+	req.Request.RequestId = requestID
 
 	if req.PublicId == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "req PublicId is required")
@@ -112,12 +135,12 @@ func (a *ServiceActivity) GetActivitiesByID(ctx context.Context, req *pba.GetAct
 			Activity: activity.Activity,
 			Response: &pba.BaseResponse{
 				Upstream:  "activity-service",
-				RequestId: domain.GenerateRequestID(ctx),
+				RequestId: requestID,
 			},
 		}, nil
 	}
 	span.SetAttributes(
-		attribute.String("request.id", req.PublicId),
+		attribute.String("request.id", req.Request.RequestId),
 		attribute.String("request.details", req.String()),
 	)
 
@@ -127,7 +150,7 @@ func (a *ServiceActivity) GetActivitiesByID(ctx context.Context, req *pba.GetAct
 		Activity: activity.Activity,
 		Response: &pba.BaseResponse{
 			Upstream:  "activity-service",
-			RequestId: domain.GenerateRequestID(ctx),
+			RequestId: requestID,
 		},
 	}, nil
 
@@ -137,6 +160,17 @@ func (a *ServiceActivity) GetActivitiesByName(ctx context.Context, req *pba.GetA
 	tracer := otel.Tracer("FITDEV")
 	ctx, span := tracer.Start(ctx, "Activity/GetActivitiesByName")
 	defer span.End()
+
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pba.BaseRequest{}
+	}
+
+	req.Request.RequestId = requestID
 
 	if req.PublicId == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "req name is required")
@@ -157,12 +191,12 @@ func (a *ServiceActivity) GetActivitiesByName(ctx context.Context, req *pba.GetA
 			Activity: activity.Activity,
 			Response: &pba.BaseResponse{
 				Upstream:  "activity-service",
-				RequestId: domain.GenerateRequestID(ctx),
+				RequestId: requestID,
 			},
 		}, nil
 	}
 	span.SetAttributes(
-		attribute.String("request.id", req.PublicId),
+		attribute.String("request.id", req.Request.RequestId),
 		attribute.String("request.details", req.String()),
 	)
 
@@ -172,7 +206,7 @@ func (a *ServiceActivity) GetActivitiesByName(ctx context.Context, req *pba.GetA
 		Activity: activity.Activity,
 		Response: &pba.BaseResponse{
 			Upstream:  "activity-service",
-			RequestId: domain.GenerateRequestID(ctx),
+			RequestId: requestID,
 		},
 	}, nil
 
@@ -186,6 +220,17 @@ func (a *ServiceActivity) GetUserExerciseSession(ctx context.Context, req *pba.G
 	tracer := otel.Tracer("FITDEV")
 	ctx, span := tracer.Start(ctx, "Activity/GetUserExerciseSession")
 	defer span.End()
+
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pba.BaseRequest{}
+	}
+
+	req.Request.RequestId = requestID
 
 	if req.PublicId == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "req name is required")
@@ -202,13 +247,13 @@ func (a *ServiceActivity) GetUserExerciseSession(ctx context.Context, req *pba.G
 			Session: exerciseSession.Session,
 			Response: &pba.BaseResponse{
 				Upstream:  "activity-service",
-				RequestId: domain.GenerateRequestID(ctx),
+				RequestId: requestID,
 			},
 		}, nil
 	}
 
 	span.SetAttributes(
-		attribute.String("request.id", req.PublicId),
+		attribute.String("request.id", req.Request.RequestId),
 		attribute.String("request.details", req.String()),
 	)
 
@@ -218,7 +263,7 @@ func (a *ServiceActivity) GetUserExerciseSession(ctx context.Context, req *pba.G
 		Session: exerciseSession.Session,
 		Response: &pba.BaseResponse{
 			Upstream:  "activity-service",
-			RequestId: domain.GenerateRequestID(ctx),
+			RequestId: requestID,
 		},
 	}, nil
 
@@ -234,6 +279,17 @@ func (a *ServiceActivity) GetUserExerciseTotalData(ctx context.Context, req *pba
 	ctx, span := tracer.Start(ctx, "Activity/GetUserExerciseTotalData")
 	defer span.End()
 
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pba.BaseRequest{}
+	}
+
+	req.Request.RequestId = requestID
+
 	sessionStats, err := a.repo.GetUserExerciseTotalData(ctx, req)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -245,10 +301,15 @@ func (a *ServiceActivity) GetUserExerciseTotalData(ctx context.Context, req *pba
 			Session: sessionStats.Session,
 			Response: &pba.BaseResponse{
 				Upstream:  "activity-service",
-				RequestId: domain.GenerateRequestID(ctx),
+				RequestId: requestID,
 			},
 		}, nil
 	}
+
+	span.SetAttributes(
+		attribute.String("request.id", req.Request.RequestId),
+		attribute.String("request.details", req.String()),
+	)
 
 	return &pba.GetUserExerciseTotalDataRes{
 		Success: true,
@@ -256,7 +317,7 @@ func (a *ServiceActivity) GetUserExerciseTotalData(ctx context.Context, req *pba
 		Session: sessionStats.Session,
 		Response: &pba.BaseResponse{
 			Upstream:  "activity-service",
-			RequestId: domain.GenerateRequestID(ctx),
+			RequestId: requestID,
 		},
 	}, nil
 }
@@ -265,6 +326,17 @@ func (a *ServiceActivity) GetUserExerciseSessionStats(ctx context.Context, req *
 	tracer := otel.Tracer("FITDEV")
 	ctx, span := tracer.Start(ctx, "Activity/GetUserExerciseSessionStats")
 	defer span.End()
+
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pba.BaseRequest{}
+	}
+
+	req.Request.RequestId = requestID
 
 	userID := req.PublicId
 	if userID == "" {
@@ -282,13 +354,13 @@ func (a *ServiceActivity) GetUserExerciseSessionStats(ctx context.Context, req *
 			ExerciseCount: stats.ExerciseCount,
 			Response: &pba.BaseResponse{
 				Upstream:  "activity-service",
-				RequestId: domain.GenerateRequestID(ctx),
+				RequestId: requestID,
 			},
 		}, nil
 	}
 
 	span.SetAttributes(
-		attribute.String("request.id", req.PublicId),
+		attribute.String("request.id", req.Request.RequestId),
 		attribute.String("request.details", req.String()),
 	)
 
@@ -298,7 +370,7 @@ func (a *ServiceActivity) GetUserExerciseSessionStats(ctx context.Context, req *
 		ExerciseCount: stats.ExerciseCount,
 		Response: &pba.BaseResponse{
 			Upstream:  "activity-service",
-			RequestId: domain.GenerateRequestID(ctx),
+			RequestId: requestID,
 		},
 	}, nil
 }
