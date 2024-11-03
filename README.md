@@ -12,6 +12,8 @@ TODO
  - Fix Prometheus
  - Loki
  - Complete Grafana
+ - PDF builder: https://github.com/johnfercher/maroto
+ - CSV and Excel builder: check Domonda
  - Complete:
    - Traces
       Exporters: Stdout, Jaeger, Zipkin, Datadog and OpenTelemetry (OTLP) collector

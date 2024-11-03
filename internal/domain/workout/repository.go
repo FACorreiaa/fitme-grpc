@@ -9,9 +9,11 @@ import (
 	"time"
 
 	pbw "github.com/FACorreiaa/fitme-protos/modules/workout/generated"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -357,6 +359,186 @@ func (r *RepositoryWorkout) UpdateExercise(ctx context.Context, req *pbw.UpdateE
 		Success:  true,
 		Message:  "Exercise updated successfully",
 		Exercise: updatedExercise,
+	}, nil
+}
+
+//func (r *RepositoryWorkout) CreateWorkoutPlan(ctx context.Context, req *pbw.InsertWorkoutPlanReq) (*pbw.InsertWorkoutPlanRes, error) {
+//	logger := zap.L() // Assuming you have initialized your logger
+//	newWorkoutPlan := req.Workout
+//	plan := req.PlanDay
+//
+//	tx, err := r.pgpool.BeginTx(ctx, pgx.TxOptions{})
+//	if err != nil {
+//		logger.Error("Failed to start transaction", zap.Error(err))
+//		return nil, status.Error(codes.Internal, "failed to start transaction")
+//	}
+//	defer func() {
+//		if err != nil {
+//			_ = tx.Rollback(ctx)
+//			logger.Warn("Transaction rolled back", zap.Error(err))
+//		}
+//	}()
+//
+//	// Insert workout plan
+//	query := `
+//        INSERT INTO workout_plan (id, user_id, description, notes, rating, created_at)
+//        VALUES ($1, $2, $3, $4, $5, $6)
+//    `
+//	_, err = tx.Exec(ctx, query, newWorkoutPlan.WorkoutId, newWorkoutPlan.UserId, newWorkoutPlan.Description, newWorkoutPlan.Notes, newWorkoutPlan.Rating, time.Now())
+//	if err != nil {
+//		logger.Error("Failed to insert workout plan", zap.Error(err))
+//		return &pbw.InsertWorkoutPlanRes{}, status.Error(codes.Internal, "failed to insert workout plan")
+//	}
+//
+//	// Insert workout days and details in batches
+//	var workoutDayValues []interface{}
+//	var workoutPlanDetailValues []interface{}
+//
+//	for _, day := range plan {
+//		createdAt := timestamppb.New(time.Now())
+//		workDayID := uuid.NewString()
+//
+//		workoutDayValues = append(workoutDayValues, workDayID, newWorkoutPlan.WorkoutId, day.Day, createdAt.AsTime())
+//
+//		workoutPlanDetailID := uuid.NewString()
+//		workoutPlanDetailValues = append(workoutPlanDetailValues, workoutPlanDetailID, newWorkoutPlan.WorkoutId, day.Day, day.ExerciseId, createdAt.AsTime())
+//	}
+//
+//	// Batch insert workout days
+//	workoutDayQuery := `
+//        INSERT INTO workout_day (id, workout_plan_id, day, created_at)
+//        VALUES ($1, $2, $3, $4), ($5, $6, $7, $8), ...
+//    `
+//	_, err = tx.Exec(ctx, workoutDayQuery, workoutDayValues...)
+//	if err != nil {
+//		logger.Error("Failed to insert workout days", zap.Error(err))
+//		return &pbw.InsertWorkoutPlanRes{}, status.Error(codes.Internal, "failed to insert workout days")
+//	}
+//
+//	// Batch insert workout plan details
+//	workoutPlanDetailQuery := `
+//        INSERT INTO workout_plan_detail (id, workout_plan_id, day, exercises, created_at)
+//        VALUES ($1, $2, $3, $4, $5), ($6, $7, $8, $9, $10), ...
+//    `
+//	_, err = tx.Exec(ctx, workoutPlanDetailQuery, workoutPlanDetailValues...)
+//	if err != nil {
+//		logger.Error("Failed to insert workout plan details", zap.Error(err))
+//		return &pbw.InsertWorkoutPlanRes{}, status.Error(codes.Internal, "failed to insert workout plan details")
+//	}
+//
+//	err = tx.Commit(ctx)
+//	if err != nil {
+//		logger.Error("Failed to commit transaction", zap.Error(err))
+//		return &pbw.InsertWorkoutPlanRes{}, status.Error(codes.Internal, "failed to commit transaction")
+//	}
+//
+//	logger.Info("Workout plan created successfully", zap.String("workout_id", newWorkoutPlan.WorkoutId))
+//
+//	return &pbw.InsertWorkoutPlanRes{
+//		Success: true,
+//		Message: "Workout plan created successfully",
+//		Workout: &insertedPlan,
+//	}, nil
+//}
+
+func (r *RepositoryWorkout) CreateWorkoutPlan(ctx context.Context, req *pbw.InsertWorkoutPlanReq) (*pbw.InsertWorkoutPlanRes, error) {
+	newWorkoutPlan := req.Workout
+	plan := req.PlanDay
+
+	tx, err := r.pgpool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		logger.Error("Failed to start transaction", zap.Error(err))
+		return nil, status.Error(codes.Internal, "failed to start transaction")
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback(ctx)
+			logger.Warn("Transaction rolled back", zap.Error(err))
+		}
+	}()
+
+	query := `
+       INSERT INTO workout_plan (id, user_id, description, notes, rating, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6)
+   `
+	_, err = tx.Exec(ctx, query, newWorkoutPlan.WorkoutId, newWorkoutPlan.UserId, newWorkoutPlan.Description, newWorkoutPlan.Notes, newWorkoutPlan.Rating, time.Now())
+	if err != nil {
+		logger.Error("Failed to insert workout plan", zap.Error(err))
+		return &pbw.InsertWorkoutPlanRes{}, status.Error(codes.Internal, "failed to insert workout plan")
+	}
+
+	row := tx.QueryRow(ctx, "SELECT id, user_id, description, notes, rating, created_at, updated_at FROM workout_plan WHERE id = $1", newWorkoutPlan.WorkoutId)
+	insertedPlan := &pbw.XWorkoutPlan{}
+	createdAt := time.Time{}
+	updatedAt := sql.NullTime{}
+
+	err = row.Scan(&insertedPlan.WorkoutId, &insertedPlan.UserId, &insertedPlan.Description, &insertedPlan.Notes, &insertedPlan.Rating,
+		&createdAt, &updatedAt)
+	if err != nil {
+		logger.Error("Failed to insert workout days", zap.Error(err))
+		return &pbw.InsertWorkoutPlanRes{}, status.Error(codes.Internal, "failed to fetch inserted workout plan")
+	}
+	insertedPlan.CreatedAt = timestamppb.New(createdAt)
+	if updatedAt.Valid {
+		insertedPlan.UpdatedAt = timestamppb.New(updatedAt.Time)
+	} else {
+		insertedPlan.UpdatedAt = nil
+	}
+
+	// Insert each workout day
+	for _, day := range plan {
+		createdAt = time.Now()
+		workDayID := uuid.NewString()
+		workoutDay := &pbw.XWorkoutDay{
+			WorkoutDayId:  workDayID,
+			WorkoutPlanId: newWorkoutPlan.UserId,
+			Day:           day.Day,
+			CreatedAt:     timestamppb.New(createdAt),
+		}
+		// continue later
+		workoutDayQuery := `
+           INSERT INTO workout_day (id, workout_plan_id, day, created_at)
+           VALUES ($1, $2, $3, $4)
+       `
+		workoutDayQueryResult, err := tx.Exec(ctx, workoutDayQuery, workoutDay.WorkoutDayId, workoutDay.WorkoutPlanId, workoutDay.Day, createdAt)
+		fmt.Printf("Workout day result %+v", workoutDayQueryResult)
+		if err != nil {
+			logger.Error("Failed to insert workout plan details", zap.Error(err))
+			return &pbw.InsertWorkoutPlanRes{}, status.Error(codes.Internal, "failed to insert workout day")
+		}
+
+		workoutPlanDetail := &pbw.XWorkoutPlanDetail{
+			WorkoutPlanId:       uuid.NewString(),
+			WorkoutPlanDetailId: insertedPlan.WorkoutId,
+			Day:                 day.Day,
+			Exercises:           day.ExerciseId,
+			CreatedAt:           timestamppb.New(createdAt),
+		}
+
+		// Insert workout plan details
+		workoutPlanDetailQuery := `
+           INSERT INTO workout_plan_detail (id, workout_plan_id, day, exercises, created_at)
+           VALUES ($1, $2, $3, $4, $5)
+       `
+		workoutPlanDetailQueryResult, err := tx.Exec(ctx, workoutPlanDetailQuery, workoutPlanDetail)
+		fmt.Printf("Workout plan detail result %+v", workoutPlanDetailQueryResult)
+		if err != nil {
+			return &pbw.InsertWorkoutPlanRes{}, status.Error(codes.Internal, "failed to insert workout plan detail")
+		}
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		logger.Error("Failed to commit transaction", zap.Error(err))
+		return &pbw.InsertWorkoutPlanRes{}, status.Error(codes.Internal, "failed to commit transaction")
+	}
+
+	logger.Info("Workout plan created successfully", zap.String("workout_id", newWorkoutPlan.WorkoutId))
+
+	return &pbw.InsertWorkoutPlanRes{
+		Success: true,
+		Message: "Workout plan created successfully",
+		Workout: insertedPlan,
 	}, nil
 }
 

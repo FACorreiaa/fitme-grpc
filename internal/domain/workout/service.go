@@ -8,6 +8,7 @@ import (
 
 	"github.com/FACorreiaa/fitme-protos/modules/workout/generated"
 	pbw "github.com/FACorreiaa/fitme-protos/modules/workout/generated"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -355,6 +356,70 @@ func (s ServiceWorkout) UpdateWorkoutPlan(ctx context.Context, req *generated.Up
 }
 
 func (s ServiceWorkout) InsertWorkoutPlan(ctx context.Context, req *generated.InsertWorkoutPlanReq) (*generated.InsertWorkoutPlanRes, error) {
-	//TODO implement me
-	panic("implement me")
+	tracer := otel.Tracer("FITDEV")
+	ctx, span := tracer.Start(ctx, "Workout/GetExercises")
+	defer span.End()
+
+	userID := ctx.Value("userID").(string)
+	if userID == "" {
+		return nil, status.Error(codes.Unauthenticated, "userID is missing in metadata")
+	}
+
+	//workoutPlan := req.Workout
+	//workoutPlan.UserId = userID
+
+	// create a number of workday days for a plan
+	workoutDays := make([]*pbw.XWorkoutPlanDay, len(req.PlanDay))
+
+	for i, planDay := range req.PlanDay {
+		exercises := make([]*pbw.XExercises, len(planDay.ExerciseId))
+		// var wg sync.WaitGroup
+		// var mu sync.Mutex
+		// var fetchError error
+
+		for j, exercise := range planDay.ExerciseId {
+			exerciseReq := &pbw.GetExerciseIDReq{
+				ExerciseId: exercise,
+			}
+			exerciseDetails, err := s.repo.GetExerciseID(ctx, exerciseReq)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "failed to get exercise details: %v", err)
+			}
+			exercises[j] = exerciseDetails.Exercise
+		}
+		workoutDays[i] = &pbw.XWorkoutPlanDay{
+			Day:       planDay.Day,
+			Exercises: exercises,
+		}
+	}
+
+	workoutPlan := &pbw.XWorkoutPlan{
+		WorkoutId:      uuid.NewString(),
+		UserId:         userID,
+		Description:    req.Workout.Description,
+		Notes:          req.Workout.Notes,
+		Rating:         req.Workout.Rating,
+		WorkoutPlanDay: workoutDays,
+		CreatedAt:      timestamppb.New(time.Now()),
+	}
+
+	req.Workout = workoutPlan
+
+	response, err := s.repo.CreateWorkoutPlan(ctx, req)
+	if err != nil {
+		return &pbw.InsertWorkoutPlanRes{
+			Success: false,
+			Message: "Workout creation failed",
+			Response: &pbw.BaseResponse{
+				Upstream:  "workout-service",
+				RequestId: domain.GenerateRequestID(ctx),
+			},
+		}, status.Errorf(codes.Internal, "failed to insert workout: %v", err)
+	}
+
+	span.SetAttributes(
+		attribute.String("request.id", req.Request.RequestId),
+		attribute.String("request.details", req.String()),
+	)
+	return response, nil
 }
