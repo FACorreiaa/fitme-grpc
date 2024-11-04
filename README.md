@@ -25,3 +25,4 @@ TODO
         Exporters: OpenTelemetry (OTLP) collector
  - K8s deployment
  - Where to deploy ?
+ - ..
