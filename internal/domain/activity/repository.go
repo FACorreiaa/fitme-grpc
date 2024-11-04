@@ -291,11 +291,8 @@ func (a *RepositoryActivity) SaveSession(ctx context.Context, req *pba.XExercise
 	var sessionID uuid.UUID
 
 	startTime := req.StartTime.AsTime()
-	fmt.Printf("%#v", startTime)
 	endTime := req.EndTime.AsTime()
-	fmt.Printf("%#v", endTime)
 	createdAt := req.CreatedAt.AsTime()
-	fmt.Printf("%#v", createdAt)
 
 	// Execute the query and get the inserted session ID
 	err := a.pgpool.QueryRow(ctx, query,

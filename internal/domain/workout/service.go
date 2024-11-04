@@ -70,8 +70,6 @@ func (s ServiceWorkout) GetExercises(ctx context.Context, req *pbw.GetExercisesR
 	for _, a := range exercisesResponse.Exercise {
 		//createdAtFormatted := a.CreatedAt.AsTime().Format("2006-01-02 15:04:05.999999")
 		//updatedAtFormatted := a.UpdatedAt.AsTime().Format("2006-01-02 15:04:05.999999")
-
-		fmt.Printf("Created at: %#v", a.CreatedAt.AsTime())
 		response.Exercise = append(response.Exercise, &pbw.XExercises{
 			ExerciseId:    a.ExerciseId,
 			Name:          a.Name,

@@ -3,7 +3,6 @@ package activity
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
@@ -71,7 +70,6 @@ func (a *ServiceActivity) GetActivity(ctx context.Context, req *pba.GetActivityR
 		//createdAtFormatted := a.CreatedAt.AsTime().Format("2006-01-02 15:04:05.999999")
 		//updatedAtFormatted := a.UpdatedAt.AsTime().Format("2006-01-02 15:04:05.999999")
 
-		fmt.Printf("Created at: %#v", a.CreatedAt.AsTime())
 		response.Activity = append(response.Activity, &pba.XActivity{
 			ActivityId:        a.ActivityId,
 			UserId:            a.UserId,
@@ -462,12 +460,6 @@ func (a *ServiceActivity) ResumeActivityTracker(ctx context.Context, req *pba.Re
 	if sessionID == "" {
 		return nil, status.Error(codes.InvalidArgument, "Session ID is required")
 	}
-
-	//for id, session := range a.exerciseSessions {
-	//	fmt.Printf("Exercise Session ID: %s\n", id)
-	//	fmt.Printf("Session Name: %s\n", session.SessionName)
-	//	fmt.Printf("ExerciseSessionId: %s\n", session.ExerciseSessionId)
-	//}
 
 	mu.Lock()
 	session, found := a.exerciseSessions[sessionID]

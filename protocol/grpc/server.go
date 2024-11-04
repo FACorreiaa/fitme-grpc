@@ -67,7 +67,7 @@ func BootstrapServer(
 	_, recoveryInterceptor := grpcrecovery.Interceptors(grpcrecovery.RegisterMetrics(registry))
 
 	// session
-	sessionInterceptor := session.InterceptorSession(sessionManager)
+	sessionInterceptor := session.InterceptorSession()
 
 	requestGeneratorSession := grpcrequest.RequestIDMiddleware()
 

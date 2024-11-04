@@ -4,10 +4,19 @@ import (
 	"context"
 
 	pb "github.com/FACorreiaa/fitme-protos/modules/customer/generated"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+type Claims struct {
+	UserID string `json:"userId"`
+	Role   string `json:"role"`
+	jwt.RegisteredClaims
+}
+
+var JwtSecretKey = []byte("your-secret-key")
 
 // CustomerService implements the Customer gRPC server
 type CustomerService struct {

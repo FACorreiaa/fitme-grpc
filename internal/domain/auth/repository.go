@@ -9,10 +9,15 @@ import (
 	"time"
 
 	pb "github.com/FACorreiaa/fitme-protos/modules/user/generated"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
+
+	"github.com/FACorreiaa/fitme-grpc/internal/domain"
 )
 
 type AuthRepository struct {
@@ -42,32 +47,46 @@ func (a *AuthRepository) Register(ctx context.Context, req *pb.RegisterRequest) 
 }
 
 func (a *AuthRepository) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResponse, error) {
-	var passwordHash, email, userID string
+	var user User
 	err := a.pgpool.QueryRow(ctx, `SELECT id, password, email FROM "users" WHERE username=$1`, req.Username).Scan(
-		&userID, &passwordHash, &email)
+		&user.ID, &user.Password, &user.Email)
 	if err != nil {
 		return nil, errors.New("user not found")
 	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.Password))
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password))
 	if err != nil {
 		return nil, errors.New("invalid credentials")
 	}
 
-	sessionID, err := a.sessionManager.GenerateSession(UserSession{
-		ID:       userID,
-		Email:    req.Email,
-		Username: req.Username,
-	})
+	expirationTime := time.Now().Add(24 * time.Hour)
+	claims := &domain.Claims{
+		UserID: user.ID,
+		Role:   "user",
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+		},
+	}
 
-	fmt.Printf("sessionIDsessionID %s", sessionID)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(domain.JwtSecretKey)
+
+	if err != nil {
+		return nil, status.Error(codes.Internal, "could not create token")
+	}
+
+	//sessionID, err := a.sessionManager.GenerateSession(UserSession{
+	//	ID:       userID,
+	//	Email:    req.Email,
+	//	Username: req.Username,
+	//})
 
 	//err = a.redis.Set(ctx, req.Username, sessionID, 0).Err()
 	//if err != nil {
 	//	return nil, err
 	//}
 
-	return &pb.LoginResponse{Token: sessionID, Message: "Login successful!"}, nil
+	return &pb.LoginResponse{Token: tokenString, Message: "Login successful!"}, nil
 }
 
 func (a *AuthRepository) Logout(ctx context.Context, req *pb.NilReq) (*pb.NilRes, error) {
@@ -170,8 +189,6 @@ func (a *AuthRepository) GetAllUsers(ctx context.Context) (*pb.GetAllUsersRespon
 		if err != nil {
 			return nil, err
 		}
-
-		fmt.Printf("role %s", roleStr)
 
 		var role pb.User_Role
 		switch roleStr {

@@ -2,17 +2,21 @@ package session
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/golang-jwt/jwt/v5"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"github.com/FACorreiaa/fitme-grpc/internal/domain/auth"
+	"github.com/FACorreiaa/fitme-grpc/internal/domain"
 )
 
-func InterceptorSession(sessionManager *auth.SessionManager) grpc.UnaryServerInterceptor {
+// Define your secret key for signing tokens
+
+// Claims struct
+
+func InterceptorSession() grpc.UnaryServerInterceptor {
 	return func(
 		ctx context.Context,
 		req interface{},
@@ -31,43 +35,34 @@ func InterceptorSession(sessionManager *auth.SessionManager) grpc.UnaryServerInt
 			return handler(ctx, req)
 		}
 
-		fmt.Printf("info.FullMethod: %s\n", info.FullMethod)
-
 		md, ok := metadata.FromIncomingContext(ctx)
 		if !ok {
 			return nil, status.Error(codes.Unauthenticated, "missing context metadata")
 		}
 
-		// Extract token
-		token := md["authorization"]
-		if len(token) == 0 {
-			return nil, status.Error(codes.Unauthenticated, "missing auth token")
-		}
-
-		// Validate session
-		userSession, err := sessionManager.GetSession(token[0])
-		if err != nil {
-			return nil, status.Error(codes.Unauthenticated, "invalid session token")
-		}
-
-		userID := userSession.ID
-		ctx = context.WithValue(ctx, "userSession", userSession)
-		ctx = context.WithValue(ctx, "userID", userID)
-
-		// TODO handle permissions later
-
-		//requiredPermission, ok := MethodPermissions[info.FullMethod]
-		//if !ok {
-		//	return nil, status.Error(codes.PermissionDenied, "method not found")
+		authHeader := md["authorization"]
+		//if len(authHeader) == 0 || len(authHeader[0]) < 8 || authHeader[0][:7] != "Bearer " {
+		//	return nil, status.Error(codes.Unauthenticated, "missing or invalid auth token")
 		//}
 		//
-		//userPermissions := GetUserPermissions(userSession.Role)
-		//fmt.Printf("userPermissions: %+v\n", userPermissions)
-		//if !hasPermission(userPermissions, requiredPermission) {
-		//	return nil, status.Error(codes.PermissionDenied, "user does not have permission to access this method")
-		//}
+		//tokenString := authHeader[0][7:]
+		if len(authHeader) == 0 {
+			return nil, status.Error(codes.Unauthenticated, "missing or invalid auth token")
+		}
 
-		// Pass user session in context
+		tokenString := authHeader[0]
+
+		claims := &domain.Claims{}
+		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+			return domain.JwtSecretKey, nil
+		})
+		if err != nil || !token.Valid {
+			return nil, status.Error(codes.Unauthenticated, "invalid or expired token")
+		}
+
+		ctx = context.WithValue(ctx, "userID", claims.UserID)
+		ctx = context.WithValue(ctx, "role", claims.Role)
+
 		return handler(ctx, req)
 	}
 }
