@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lib/pq"
+
 	pbw "github.com/FACorreiaa/fitme-protos/modules/workout/generated"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -534,10 +536,216 @@ func (r *RepositoryWorkout) CreateWorkoutPlan(ctx context.Context, req *pbw.Inse
 	}, nil
 }
 
+func (r *RepositoryWorkout) GetWorkoutPlans(ctx context.Context, req *pbw.GetWorkoutPlansReq) (*pbw.GetWorkoutPlansRes, error) {
+	query := `
+		SELECT wp.id AS workout_plan_id, wp.user_id, wp.description,
+			   wp.notes, wp.rating, wp.created_at, wp.updated_at, wd.day, wpd.exercises
+		FROM workout_plan AS wp
+		LEFT JOIN workout_plan_detail AS wpd ON wp.id = wpd.workout_plan_id
+		LEFT JOIN workout_day AS wd ON wp.id = wd.workout_plan_id
+		GROUP BY wp.id, wd.day, wpd.exercises
+		ORDER BY wd.day;
+	`
+
+	rows, err := r.pgpool.Query(ctx, query)
+	if err != nil {
+		return &pbw.GetWorkoutPlansRes{}, status.Error(codes.Internal, "failed to query workout plans")
+	}
+	defer rows.Close()
+
+	workouts := make(map[string]*pbw.XWorkoutPlanResponse)
+
+	for rows.Next() {
+
+		var row struct {
+			WorkoutPlanID uuid.UUID      `db:"workout_plan_id"`
+			UserID        uuid.UUID      `db:"user_id"`
+			Description   string         `db:"description"`
+			Notes         string         `db:"notes"`
+			Rating        int            `db:"rating"`
+			CreatedAt     time.Time      `db:"created_at"`
+			UpdatedAt     sql.NullTime   `db:"updated_at"`
+			Day           string         `db:"day"`
+			Exercises     pq.StringArray `db:"exercises"`
+		}
+
+		createdAt := timestamppb.New(row.CreatedAt)
+		var updatedAt *timestamppb.Timestamp
+
+		if row.UpdatedAt.Valid {
+			updatedAt = timestamppb.New(row.UpdatedAt.Time)
+		} else {
+			updatedAt = nil
+		}
+
+		err = rows.Scan(&row.WorkoutPlanID, &row.UserID, &row.Description, &row.Notes, &row.Rating, &row.CreatedAt,
+			&row.UpdatedAt, &row.Day, &row.Exercises)
+		if err != nil {
+			logger.Error("Failed to scan workout plan", zap.Error(err))
+			return nil, status.Error(codes.Internal, "failed to scan workout plan")
+		}
+
+		if _, ok := workouts[row.WorkoutPlanID.String()]; !ok {
+			workouts[row.WorkoutPlanID.String()] = &pbw.XWorkoutPlanResponse{
+				WorkoutPlanId: row.WorkoutPlanID.String(),
+				UserId:        row.UserID.String(),
+				Description:   row.Description,
+				WorkoutDay:    []*pbw.WorkoutDayResponse{},
+				Notes:         row.Notes,
+				CreatedAt:     createdAt,
+				UpdatedAt:     updatedAt,
+				Rating:        uint32(row.Rating),
+			}
+		}
+
+		if plan, ok := workouts[row.WorkoutPlanID.String()]; ok {
+			day := &pbw.WorkoutDayResponse{
+				Day:       row.Day,
+				Exercises: row.Exercises,
+			}
+			plan.WorkoutDay = append(plan.WorkoutDay, day)
+			workouts[row.WorkoutPlanID.String()] = plan
+		}
+	}
+
+	result := &pbw.GetWorkoutPlansRes{
+		Success:     true,
+		Message:     "Workout plans retrieved successfully",
+		WorkoutPlan: []*pbw.XWorkoutPlanResponse{},
+	}
+	for _, workout := range workouts {
+		result.WorkoutPlan = append(result.WorkoutPlan, workout)
+	}
+
+	return result, nil
+}
+
+func (r *RepositoryWorkout) GetWorkoutPlan(ctx context.Context, req *pbw.GetWorkoutPlanReq) (*pbw.GetWorkoutPlanRes, error) {
+	workoutPlanProto := &pbw.GetWorkoutPlanRes{
+		WorkoutPlan: &pbw.XWorkoutPlanResponse{},
+	}
+	workoutPlanID := req.WorkoutPlanId
+
+	if workoutPlanID == "" {
+		return &pbw.GetWorkoutPlanRes{}, status.Error(codes.InvalidArgument, "workout ID is required")
+	}
+
+	var row struct {
+		WorkoutPlanID uuid.UUID      `db:"workout_plan_id"`
+		UserID        uuid.UUID      `db:"user_id"`
+		Description   string         `db:"description"`
+		Notes         string         `db:"notes"`
+		Rating        int            `db:"rating"`
+		CreatedAt     time.Time      `db:"created_at"`
+		UpdatedAt     sql.NullTime   `db:"updated_at"`
+		Day           string         `db:"day"`
+		Exercises     pq.StringArray `db:"exercises"`
+	}
+
+	query := `SELECT
+				wp.id AS workout_plan_id, wp.user_id, wp.description,
+				wp.notes, wp.rating, wp.created_at, wp.updated_at, wd.day, wpd.exercises
+				FROM workout_plan AS wp
+				JOIN workout_plan_detail AS wpd ON wp.id = wpd.workout_plan_id
+				JOIN workout_day AS wd ON wp.id = wd.workout_plan_id
+				WHERE wp.id = $1
+				GROUP BY wp.id, wd.day, wpd.exercises
+				ORDER BY wd.day;`
+
+	// Perform the query and scan the results
+	err := r.pgpool.QueryRow(ctx, query, workoutPlanID).Scan(
+		&row.WorkoutPlanID,
+		&row.UserID,
+		&row.Description,
+		&row.Notes,
+		&row.Rating,
+		&row.CreatedAt,
+		&row.UpdatedAt,
+		&row.Day,
+		&row.Exercises,
+	)
+
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to query workout plan")
+	}
+
+	createdAt := timestamppb.New(row.CreatedAt)
+	updatedAt := nullTimeToTimestamppb(row.UpdatedAt)
+
+	workoutPlanProto.WorkoutPlan.WorkoutPlanId = row.WorkoutPlanID.String()
+	workoutPlanProto.WorkoutPlan.UserId = row.UserID.String()
+	workoutPlanProto.WorkoutPlan.Description = row.Description
+	workoutPlanProto.WorkoutPlan.Notes = row.Notes
+	workoutPlanProto.WorkoutPlan.Rating = uint32(row.Rating)
+	workoutPlanProto.WorkoutPlan.CreatedAt = createdAt
+	workoutPlanProto.WorkoutPlan.UpdatedAt = updatedAt
+	workoutPlanProto.WorkoutPlan.Day = row.Day
+	workoutPlanProto.WorkoutPlan.Exercises = row.Exercises
+
+	return workoutPlanProto, nil
+}
+
+func (r *RepositoryWorkout) DeleteWorkoutPlan(ctx context.Context, req *pbw.DeleteWorkoutPlanReq) (*pbw.NilRes, error) {
+	tx, err := r.pgpool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to start transaction")
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback(ctx)
+		}
+	}()
+
+	workoutPlanID := req.WorkoutPlanId
+	userID := req.UserId
+
+	// TODO refactor
+	// Delete from workout_plan
+	result, err := tx.Exec(ctx, `
+        DELETE FROM workout_day
+	   	WHERE workout_plan_id = $1`,
+		workoutPlanID)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, status.Error(codes.NotFound, "workout plan not found")
+		}
+		return nil, status.Error(codes.Internal, "failed to delete workout plan")
+	}
+
+	_, err = tx.Exec(ctx, `
+		DELETE FROM workout_plan_detail
+	   	WHERE workout_plan_id = $1`,
+		workoutPlanID)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to delete workout plan detail")
+	}
+
+	// Delete from workout_plan_detail
+	_, err = tx.Exec(ctx, `
+		DELETE FROM workout_plan
+		WHERE id = $1 AND user_id = $2`,
+		workoutPlanID, userID)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to delete workout plan detail")
+	}
+
+	rowsAffected := result.RowsAffected()
+	if rowsAffected == 0 {
+		return nil, status.Error(codes.NotFound, "no rows deleted")
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to commit transaction")
+	}
+
+	return &pbw.NilRes{}, nil
+}
+
 // GetWorkoutPlanExercises verify later
 func (r *RepositoryWorkout) GetWorkoutPlanExercises(ctx context.Context, req *pbw.GetWorkoutPlanExercisesReq) (*pbw.GetWorkoutPlanExercisesRes, error) {
 	workoutProtoList := make([]*pbw.XWorkoutExerciseDay, 0)
-	//workoutList := make([]WorkoutExerciseDay, 0)
 	query := `SELECT el.id, el.name, el.type, el.muscle, el.equipment, el.difficulty, el.instructions,
        				el.video, el.custom_created, el.created_at, el.updated_at, wpd.day
 					FROM workout_plan_detail wpd

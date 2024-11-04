@@ -364,26 +364,6 @@ func (s ServiceWorkout) InsertExerciseWorkoutPlan(ctx context.Context, req *gene
 	return &pbw.NilRes{}, nil
 }
 
-func (s ServiceWorkout) GetWorkoutPlans(ctx context.Context, req *generated.GetWorkoutPlansReq) (*generated.GetWorkoutPlansRes, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (s ServiceWorkout) GetWorkoutPlan(ctx context.Context, req *generated.GetWorkoutPlanReq) (*generated.GetWorkoutPlanRes, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (s ServiceWorkout) DeleteWorkoutPlan(ctx context.Context, req *generated.DeleteWorkoutPlanReq) (*generated.NilRes, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (s ServiceWorkout) UpdateWorkoutPlan(ctx context.Context, req *generated.UpdateWorkoutPlanReq) (*generated.UpdateWorkoutPlanRes, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
 func (s ServiceWorkout) InsertWorkoutPlan(ctx context.Context, req *generated.InsertWorkoutPlanReq) (*generated.InsertWorkoutPlanRes, error) {
 	tracer := otel.Tracer("FITDEV")
 	ctx, span := tracer.Start(ctx, "Workout/GetExercises")
@@ -461,6 +441,7 @@ func (s ServiceWorkout) InsertWorkoutPlan(ctx context.Context, req *generated.In
 		attribute.String("request.id", req.Request.RequestId),
 		attribute.String("request.details", req.String()),
 	)
+
 	return &pbw.InsertWorkoutPlanRes{
 		Success: false,
 		Message: "Workout creation failed",
@@ -470,4 +451,137 @@ func (s ServiceWorkout) InsertWorkoutPlan(ctx context.Context, req *generated.In
 			RequestId: requestID,
 		},
 	}, nil
+}
+
+func (s ServiceWorkout) GetWorkoutPlans(ctx context.Context, req *generated.GetWorkoutPlansReq) (*generated.GetWorkoutPlansRes, error) {
+	tracer := otel.Tracer("FITDEV")
+	ctx, span := tracer.Start(ctx, "Workout/GetExercises")
+	defer span.End()
+
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pbw.BaseRequest{}
+	}
+
+	req.Request.RequestId = requestID
+
+	userID := ctx.Value("userID").(string)
+	if userID == "" {
+		return nil, status.Error(codes.Unauthenticated, "userID is missing in metadata")
+	}
+
+	result, err := s.repo.GetWorkoutPlans(ctx, req)
+	if err != nil {
+		return &pbw.GetWorkoutPlansRes{
+			Success: false,
+			Message: "Workout fetch failed",
+			Response: &pbw.BaseResponse{
+				Upstream:  "workout-service",
+				RequestId: requestID,
+			},
+		}, status.Errorf(codes.Internal, "failed to get workout plans: %v", err)
+	}
+
+	span.SetAttributes(
+		attribute.String("request.id", req.Request.RequestId),
+		attribute.String("request.details", req.String()),
+	)
+
+	return &pbw.GetWorkoutPlansRes{
+		Success:     true,
+		Message:     "Workout fetch succeeded",
+		WorkoutPlan: result.WorkoutPlan,
+		Response: &pbw.BaseResponse{
+			Upstream:  "workout-service",
+			RequestId: requestID,
+		},
+	}, nil
+}
+
+func (s ServiceWorkout) GetWorkoutPlan(ctx context.Context, req *generated.GetWorkoutPlanReq) (*generated.GetWorkoutPlanRes, error) {
+	tracer := otel.Tracer("FITDEV")
+	ctx, span := tracer.Start(ctx, "Workout/GetExercises")
+	defer span.End()
+
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pbw.BaseRequest{}
+	}
+
+	req.Request.RequestId = requestID
+
+	userID := ctx.Value("userID").(string)
+	if userID == "" {
+		return nil, status.Error(codes.Unauthenticated, "userID is missing in metadata")
+	}
+
+	workout, err := s.repo.GetWorkoutPlan(ctx, req)
+	if err != nil {
+		return &pbw.GetWorkoutPlanRes{
+			Success: false,
+			Message: "Workout plan fetch failed",
+			Response: &pbw.BaseResponse{
+				Upstream:  "workout-service",
+				RequestId: requestID,
+			},
+		}, status.Errorf(codes.Internal, "failed to get workout plan: %v", err)
+	}
+
+	span.SetAttributes(
+		attribute.String("request.id", req.Request.RequestId),
+		attribute.String("request.details", req.String()),
+	)
+
+	return &pbw.GetWorkoutPlanRes{
+		Success:     true,
+		Message:     "Workout plan fetch succeed",
+		WorkoutPlan: workout.WorkoutPlan,
+		Response: &pbw.BaseResponse{
+			Upstream:  "workout-service",
+			RequestId: requestID,
+		},
+	}, nil
+}
+
+func (s ServiceWorkout) DeleteWorkoutPlan(ctx context.Context, req *pbw.DeleteWorkoutPlanReq) (*pbw.NilRes, error) {
+	tracer := otel.Tracer("FITDEV")
+	ctx, span := tracer.Start(ctx, "Workout/GetExercises")
+	defer span.End()
+
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pbw.BaseRequest{}
+	}
+
+	req.Request.RequestId = requestID
+
+	userID := ctx.Value("userID").(string)
+	if userID == "" {
+		return nil, status.Error(codes.Unauthenticated, "userID is missing in metadata")
+	}
+	req.UserId = userID
+
+	_, err := s.repo.DeleteWorkoutPlan(ctx, req)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to delete workout plan")
+	}
+
+	return &pbw.NilRes{}, nil
+}
+
+func (s ServiceWorkout) UpdateWorkoutPlan(ctx context.Context, req *generated.UpdateWorkoutPlanReq) (*generated.UpdateWorkoutPlanRes, error) {
+	//TODO implement me
+	panic("implement me")
 }
