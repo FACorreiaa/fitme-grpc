@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fitme-deployment
+  labels:
+    app: fitme
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fitme
+  template:
+    metadata:
+      labels:
+        app: fitme
+    spec:
+      containers:
+        - name: fitme
+          image: a11199/fit-me:latest
+          ports:
+            - containerPort: 8000
+            - containerPort: 7077
+          env:
+            - name: POSTGRES_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_HOST
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_DB
+            - name: POSTGRES_HOST_AUTH_METHOD
+              value: "trust"
+            - name: REDIS_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: REDIS_HOST
+            - name: REDIS_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: REDIS_PORT
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fitme-service
+spec:
+  type: NodePort
+  selector:
+    app: fitme
+  ports:
+    - name: grpc
+      protocol: TCP
+      port: 8000
+      targetPort: 8000
+      nodePort: 30100
+    - name: http
+      protocol: TCP
+      port: 7077
+      targetPort: 7077
+      nodePort: 30101
