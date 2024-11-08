@@ -13,11 +13,13 @@ import (
 	cpb "github.com/FACorreiaa/fitme-protos/modules/customer/generated"
 	upb "github.com/FACorreiaa/fitme-protos/modules/user/generated"
 	wpb "github.com/FACorreiaa/fitme-protos/modules/workout/generated"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	config "github.com/FACorreiaa/fitme-grpc/config"
 	"github.com/FACorreiaa/fitme-grpc/logger"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc"
+	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpcprometheus"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -51,7 +53,7 @@ func ServeGRPC(ctx context.Context, port string, container *ServiceContainer) er
 	if err != nil {
 		return errors.Wrap(err, "failed to configure prometheus registry")
 	}
-	tp, err := otelTraceProvider(ctx, true, "", "", "", "localhost:4317")
+	tp, err := otelTraceProvider(ctx, true, "", "", "", "localhost:7077")
 	if err != nil {
 		return errors.Wrap(err, "failed to configure jaeger trace provider")
 	}
@@ -101,6 +103,19 @@ func ServeHTTP(port string) error {
 
 	cfg, err := config.InitConfig()
 
+	ctx := context.Background()
+	collectors := grpcprometheus.NewPrometheusMetricsCollectors()
+
+	// Set up Prometheus registry and register collectors
+	registry := prometheus.NewRegistry()
+	if err = grpcprometheus.RegisterMetrics(registry, collectors); err != nil {
+		log.Fatal("failed to register Prometheus metrics")
+	}
+
+	if err = grpcprometheus.SetupTracing(ctx); err != nil {
+		log.Fatal("failed to set up tracing")
+	}
+
 	if err != nil {
 		log.Error("failed to initialize config", zap.Error(err))
 		return err
@@ -122,11 +137,9 @@ func ServeHTTP(port string) error {
 		// Respond with appropriate status code
 		w.WriteHeader(http.StatusOK)
 	})
+
 	server.HandleFunc("/metrics", promhttp.Handler().ServeHTTP) // This should use the correct registry.
-
-	//reg, _ := setupPrometheusRegistry(ctx)
-
-	//server.Handle("/prometheus/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
+	//http.Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
 
 	listener := &http.Server{
 		Addr:              fmt.Sprintf(":%s", port),

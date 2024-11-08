@@ -88,7 +88,7 @@ func RegisterMetrics(registry *prometheus.Registry, collectors *Collectors) erro
 }
 
 func SetupTracing(ctx context.Context) error {
-	tp, err := otelTraceProvider(ctx, true, "", "", "", "localhost:4317")
+	tp, err := otelTraceProvider(ctx, true, "", "", "", "localhost:7077")
 	if err != nil {
 		return fmt.Errorf("failed to create trace provider: %w", err)
 	}

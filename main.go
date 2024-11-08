@@ -83,7 +83,7 @@ func main() {
 		return
 	}
 
-	if err := logger.Init(
+	if err = logger.Init(
 		zap.DebugLevel,
 		zap.String("service", "example"),
 		zap.String("version", "v42.0.69"),
@@ -114,13 +114,26 @@ func main() {
 
 	container := internal.NewServiceContainer(ctx, pool, redisClient, brokers)
 
+	//var wg sync.WaitGroup
+	//wg.Add(2)
+
 	go func() {
+		//defer wg.Done()
 		if err = internal.ServeGRPC(ctx, cfg.Server.GrpcPort, container); err != nil {
 			zapLogger.Error("failed to serve grpc", zap.Error(err))
 			return
 		}
 	}()
 
+	//go func() {
+	//	defer wg.Done()
+	//	if err = internal.ServeHTTP(cfg.Server.HTTPPort); err != nil {
+	//		zapLogger.Error("failed to serve http", zap.Error(err))
+	//		return
+	//	}
+	//}()
+	//
+	//wg.Wait()
 	if err = internal.ServeHTTP(cfg.Server.HTTPPort); err != nil {
 		zapLogger.Error("failed to serve http", zap.Error(err))
 		return

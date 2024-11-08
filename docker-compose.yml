@@ -1,6 +1,15 @@
 version: "3.9"
 
 services:
+#  app:
+#    build:
+#      dockerfile: Dockerfile
+#      context: .
+#      target: dev
+#    volumes:
+#      - .:/app
+#    networks:
+#      - fit-me
   postgres:
     env_file:
       - .env
@@ -33,6 +42,18 @@ services:
       - "6388"
     volumes:
       - ./.data/docker-redis:/var/lib/redis/data
+    networks:
+      - fit-me
+  prometheus:
+    image: cstyan/prometheus:exemplars-64206a
+    platform: linux/amd64
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus.yml
+    entrypoint:
+      - /bin/prometheus
+      - --config.file=/etc/prometheus.yml
+    ports:
+      - "9090:9090"
     networks:
       - fit-me
 
@@ -109,18 +130,7 @@ services:
 #      options:
 #        loki-url: 'http://localhost:3100/api/prom/push'
 #
-  prometheus:
-    image: cstyan/prometheus:exemplars-64206a
-    platform: linux/amd64
-    volumes:
-      - ./config/prometheus.yml:/etc/prometheus.yml
-    entrypoint:
-      - /bin/prometheus
-      - --config.file=/etc/prometheus.yml
-    ports:
-      - "9090:9090"
-    networks:
-      - fit-me
+
 
 #  otel-collector:
 #    image: otel/opentelemetry-collector:latest

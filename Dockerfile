@@ -1,4 +1,3 @@
-# Build stage
 FROM golang:1.23.1 AS base
 
 LABEL maintainer="a11199"
@@ -15,8 +14,8 @@ ENV CGO_ENABLED=0
 
 RUN go build -o /fitme ./*.go
 
-# Final stage
-FROM busybox
+FROM busybox as dev
 
 COPY --from=base /fitme /usr/bin/fitme
+RUN chmod +x /usr/bin/fitme
 CMD ["/usr/bin/fitme"]

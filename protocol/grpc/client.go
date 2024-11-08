@@ -31,8 +31,6 @@ func BootstrapClient(
 		propagation.Baggage{},
 	))
 
-	//
-
 	spanInterceptor, _ := grpcspan.Interceptors()
 
 	// -- Zap logging interceptor setup
@@ -56,6 +54,19 @@ func BootstrapClient(
 	connOptions := []grpc.DialOption{
 		// We terminate TLS in the linkerd sidecar, so no need for TLS on the listen server
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+
+		// default config
+		grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"round_robin"}`),
+
+		//	"methodConfig": [{
+		//	"name": [{"service": "your.package.ServiceName"}],
+		//	"retryPolicy": {
+		//	"maxAttempts": 5,
+		//	"initialBackoff": "0.1s",
+		//	"maxBackoff": "1s",
+		//	"backoffMultiplier": 2,
+		//	"retryableStatusCodes": ["UNAVAILABLE"]
+		//}}]
 
 		// Add the unary interceptors
 		grpc.WithChainUnaryInterceptor(
