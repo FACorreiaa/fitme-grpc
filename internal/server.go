@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
-	"os/signal"
 	"sync/atomic"
 
 	apb "github.com/FACorreiaa/fitme-protos/modules/activity/generated"
@@ -13,17 +11,15 @@ import (
 	cpb "github.com/FACorreiaa/fitme-protos/modules/customer/generated"
 	upb "github.com/FACorreiaa/fitme-protos/modules/user/generated"
 	wpb "github.com/FACorreiaa/fitme-protos/modules/workout/generated"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-
-	config "github.com/FACorreiaa/fitme-grpc/config"
-	"github.com/FACorreiaa/fitme-grpc/logger"
-	"github.com/FACorreiaa/fitme-grpc/protocol/grpc"
-	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpcprometheus"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/reflection"
+
+	config "github.com/FACorreiaa/fitme-grpc/config"
+	"github.com/FACorreiaa/fitme-grpc/logger"
+	"github.com/FACorreiaa/fitme-grpc/protocol/grpc"
 )
 
 // --- Server components
@@ -34,64 +30,49 @@ var isReady atomic.Value
 
 func ServeGRPC(ctx context.Context, port string, container *ServiceContainer) error {
 	log := logger.Log
-	// dependencies
 
-	//customerService := domain.NewCustomerService(pgPool, redisClient)
-	//
-	//// implement brokers
-	//
-	//sessionManager := auth.NewSessionManager(pgPool, redisClient)
-	//
-	//authRepo := repository.NewAuthService(pgPool, redisClient, sessionManager)
-	//authService := service.NewAuthService(authRepo, pgPool, redisClient, sessionManager)
-
-	// When you have a configured prometheus registry and OTEL trace provider,
-	// pass in as param 3 & 4
-
-	// configure prometheus registry
-	registry, err := setupPrometheusRegistry(ctx)
+	// Configure Prometheus registry and trace provider
+	promRegistry, err := setupPrometheusRegistry(ctx)
 	if err != nil {
-		return errors.Wrap(err, "failed to configure prometheus registry")
-	}
-	tp, err := otelTraceProvider(ctx, true, "", "", "", "localhost:7077")
-	if err != nil {
-		return errors.Wrap(err, "failed to configure jaeger trace provider")
-	}
-	server, listener, err := grpc.BootstrapServer(port, logger.Log, registry, tp, container.AuthService.SessionManager)
-	if err != nil {
-		return errors.Wrap(err, "failed to configure grpc server")
+		return errors.Wrap(err, "failed to configure Prometheus registry")
 	}
 
-	// Replace with your actual generated registration method
-	//generated.RegisterDummyServer(server, implementation)
-	//client := generated.NewCustomerClient(brokers.Customer)
+	// Initialize OpenTelemetry trace provider with options as needed
+	traceProvider, err := SetupTracerProvider(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to configure OpenTelemetry trace provider")
+	}
 
-	//customerService and any implementation is a dependency that is injected to dest and delete
+	// Ensure TracerProvider shuts down properly on exit
+	defer func() {
+		if err := traceProvider.Shutdown(ctx); err != nil {
+			log.Error("failed to shut down trace provider", zap.Error(err))
+		}
+	}()
 
+	// Bootstrap the gRPC server
+	server, listener, err := grpc.BootstrapServer(port, log, promRegistry, traceProvider)
+	if err != nil {
+		return errors.Wrap(err, "failed to configure gRPC server")
+	}
+
+	// Register your services
 	cpb.RegisterCustomerServer(server, container.CustomerService)
 	upb.RegisterAuthServer(server, container.AuthService)
 	ccpb.RegisterCalculatorServer(server, container.CalculatorService)
 	apb.RegisterActivityServer(server, container.ServiceActivity)
 	wpb.RegisterWorkoutServer(server, container.WorkoutService)
-	// Enable reflection to be able to use grpcui or insomnia without
-	// having to manually maintain .proto files
 
+	// Enable gRPC reflection for easier debugging
 	reflection.Register(server)
 
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	go func() {
-		for range c {
-			log.Warn("shutting down grpc server")
-			server.GracefulStop()
-			<-ctx.Done()
-		}
-	}()
+	// Start serving
+	log.Info("gRPC server starting", zap.String("port", port))
+	if err := server.Serve(listener); err != nil {
+		return errors.Wrap(err, "gRPC server failed to serve")
+	}
 
-	isReady.Store(true)
-
-	log.Info("running grpc server", zap.String("port", port))
-	return server.Serve(listener)
+	return nil
 }
 
 // ServeHTTP creates a simple server to serve Prometheus metrics for
@@ -102,24 +83,27 @@ func ServeHTTP(port string) error {
 	log.Info("running http server", zap.String("port", port))
 
 	cfg, err := config.InitConfig()
-
-	ctx := context.Background()
-	collectors := grpcprometheus.NewPrometheusMetricsCollectors()
-
-	// Set up Prometheus registry and register collectors
-	registry := prometheus.NewRegistry()
-	if err = grpcprometheus.RegisterMetrics(registry, collectors); err != nil {
-		log.Fatal("failed to register Prometheus metrics")
-	}
-
-	if err = grpcprometheus.SetupTracing(ctx); err != nil {
-		log.Fatal("failed to set up tracing")
-	}
-
 	if err != nil {
 		log.Error("failed to initialize config", zap.Error(err))
 		return err
 	}
+	//ctx := context.Background()
+	//collectors := grpcprometheus.NewPrometheusMetricsCollectors()
+	//
+	//// Set up Prometheus registry and register collectors
+	//registry := prometheus.NewRegistry()
+	//if err = grpcprometheus.RegisterMetrics(registry, collectors); err != nil {
+	//	log.Fatal("failed to register Prometheus metrics")
+	//}
+	//
+	//if err = grpcprometheus.SetupTracing(ctx); err != nil {
+	//	log.Fatal("failed to set up tracing")
+	//}
+	//
+	//if err != nil {
+	//	log.Error("failed to initialize config", zap.Error(err))
+	//	return err
+	//}
 	//reg := prometheus.NewRegistry()
 
 	server := http.NewServeMux()

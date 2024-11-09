@@ -8,6 +8,8 @@ services:
 #      target: dev
 #    volumes:
 #      - .:/app
+#  volumes:
+#    - .:/opt/app/api
 #    networks:
 #      - fit-me
   postgres:

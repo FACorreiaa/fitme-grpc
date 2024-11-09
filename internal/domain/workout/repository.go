@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -899,4 +900,70 @@ func (r *RepositoryWorkout) InsertExerciseWorkoutPlan(ctx context.Context, req *
 	}
 
 	return &pbw.NilRes{}, nil
+}
+
+// UpdateWorkoutPlan TODO add proper logic to update all fields ok?
+// add transaction to update all tables that are in a workout
+func (r *RepositoryWorkout) UpdateWorkoutPlan(ctx context.Context, req *pbw.UpdateWorkoutPlanReq) (*pbw.UpdateWorkoutPlanRes, error) {
+	//tx, err := r.pgpool.BeginTx(ctx, pgx.TxOptions{})
+	//if err != nil {
+	//	return nil, status.Error(codes.Internal, "failed to start transaction")
+	//}
+	//
+	//defer func() {
+	//	if err != nil {
+	//		_ = tx.Rollback(ctx)
+	//	}
+	//}()
+	query := `UPDATE workout_plan SET `
+
+	var setClauses []string
+	var args []interface{}
+	argIndex := 1
+	updatedWorkouts := &pbw.XWorkoutPlan{}
+	for _, update := range req.Updates {
+		switch update.Field {
+		case "description":
+			setClauses = append(setClauses, fmt.Sprintf("description = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedWorkouts.Description = update.NewValue
+		case "notes":
+			setClauses = append(setClauses, fmt.Sprintf("notes = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedWorkouts.Notes = update.NewValue
+		case "rating":
+			newValue, err := strconv.ParseUint(update.NewValue, 10, 32)
+			if err != nil {
+				return nil, err
+			}
+			setClauses = append(setClauses, fmt.Sprintf("rating = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedWorkouts.Rating = uint32(newValue)
+		}
+	}
+
+	if len(setClauses) == 0 {
+		return nil, fmt.Errorf("no updates provided")
+	}
+
+	query += strings.Join(setClauses, ", ")
+	query += ` WHERE id = $` + fmt.Sprintf("%d", argIndex)
+	args = append(args, req.WorkoutId)
+
+	_, err := r.pgpool.Exec(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update exercise: %w", err)
+	}
+
+	updatedWorkouts.WorkoutId = req.WorkoutId
+
+	return &pbw.UpdateWorkoutPlanRes{
+		Success: true,
+		Message: "Workout updated successfully",
+		Workout: updatedWorkouts,
+	}, nil
+
 }

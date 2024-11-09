@@ -581,7 +581,39 @@ func (s ServiceWorkout) DeleteWorkoutPlan(ctx context.Context, req *pbw.DeleteWo
 	return &pbw.NilRes{}, nil
 }
 
-func (s ServiceWorkout) UpdateWorkoutPlan(ctx context.Context, req *generated.UpdateWorkoutPlanReq) (*generated.UpdateWorkoutPlanRes, error) {
-	//TODO implement me
-	panic("implement me")
+func (s ServiceWorkout) UpdateWorkoutPlan(ctx context.Context, req *pbw.UpdateWorkoutPlanReq) (*pbw.UpdateWorkoutPlanRes, error) {
+	if req.WorkoutId == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "req id is required")
+	}
+	res, err := s.repo.UpdateWorkoutPlan(ctx, req)
+	tracer := otel.Tracer("FITDEV")
+	ctx, span := tracer.Start(ctx, "Workout/UpdateWorkoutPlan")
+	defer span.End()
+
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pbw.BaseRequest{}
+	}
+
+	req.Request.RequestId = requestID
+
+	if err != nil {
+		logger.Error("failed to update exercise", zap.Error(err))
+		return &generated.UpdateWorkoutPlanRes{
+			Success: false,
+			Message: "failed to update workout: " + err.Error(),
+		}, nil
+	}
+
+	// change later
+	span.SetAttributes(
+		attribute.String("request.id", requestID),
+		attribute.String("request.details", req.String()),
+	)
+
+	return res, nil
 }

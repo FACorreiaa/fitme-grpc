@@ -2,7 +2,6 @@ package internal
 
 import (
 	"context"
-	"log"
 	"math/rand"
 	"net/http"
 	"time"
@@ -21,12 +20,16 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/credentials"
+
+	"github.com/FACorreiaa/fitme-grpc/logger"
 )
 
 const meterName = "github.com/open-telemetry/opentelemetry-go/example/prometheus"
 
 func setupPrometheusRegistry(ctx context.Context) (*prometheus.Registry, error) {
 	// Initialize Prometheus registry
+	log := logger.Log
+
 	reg := prometheus.NewRegistry()
 	//#nosec
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -43,7 +46,7 @@ func setupPrometheusRegistry(ctx context.Context) (*prometheus.Registry, error) 
 		attribute.Key("C").String("D"),
 	)
 	// Register the promhttp handler for serving metrics
-	http.Handle("/prometheus/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
+	http.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
 
 	counter, err := meter.Float64Counter("foo", api.WithDescription("a simple counter"))
 	if err != nil {
@@ -53,7 +56,7 @@ func setupPrometheusRegistry(ctx context.Context) (*prometheus.Registry, error) 
 
 	gauge, err := meter.Float64ObservableGauge("bar", api.WithDescription("a fun little gauge"))
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Error making gauge", zap.Error(err))
 	}
 	_, err = meter.RegisterCallback(func(_ context.Context, o api.Observer) error {
 		n := -10. + rng.Float64()*(90.) // [-10, 100)
@@ -61,7 +64,7 @@ func setupPrometheusRegistry(ctx context.Context) (*prometheus.Registry, error) 
 		return nil
 	}, gauge)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Errors registering", zap.Error(err))
 	}
 
 	// This is the equivalent of prometheus.NewHistogramVec
@@ -71,7 +74,7 @@ func setupPrometheusRegistry(ctx context.Context) (*prometheus.Registry, error) 
 		api.WithExplicitBucketBoundaries(64, 128, 256, 512, 1024, 2048, 4096),
 	)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Error making histogram", zap.Error(err))
 	}
 	histogram.Record(ctx, 136, opt)
 	histogram.Record(ctx, 64, opt)
@@ -112,12 +115,24 @@ func otelTraceProvider(ctx context.Context, insecure bool, caFile, certFile, key
 	)
 
 	tracerProvider := trace.NewTracerProvider(trace.WithBatcher(exp))
-	defer func() {
-		if err := tracerProvider.Shutdown(ctx); err != nil {
-			zap.Error(err)
-			panic(err)
-		}
-	}()
 	otel.SetTracerProvider(tracerProvider)
 	return tp, nil
+}
+
+func SetupTracerProvider(ctx context.Context) (*trace.TracerProvider, error) {
+	log := logger.Log
+
+	traceProvider, err := otelTraceProvider(ctx, true, "", "", "", "localhost:7077")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to configure OpenTelemetry trace provider")
+	}
+
+	// Ensure TracerProvider shuts down properly on exit
+	defer func() {
+		if err = traceProvider.Shutdown(ctx); err != nil {
+			log.Error("failed to shut down trace provider", zap.Error(err))
+		}
+	}()
+
+	return traceProvider, nil
 }

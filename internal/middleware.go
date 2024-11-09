@@ -6,6 +6,7 @@ import (
 	"github.com/FACorreiaa/fitme-protos/modules/calculator"
 	"github.com/FACorreiaa/fitme-protos/modules/customer"
 	"github.com/FACorreiaa/fitme-protos/modules/user"
+	"github.com/FACorreiaa/fitme-protos/modules/workout"
 
 	"github.com/FACorreiaa/fitme-protos/utils"
 	"go.uber.org/zap"
@@ -54,9 +55,12 @@ func ConfigureUpstreamClients(log *zap.Logger, transport *utils.TransportUtils) 
 		return nil
 	}
 
+	workoutBroker, err := workout.NewBroker(cfg.UpstreamServices.Workout)
+
 	brokers.Customer = customerBroker
 	brokers.Auth = authBroker
 	brokers.Calculator = calculatorBroker
 	brokers.Activity = activityBroker
+	brokers.Workout = workoutBroker
 	return brokers
 }

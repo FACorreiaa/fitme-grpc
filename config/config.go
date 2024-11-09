@@ -56,6 +56,7 @@ type Config struct {
 		Auth       string `mapstructure:"auth"`
 		Calculator string `mapstructure:"calculator"`
 		Activity   string `mapstructure:"activity"`
+		Workout    string `mapstructure:"workout"`
 	} `mapstructure:"upstreamServices"`
 }
 

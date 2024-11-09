@@ -54,4 +54,6 @@ UpstreamServices:
   Auth: "http://auth-service:8080"
   Activity: "http://activity-service:8080"
   Calculator: "http://calculator-service:8080"
+  Workout: "http://workout-service:8080"
+
 

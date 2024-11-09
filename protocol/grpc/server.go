@@ -12,7 +12,6 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 
-	"github.com/FACorreiaa/fitme-grpc/internal/domain/auth"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpclog"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpcprometheus"
@@ -30,7 +29,6 @@ func BootstrapServer(
 	log *zap.Logger,
 	registry *prometheus.Registry,
 	traceProvider trace.TracerProvider,
-	sessionManager *auth.SessionManager,
 	opts ...grpc.ServerOption,
 ) (*grpc.Server, net.Listener, error) {
 	// initiate the listener
