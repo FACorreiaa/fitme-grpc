@@ -35,12 +35,12 @@ func NewAuthRepository(db *pgxpool.Pool, redis *redis.Client, sessionManager *Se
 func (a *AuthRepository) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Internal, "failed to hash password: %v", err)
 	}
 
 	_, err = a.pgpool.Exec(ctx, `INSERT INTO "users" (username, email, password) VALUES ($1, $2, $3)`, req.Username, req.Email, hashedPassword)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Internal, "failed to insert user: %v", err)
 	}
 
 	return &pb.RegisterResponse{Message: "Registration successful"}, nil
@@ -51,12 +51,12 @@ func (a *AuthRepository) Login(ctx context.Context, req *pb.LoginRequest) (*pb.L
 	err := a.pgpool.QueryRow(ctx, `SELECT id, password, email FROM "users" WHERE username=$1`, req.Username).Scan(
 		&user.ID, &user.Password, &user.Email)
 	if err != nil {
-		return nil, errors.New("user not found")
+		return nil, status.Errorf(codes.Internal, "failed to query user: %v", err)
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password))
 	if err != nil {
-		return nil, errors.New("invalid credentials")
+		return nil, status.Errorf(codes.Unauthenticated, "invalid password")
 	}
 
 	expirationTime := time.Now().Add(24 * time.Hour)

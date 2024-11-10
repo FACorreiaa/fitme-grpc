@@ -37,13 +37,13 @@ func ConfigureUpstreamClients(log *zap.Logger, transport *utils.TransportUtils) 
 		return nil
 	}
 
-	authBroker, err := user.NewBroker(cfg.UpstreamServices.Customer)
+	authBroker, err := user.NewBroker(cfg.UpstreamServices.Auth)
 	if err != nil {
 		log.Error("failed to create auth service broker", zap.Error(err))
 		return nil
 	}
 
-	calculatorBroker, err := calculator.NewBroker(cfg.UpstreamServices.Customer)
+	calculatorBroker, err := calculator.NewBroker(cfg.UpstreamServices.Calculator)
 	if err != nil {
 		log.Error("failed to create calculator service broker", zap.Error(err))
 		return nil
