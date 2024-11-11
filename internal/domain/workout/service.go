@@ -338,13 +338,75 @@ func (s ServiceWorkout) GetExerciseByIdWorkoutPlan(ctx context.Context, req *pbw
 }
 
 func (s ServiceWorkout) DeleteExerciseByIdWorkoutPlan(ctx context.Context, req *pbw.DeleteExerciseByIdWorkoutPlanReq) (*pbw.NilRes, error) {
-	//TODO implement me
-	panic("implement me")
+	tracer := otel.Tracer("FITDEV")
+	ctx, span := tracer.Start(ctx, "Workout/GetExercises")
+	defer span.End()
+
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pbw.BaseRequest{}
+	}
+
+	req.Request.RequestId = requestID
+
+	//userID := ctx.Value("userID").(string)
+	//if userID == "" {
+	//	return nil, status.Error(codes.Unauthenticated, "userID is missing in metadata")
+	//}
+	//req.UserId = userID
+
+	_, err := s.repo.DeleteExerciseWorkoutPlan(ctx, req)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to delete workout plan")
+	}
+
+	span.SetAttributes(
+		attribute.String("request.id", requestID),
+		attribute.String("request.details", req.String()),
+	)
+
+	return &pbw.NilRes{}, nil
 }
 
 func (s ServiceWorkout) UpdateExerciseByIdWorkoutPlan(ctx context.Context, req *pbw.UpdateExerciseByIdWorkoutPlanReq) (*pbw.UpdateExerciseByIdWorkoutPlanRes, error) {
-	//TODO implement me
-	panic("implement me")
+	if req.WorkoutPlanId == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "req id is required")
+	}
+	res, err := s.repo.UpdateExerciseWorkoutPLan(ctx, req)
+	tracer := otel.Tracer("FITDEV")
+	ctx, span := tracer.Start(ctx, "Workout/UpdateExerciseByIdWorkoutPlan")
+	defer span.End()
+
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pbw.BaseRequest{}
+	}
+
+	req.Request.RequestId = requestID
+
+	if err != nil {
+		logger.Error("failed to update exercise", zap.Error(err))
+		return &pbw.UpdateExerciseByIdWorkoutPlanRes{
+			Success: false,
+			Message: "failed to update workout: " + err.Error(),
+		}, nil
+	}
+
+	// change later
+	span.SetAttributes(
+		attribute.String("request.id", requestID),
+		attribute.String("request.details", req.String()),
+	)
+
+	return res, nil
 }
 
 func (s ServiceWorkout) InsertExerciseWorkoutPlan(ctx context.Context, req *pbw.InsertExerciseWorkoutPlanReq) (*pbw.NilRes, error) {
@@ -376,9 +438,9 @@ func (s ServiceWorkout) InsertExerciseWorkoutPlan(ctx context.Context, req *pbw.
 	return &pbw.NilRes{}, nil
 }
 
-func (s ServiceWorkout) DeleteExerciseWorkoutPlan(ctx context.Context, req *pbw.DeleteExerciseByIdWorkoutPlanReq) *pbw.NilRes {
-	return nil
-}
+//func (s ServiceWorkout) DeleteExerciseWorkoutPlan(ctx context.Context, req *pbw.DeleteExerciseByIdWorkoutPlanReq) *pbw.NilRes {
+//	return nil
+//}
 
 // InsertWorkoutPlan Workouts
 func (s ServiceWorkout) InsertWorkoutPlan(ctx context.Context, req *pbw.InsertWorkoutPlanReq) (*pbw.InsertWorkoutPlanRes, error) {
@@ -594,6 +656,11 @@ func (s ServiceWorkout) DeleteWorkoutPlan(ctx context.Context, req *pbw.DeleteWo
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to delete workout plan")
 	}
+
+	span.SetAttributes(
+		attribute.String("request.id", requestID),
+		attribute.String("request.details", req.String()),
+	)
 
 	return &pbw.NilRes{}, nil
 }

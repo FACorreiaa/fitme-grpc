@@ -917,7 +917,81 @@ func (r *RepositoryWorkout) DeleteExerciseWorkoutPlan(ctx context.Context, req *
 		SET exercises = array_remove(exercises, $1)
 		WHERE workout_plan_id = $2 AND day = $3`
 
-	result, err := tx.Exec(ctx, query, req.)
+	// TODO Check later if we delete one or multiple exercises. Or both
+	//result, err := tx.Exec(ctx, query, req.ExerciseId, req.WorkoutPlanId, req.Day)
+
+	var totalRowsAffected int64
+	for _, exerciseId := range req.ExerciseId {
+		result, err := tx.Exec(ctx, query, exerciseId, req.WorkoutPlanId, req.Day)
+		if err != nil {
+			return nil, status.Error(codes.Internal, "failed to delete exercise from workout plan")
+		}
+		totalRowsAffected += result.RowsAffected()
+	}
+
+	if totalRowsAffected == 0 {
+		return nil, status.Error(codes.NotFound, "no exercises found to delete")
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to commit transaction")
+	}
+
+	return &pbw.NilRes{}, nil
+}
+
+func (r *RepositoryWorkout) UpdateExerciseWorkoutPLan(ctx context.Context, req *pbw.UpdateExerciseByIdWorkoutPlanReq) (*pbw.UpdateExerciseByIdWorkoutPlanRes, error) {
+	tx, err := r.pgpool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to start transaction")
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback(ctx)
+		}
+	}()
+
+	query := `UPDATE workout_plan_detail SET `
+	var setClauses []string
+	var args []interface{}
+	argIndex := 1
+	updatedFields := make(map[string]string)
+
+	// Build the SET clauses dynamically based on updates
+	for _, update := range req.Updates {
+		switch update.Field {
+		case "exercise_id":
+			setClauses = append(setClauses, fmt.Sprintf("exercises = array_replace(exercises, $%d, $%d)", argIndex, argIndex+1))
+			args = append(args, update.OldValue, update.NewValue)
+			updatedFields["exercise_id"] = update.NewValue
+			argIndex += 2
+		}
+	}
+
+	if len(setClauses) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "no updates provided")
+	}
+
+	query += strings.Join(setClauses, ", ")
+	query += fmt.Sprintf(" WHERE workout_plan_id = $%d", argIndex)
+	args = append(args, req.WorkoutPlanId)
+	argIndex++
+
+	_, err = tx.Exec(ctx, query, args...)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to update exercise in workout plan")
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to commit transaction")
+	}
+
+	return &pbw.UpdateExerciseByIdWorkoutPlanRes{
+		Success: true,
+		Message: "Exercise updated successfully in workout plan",
+	}, nil
 
 }
 
