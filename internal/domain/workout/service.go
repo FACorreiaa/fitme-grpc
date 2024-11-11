@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FACorreiaa/fitme-protos/modules/workout/generated"
 	pbw "github.com/FACorreiaa/fitme-protos/modules/workout/generated"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -36,6 +35,7 @@ func NewServiceWorkout(ctx context.Context, repo domain.RepositoryWorkout) *Serv
 	}
 }
 
+// GetExercises Exercises
 func (s ServiceWorkout) GetExercises(ctx context.Context, req *pbw.GetExercisesReq) (*pbw.GetExercisesRes, error) {
 	tracer := otel.Tracer("FITDEV")
 	ctx, span := tracer.Start(ctx, "Workout/GetExercises")
@@ -258,7 +258,7 @@ func (s ServiceWorkout) UpdateExercise(ctx context.Context, req *pbw.UpdateExerc
 
 	if err != nil {
 		logger.Error("failed to update exercise", zap.Error(err))
-		return &generated.UpdateExerciseRes{
+		return &pbw.UpdateExerciseRes{
 			Success: false,
 			Message: "failed to update exercise: " + err.Error(),
 		}, nil
@@ -273,7 +273,8 @@ func (s ServiceWorkout) UpdateExercise(ctx context.Context, req *pbw.UpdateExerc
 	return res, nil
 }
 
-func (s ServiceWorkout) GetWorkoutPlanExercises(ctx context.Context, req *generated.GetWorkoutPlanExercisesReq) (*generated.GetWorkoutPlanExercisesRes, error) {
+// GetWorkoutPlanExercises Workout plan
+func (s ServiceWorkout) GetWorkoutPlanExercises(ctx context.Context, req *pbw.GetWorkoutPlanExercisesReq) (*pbw.GetWorkoutPlanExercisesRes, error) {
 	tracer := otel.Tracer("FITDEV")
 	ctx, span := tracer.Start(ctx, "Workout/UpdateExercise")
 	defer span.End()
@@ -311,7 +312,7 @@ func (s ServiceWorkout) GetWorkoutPlanExercises(ctx context.Context, req *genera
 	return res, nil
 }
 
-func (s ServiceWorkout) GetExerciseByIdWorkoutPlan(ctx context.Context, req *generated.GetExerciseByIdWorkoutPlanReq) (*generated.GetExerciseByIdWorkoutPlanRes, error) {
+func (s ServiceWorkout) GetExerciseByIdWorkoutPlan(ctx context.Context, req *pbw.GetExerciseByIdWorkoutPlanReq) (*pbw.GetExerciseByIdWorkoutPlanRes, error) {
 	exerciseID := req.ExerciseWorkoutPlan
 	tracer := otel.Tracer("FITDEV")
 	ctx, span := tracer.Start(ctx, "Workout/UpdateExercise")
@@ -336,20 +337,31 @@ func (s ServiceWorkout) GetExerciseByIdWorkoutPlan(ctx context.Context, req *gen
 	return workout, nil
 }
 
-func (s ServiceWorkout) DeleteExerciseByIdWorkoutPlan(ctx context.Context, req *generated.DeleteExerciseByIdWorkoutPlanReq) (*generated.NilRes, error) {
+func (s ServiceWorkout) DeleteExerciseByIdWorkoutPlan(ctx context.Context, req *pbw.DeleteExerciseByIdWorkoutPlanReq) (*pbw.NilRes, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (s ServiceWorkout) UpdateExerciseByIdWorkoutPlan(ctx context.Context, req *generated.UpdateExerciseByIdWorkoutPlanReq) (*generated.UpdateExerciseByIdWorkoutPlanRes, error) {
+func (s ServiceWorkout) UpdateExerciseByIdWorkoutPlan(ctx context.Context, req *pbw.UpdateExerciseByIdWorkoutPlanReq) (*pbw.UpdateExerciseByIdWorkoutPlanRes, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (s ServiceWorkout) InsertExerciseWorkoutPlan(ctx context.Context, req *generated.InsertExerciseWorkoutPlanReq) (*generated.NilRes, error) {
+func (s ServiceWorkout) InsertExerciseWorkoutPlan(ctx context.Context, req *pbw.InsertExerciseWorkoutPlanReq) (*pbw.NilRes, error) {
 	tracer := otel.Tracer("FITDEV")
 	ctx, span := tracer.Start(ctx, "Workout/UpdateExercise")
 	defer span.End()
+
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pbw.BaseRequest{}
+	}
+
+	req.Request.RequestId = requestID
 
 	_, err := s.repo.InsertExerciseWorkoutPlan(ctx, req)
 	if err != nil {
@@ -364,7 +376,12 @@ func (s ServiceWorkout) InsertExerciseWorkoutPlan(ctx context.Context, req *gene
 	return &pbw.NilRes{}, nil
 }
 
-func (s ServiceWorkout) InsertWorkoutPlan(ctx context.Context, req *generated.InsertWorkoutPlanReq) (*generated.InsertWorkoutPlanRes, error) {
+func (s ServiceWorkout) DeleteExerciseWorkoutPlan(ctx context.Context, req *pbw.DeleteExerciseByIdWorkoutPlanReq) *pbw.NilRes {
+	return nil
+}
+
+// InsertWorkoutPlan Workouts
+func (s ServiceWorkout) InsertWorkoutPlan(ctx context.Context, req *pbw.InsertWorkoutPlanReq) (*pbw.InsertWorkoutPlanRes, error) {
 	tracer := otel.Tracer("FITDEV")
 	ctx, span := tracer.Start(ctx, "Workout/GetExercises")
 	defer span.End()
@@ -453,7 +470,7 @@ func (s ServiceWorkout) InsertWorkoutPlan(ctx context.Context, req *generated.In
 	}, nil
 }
 
-func (s ServiceWorkout) GetWorkoutPlans(ctx context.Context, req *generated.GetWorkoutPlansReq) (*generated.GetWorkoutPlansRes, error) {
+func (s ServiceWorkout) GetWorkoutPlans(ctx context.Context, req *pbw.GetWorkoutPlansReq) (*pbw.GetWorkoutPlansRes, error) {
 	tracer := otel.Tracer("FITDEV")
 	ctx, span := tracer.Start(ctx, "Workout/GetExercises")
 	defer span.End()
@@ -502,7 +519,7 @@ func (s ServiceWorkout) GetWorkoutPlans(ctx context.Context, req *generated.GetW
 	}, nil
 }
 
-func (s ServiceWorkout) GetWorkoutPlan(ctx context.Context, req *generated.GetWorkoutPlanReq) (*generated.GetWorkoutPlanRes, error) {
+func (s ServiceWorkout) GetWorkoutPlan(ctx context.Context, req *pbw.GetWorkoutPlanReq) (*pbw.GetWorkoutPlanRes, error) {
 	tracer := otel.Tracer("FITDEV")
 	ctx, span := tracer.Start(ctx, "Workout/GetExercises")
 	defer span.End()
@@ -603,7 +620,7 @@ func (s ServiceWorkout) UpdateWorkoutPlan(ctx context.Context, req *pbw.UpdateWo
 
 	if err != nil {
 		logger.Error("failed to update exercise", zap.Error(err))
-		return &generated.UpdateWorkoutPlanRes{
+		return &pbw.UpdateWorkoutPlanRes{
 			Success: false,
 			Message: "failed to update workout: " + err.Error(),
 		}, nil

@@ -559,15 +559,15 @@ func (r *RepositoryWorkout) GetWorkoutPlans(ctx context.Context, req *pbw.GetWor
 	for rows.Next() {
 
 		var row struct {
-			WorkoutPlanID uuid.UUID      `db:"workout_plan_id"`
-			UserID        uuid.UUID      `db:"user_id"`
-			Description   string         `db:"description"`
-			Notes         string         `db:"notes"`
-			Rating        int            `db:"rating"`
-			CreatedAt     time.Time      `db:"created_at"`
-			UpdatedAt     sql.NullTime   `db:"updated_at"`
-			Day           string         `db:"day"`
-			Exercises     pq.StringArray `db:"exercises"`
+			WorkoutPlanID uuid.UUID    `db:"workout_plan_id"`
+			UserID        uuid.UUID    `db:"user_id"`
+			Description   string       `db:"description"`
+			Notes         string       `db:"notes"`
+			Rating        int          `db:"rating"`
+			CreatedAt     time.Time    `db:"created_at"`
+			UpdatedAt     sql.NullTime `db:"updated_at"`
+			Day           string       `db:"day"`
+			Exercises     []string     `db:"exercises"`
 		}
 
 		createdAt := timestamppb.New(row.CreatedAt)
@@ -760,10 +760,10 @@ func (r *RepositoryWorkout) GetWorkoutPlanExercises(ctx context.Context, req *pb
 		workoutProto := pbw.XWorkoutExerciseDay{}
 		workoutList := &WorkoutExerciseDay{}
 
-		err := rows.Scan(
-			workoutList.ID, workoutList.Name, workoutList.ExerciseType, workoutList.MuscleGroup, workoutList.Equipment,
-			workoutList.Difficulty, workoutList.Instructions, workoutList.Video, workoutList.CustomCreated,
-			workoutList.CreatedAt, workoutList.UpdatedAt)
+		err = rows.Scan(
+			&workoutList.ID, &workoutList.Name, &workoutList.ExerciseType, &workoutList.MuscleGroup, &workoutList.Equipment,
+			&workoutList.Difficulty, &workoutList.Instructions, &workoutList.Video, &workoutList.CustomCreated,
+			&workoutList.CreatedAt, &workoutList.UpdatedAt, &workoutList.Day)
 
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -900,6 +900,25 @@ func (r *RepositoryWorkout) InsertExerciseWorkoutPlan(ctx context.Context, req *
 	}
 
 	return &pbw.NilRes{}, nil
+}
+
+func (r *RepositoryWorkout) DeleteExerciseWorkoutPlan(ctx context.Context, req *pbw.DeleteExerciseByIdWorkoutPlanReq) (*pbw.NilRes, error) {
+	tx, err := r.pgpool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to start transaction")
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback(ctx)
+		}
+	}()
+
+	query := `UPDATE workout_plan_detail
+		SET exercises = array_remove(exercises, $1)
+		WHERE workout_plan_id = $2 AND day = $3`
+
+	result, err := tx.Exec(ctx, query, req.)
+
 }
 
 // UpdateWorkoutPlan TODO add proper logic to update all fields ok?
