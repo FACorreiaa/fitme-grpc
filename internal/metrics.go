@@ -3,12 +3,10 @@ package internal
 import (
 	"context"
 	"math/rand"
-	"net/http"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
@@ -46,7 +44,7 @@ func setupPrometheusRegistry(ctx context.Context) (*prometheus.Registry, error) 
 		attribute.Key("C").String("D"),
 	)
 	// Register the promhttp handler for serving metrics
-	http.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
+	//http.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
 
 	counter, err := meter.Float64Counter("foo", api.WithDescription("a simple counter"))
 	if err != nil {

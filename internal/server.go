@@ -12,7 +12,7 @@ import (
 	mpb "github.com/FACorreiaa/fitme-protos/modules/measurement/generated"
 	upb "github.com/FACorreiaa/fitme-protos/modules/user/generated"
 	wpb "github.com/FACorreiaa/fitme-protos/modules/workout/generated"
-
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/pkg/errors"
@@ -66,6 +66,7 @@ func ServeGRPC(ctx context.Context, port string, container *ServiceContainer) er
 	wpb.RegisterWorkoutServer(server, container.WorkoutService)
 	mpb.RegisterUserMeasurementsServer(server, container.MeasurementService)
 	// Enable gRPC reflection for easier debugging
+
 	reflection.Register(server)
 
 	// Start serving
@@ -106,7 +107,12 @@ func ServeHTTP(port string) error {
 	//	log.Error("failed to initialize config", zap.Error(err))
 	//	return err
 	//}
-	//reg := prometheus.NewRegistry()
+	promRegistry, err := setupPrometheusRegistry(context.Background())
+	if err != nil {
+		return errors.Wrap(err, "failed to configure Prometheus registry")
+	}
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(promRegistry)
 
 	server := http.NewServeMux()
 	// Add healthcheck endpoints
@@ -124,8 +130,8 @@ func ServeHTTP(port string) error {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	server.HandleFunc("/metrics", promhttp.Handler().ServeHTTP) // This should use the correct registry.
-	//http.Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
+	//server.HandleFunc("/metrics", promhttp.Handler().ServeHTTP) // This should use the correct registry.
+	server.Handle("/metrics", promhttp.HandlerFor(promRegistry, promhttp.HandlerOpts{EnableOpenMetrics: true}))
 
 	listener := &http.Server{
 		Addr:              fmt.Sprintf(":%s", port),
