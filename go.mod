@@ -3,7 +3,7 @@ module github.com/FACorreiaa/fitme-grpc
 go 1.23.1
 
 require (
-	github.com/FACorreiaa/fitme-protos v0.0.0-20241112225705-d231061c1026
+	github.com/FACorreiaa/fitme-protos v0.0.0-20241113174859-4337bd964350
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
@@ -72,8 +72,8 @@ require (
 	golang.org/x/sync v0.9.0 // indirect
 	golang.org/x/sys v0.27.0 // indirect
 	golang.org/x/text v0.20.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20241104194629-dd2ea8efbc28 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20241104194629-dd2ea8efbc28 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20241113154021-e0fbfb71d213 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20241113154021-e0fbfb71d213 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
