@@ -9,8 +9,10 @@ import (
 	apb "github.com/FACorreiaa/fitme-protos/modules/activity/generated"
 	ccpb "github.com/FACorreiaa/fitme-protos/modules/calculator/generated"
 	cpb "github.com/FACorreiaa/fitme-protos/modules/customer/generated"
+	mpb "github.com/FACorreiaa/fitme-protos/modules/measurement/generated"
 	upb "github.com/FACorreiaa/fitme-protos/modules/user/generated"
 	wpb "github.com/FACorreiaa/fitme-protos/modules/workout/generated"
+
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/pkg/errors"
@@ -62,7 +64,7 @@ func ServeGRPC(ctx context.Context, port string, container *ServiceContainer) er
 	ccpb.RegisterCalculatorServer(server, container.CalculatorService)
 	apb.RegisterActivityServer(server, container.ServiceActivity)
 	wpb.RegisterWorkoutServer(server, container.WorkoutService)
-
+	mpb.RegisterUserMeasurementsServer(server, container.MeasurementService)
 	// Enable gRPC reflection for easier debugging
 	reflection.Register(server)
 

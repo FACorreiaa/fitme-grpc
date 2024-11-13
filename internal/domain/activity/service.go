@@ -39,8 +39,8 @@ func NewCalculatorService(ctx context.Context, repo domain.RepositoryActivity) *
 }
 
 func (a *ServiceActivity) GetActivity(ctx context.Context, req *pba.GetActivityReq) (*pba.GetActivityRes, error) {
-	tracer := otel.Tracer("FITDEV")
-	ctx, span := tracer.Start(ctx, "Activity/GetActivity")
+	tracer := otel.Tracer("Activity")
+	ctx, span := tracer.Start(ctx, "GetActivity")
 	defer span.End()
 
 	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)

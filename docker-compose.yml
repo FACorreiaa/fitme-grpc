@@ -48,6 +48,7 @@ services:
       - fit-me
   prometheus:
     image: cstyan/prometheus:exemplars-64206a
+    network_mode: "host"
     platform: linux/amd64
     volumes:
       - ./config/prometheus.yml:/etc/prometheus.yml
@@ -56,8 +57,10 @@ services:
       - --config.file=/etc/prometheus.yml
     ports:
       - "9090:9090"
-    networks:
-      - fit-me
+      - "7077:7077"
+      - "8000:8000"
+#    networks:
+#      - fit-me
 
 #  otel-collector:
 #    image: otel/opentelemetry-collector-contrib

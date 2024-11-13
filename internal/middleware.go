@@ -5,9 +5,9 @@ import (
 	"github.com/FACorreiaa/fitme-protos/modules/activity"
 	"github.com/FACorreiaa/fitme-protos/modules/calculator"
 	"github.com/FACorreiaa/fitme-protos/modules/customer"
+	"github.com/FACorreiaa/fitme-protos/modules/measurement"
 	"github.com/FACorreiaa/fitme-protos/modules/user"
 	"github.com/FACorreiaa/fitme-protos/modules/workout"
-
 	"github.com/FACorreiaa/fitme-protos/utils"
 	"go.uber.org/zap"
 
@@ -56,11 +56,22 @@ func ConfigureUpstreamClients(log *zap.Logger, transport *utils.TransportUtils) 
 	}
 
 	workoutBroker, err := workout.NewBroker(cfg.UpstreamServices.Workout)
+	if err != nil {
+		log.Error("failed to create workout service broker", zap.Error(err))
+		return nil
+	}
+
+	measurementsBroker, err := measurement.NewBroker(cfg.UpstreamServices.Measurement)
+	if err != nil {
+		log.Error("failed to create measurements service broker", zap.Error(err))
+		return nil
+	}
 
 	brokers.Customer = customerBroker
 	brokers.Auth = authBroker
 	brokers.Calculator = calculatorBroker
 	brokers.Activity = activityBroker
 	brokers.Workout = workoutBroker
+	brokers.Measurements = measurementsBroker
 	return brokers
 }

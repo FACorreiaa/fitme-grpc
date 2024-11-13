@@ -5,6 +5,7 @@ import (
 
 	pba "github.com/FACorreiaa/fitme-protos/modules/activity/generated"
 	pbc "github.com/FACorreiaa/fitme-protos/modules/calculator/generated"
+	pbm "github.com/FACorreiaa/fitme-protos/modules/measurement/generated"
 	pb "github.com/FACorreiaa/fitme-protos/modules/user/generated"
 	pbw "github.com/FACorreiaa/fitme-protos/modules/workout/generated"
 )
@@ -64,4 +65,27 @@ type RepositoryWorkout interface {
 	InsertExerciseWorkoutPlan(ctx context.Context, req *pbw.InsertExerciseWorkoutPlanReq) (*pbw.NilRes, error)
 	DeleteExerciseWorkoutPlan(ctx context.Context, req *pbw.DeleteExerciseByIdWorkoutPlanReq) (*pbw.NilRes, error)
 	UpdateExerciseWorkoutPLan(ctx context.Context, req *pbw.UpdateExerciseByIdWorkoutPlanReq) (*pbw.UpdateExerciseByIdWorkoutPlanRes, error)
+}
+
+type RepositoryMeasurement interface {
+	// weight
+	CreateWeight(ctx context.Context, req *pbm.CreateWeightReq) (*pbm.XWeight, error)
+	GetWeights(ctx context.Context, req *pbm.GetWeightsReq) (*pbm.GetWeightsRes, error)
+	GetWeight(ctx context.Context, req *pbm.GetWeightReq) (*pbm.GetWeightRes, error)
+	DeleteWeight(ctx context.Context, req *pbm.DeleteWeightReq) (*pbm.NilRes, error)
+	UpdateWeight(ctx context.Context, req *pbm.UpdateWeightReq) (*pbm.UpdateWeightRes, error)
+
+	// waterIntake
+	CreateWaterMeasurement(ctx context.Context, req *pbm.CreateWaterIntakeReq) (*pbm.CreateWaterIntakeRes, error)
+	GetWaterMeasurements(ctx context.Context, req *pbm.GetWaterIntakesReq) (*pbm.GetWaterIntakesRes, error)
+	GetWaterMeasurement(ctx context.Context, req *pbm.GetWaterIntakeReq) (*pbm.GetWaterIntakeRes, error)
+	DeleteWaterMeasurement(ctx context.Context, req *pbm.DeleteWaterIntakeReq) (*pbm.NilRes, error)
+	UpdateWaterMeasurement(ctx context.Context, req *pbm.UpdateWaterIntakeReq) (*pbm.UpdateWaterIntakeRes, error)
+
+	// wasteline
+	CreateWasteLineMeasurement(ctx context.Context, req *pbm.CreateWasteLineReq) (*pbm.CreateWasteLineRes, error)
+	GetWasteLineMeasurements(ctx context.Context, req *pbm.GetWasteLinesReq) (*pbm.GetWasteLinesRes, error)
+	GetWasteLineMeasurement(ctx context.Context, req *pbm.GetWasteLineReq) (*pbm.GetWasteLineRes, error)
+	DeleteWasteLineMeasurement(ctx context.Context, req *pbm.DeleteWasteLineReq) (*pbm.NilRes, error)
+	UpdateWasteLineMeasurement(ctx context.Context, req *pbm.UpdateWasteLineReq) (*pbm.UpdateWasteLineRes, error)
 }
