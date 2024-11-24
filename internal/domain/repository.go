@@ -71,21 +71,21 @@ type RepositoryMeasurement interface {
 
 	// Weight
 	CreateWeight(ctx context.Context, req *pbm.CreateWeightReq) (*pbm.XWeight, error)
-	GetWeights(ctx context.Context, req *pbm.GetWeightsReq) ([]*pbm.XWeight, error)
+	GetWeights(ctx context.Context) ([]*pbm.XWeight, error)
 	GetWeight(ctx context.Context, req *pbm.GetWeightReq) (*pbm.XWeight, error)
 	DeleteWeight(ctx context.Context, req *pbm.DeleteWeightReq) (*pbm.NilRes, error)
 	UpdateWeight(ctx context.Context, req *pbm.UpdateWeightReq) (*pbm.XWeight, error)
 
 	// waterIntake
 	CreateWaterMeasurement(ctx context.Context, req *pbm.CreateWaterIntakeReq) (*pbm.XWaterIntake, error)
-	GetWaterMeasurements(ctx context.Context, req *pbm.GetWaterIntakesReq) ([]*pbm.XWaterIntake, error)
+	GetWaterMeasurements(ctx context.Context) ([]*pbm.XWaterIntake, error)
 	GetWaterMeasurement(ctx context.Context, req *pbm.GetWaterIntakeReq) (*pbm.XWaterIntake, error)
 	DeleteWaterMeasurement(ctx context.Context, req *pbm.DeleteWaterIntakeReq) (*pbm.NilRes, error)
 	UpdateWaterMeasurement(ctx context.Context, req *pbm.UpdateWaterIntakeReq) (*pbm.XWaterIntake, error)
 
 	// wasteline
 	CreateWasteLineMeasurement(ctx context.Context, req *pbm.CreateWasteLineReq) (*pbm.XWasteLine, error)
-	GetWasteLineMeasurements(ctx context.Context, req *pbm.GetWasteLinesReq) ([]*pbm.XWasteLine, error)
+	GetWasteLineMeasurements(ctx context.Context) ([]*pbm.XWasteLine, error)
 	GetWasteLineMeasurement(ctx context.Context, req *pbm.GetWasteLineReq) (*pbm.XWasteLine, error)
 	DeleteWasteLineMeasurement(ctx context.Context, req *pbm.DeleteWasteLineReq) (*pbm.NilRes, error)
 	UpdateWasteLineMeasurement(ctx context.Context, req *pbm.UpdateWasteLineReq) (*pbm.XWasteLine, error)

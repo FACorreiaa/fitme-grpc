@@ -92,7 +92,7 @@ func (s ServiceMeasurement) GetWeights(ctx context.Context, req *pbm.GetWeightsR
 		return nil, status.Error(codes.Unauthenticated, "userID is missing in metadata")
 	}
 
-	res, err := s.repo.GetWeights(ctx, req)
+	res, err := s.repo.GetWeights(ctx)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -298,7 +298,7 @@ func (s ServiceMeasurement) GetWaterMeasurements(ctx context.Context, req *pbm.G
 		return nil, status.Error(codes.Unauthenticated, "userID is missing in metadata")
 	}
 
-	res, err := s.repo.GetWaterMeasurements(ctx, req)
+	res, err := s.repo.GetWaterMeasurements(ctx)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -502,7 +502,7 @@ func (s ServiceMeasurement) GetWasteLineMeasurements(ctx context.Context, req *p
 		return nil, status.Error(codes.Unauthenticated, "userID is missing in metadata")
 	}
 
-	res, err := s.repo.GetWasteLineMeasurements(ctx, req)
+	res, err := s.repo.GetWasteLineMeasurements(ctx)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

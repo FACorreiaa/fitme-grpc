@@ -65,7 +65,7 @@ func (r *RepositoryMeasurement) CreateWeight(ctx context.Context, req *pbm.Creat
 	return weightProto, nil
 }
 
-func (r *RepositoryMeasurement) GetWeights(ctx context.Context, req *pbm.GetWeightsReq) ([]*pbm.XWeight, error) {
+func (r *RepositoryMeasurement) GetWeights(ctx context.Context) ([]*pbm.XWeight, error) {
 	weightsProto := make([]*pbm.XWeight, 0)
 	// test without WHERE user_id = $1
 	query := `
@@ -251,7 +251,7 @@ func (r *RepositoryMeasurement) CreateWaterMeasurement(ctx context.Context, req 
 	return waterProto, nil
 }
 
-func (r *RepositoryMeasurement) GetWaterMeasurements(ctx context.Context, req *pbm.GetWaterIntakesRes) ([]*pbm.XWaterIntake, error) {
+func (r *RepositoryMeasurement) GetWaterMeasurements(ctx context.Context) ([]*pbm.XWaterIntake, error) {
 	waterProtos := make([]*pbm.XWaterIntake, 0)
 	// test without WHERE user_id = $1
 	query := `
@@ -436,7 +436,7 @@ func (r *RepositoryMeasurement) CreateWasteLineMeasurement(ctx context.Context, 
 	return waterProto, nil
 }
 
-func (r *RepositoryMeasurement) GetWasteLineMeasurements(ctx context.Context, req *pbm.GetWasteLinesReq) ([]*pbm.XWasteLine, error) {
+func (r *RepositoryMeasurement) GetWasteLineMeasurements(ctx context.Context) ([]*pbm.XWasteLine, error) {
 	wasteLineProtos := make([]*pbm.XWasteLine, 0)
 	// test without WHERE user_id = $1
 	query := `
