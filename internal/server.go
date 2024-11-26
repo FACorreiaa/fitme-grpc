@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync/atomic"
+	"time"
 
 	apb "github.com/FACorreiaa/fitme-protos/modules/activity/generated"
 	ccpb "github.com/FACorreiaa/fitme-protos/modules/calculator/generated"
@@ -22,6 +23,7 @@ import (
 	config "github.com/FACorreiaa/fitme-grpc/config"
 	"github.com/FACorreiaa/fitme-grpc/logger"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc"
+	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpcprometheus"
 )
 
 // --- Server components
@@ -34,26 +36,27 @@ func ServeGRPC(ctx context.Context, port string, container *ServiceContainer) er
 	log := logger.Log
 
 	// Configure Prometheus registry and trace provider
-	promRegistry, err := setupPrometheusRegistry(ctx)
-	if err != nil {
-		return errors.Wrap(err, "failed to configure Prometheus registry")
-	}
+	reg := prometheus.NewRegistry()
 
 	// Initialize OpenTelemetry trace provider with options as needed
-	traceProvider, err := SetupTracerProvider(ctx)
+	traceProvider, err := grpcprometheus.SetupTracing(ctx)
 	if err != nil {
 		return errors.Wrap(err, "failed to configure OpenTelemetry trace provider")
 	}
 
 	// Ensure TracerProvider shuts down properly on exit
-	defer func() {
-		if err := traceProvider.Shutdown(ctx); err != nil {
-			log.Error("failed to shut down trace provider", zap.Error(err))
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		if err = traceProvider.Shutdown(shutdownCtx); err != nil {
+			log.Error("failed to shut down trace provider")
 		}
 	}()
 
 	// Bootstrap the gRPC server
-	server, listener, err := grpc.BootstrapServer(port, log, promRegistry, traceProvider)
+	server, listener, err := grpc.BootstrapServer(port, log, reg, traceProvider)
 	if err != nil {
 		return errors.Wrap(err, "failed to configure gRPC server")
 	}
@@ -107,12 +110,14 @@ func ServeHTTP(port string) error {
 	//	log.Error("failed to initialize config", zap.Error(err))
 	//	return err
 	//}
-	promRegistry, err := setupPrometheusRegistry(context.Background())
-	if err != nil {
-		return errors.Wrap(err, "failed to configure Prometheus registry")
-	}
-	reg := prometheus.NewRegistry()
-	reg.MustRegister(promRegistry)
+
+	//promRegistry := prometheus.NewRegistry()
+	//exporter, err := expo.New(expo.WithRegisterer(promRegistry))
+	//if err != nil {
+	//	return errors.Wrap(err, "failed to create OpenTelemetry Prometheus exporter")
+	//}
+	//reg := prometheus.NewRegistry()
+	//reg.MustRegister(promRegistry)
 
 	server := http.NewServeMux()
 	// Add healthcheck endpoints
@@ -130,8 +135,8 @@ func ServeHTTP(port string) error {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	//server.HandleFunc("/metrics", promhttp.Handler().ServeHTTP) // This should use the correct registry.
-	server.Handle("/metrics", promhttp.HandlerFor(promRegistry, promhttp.HandlerOpts{EnableOpenMetrics: true}))
+	server.HandleFunc("/metrics", promhttp.Handler().ServeHTTP) // This should use the correct registry.
+	//server.Handle("/metrics", promhttp.HandlerFor(promRegistry, promhttp.HandlerOpts{EnableOpenMetrics: true}))
 
 	listener := &http.Server{
 		Addr:              fmt.Sprintf(":%s", port),

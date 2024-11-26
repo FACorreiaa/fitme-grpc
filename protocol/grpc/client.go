@@ -38,7 +38,7 @@ func BootstrapClient(
 
 	// trace to grafana
 	ctx := context.Background()
-	if err := grpcprometheus.SetupTracing(ctx); err != nil {
+	if _, err := grpcprometheus.SetupTracing(ctx); err != nil {
 		log.Error("Failed to set up trace exporter", zap.Error(err))
 		return nil, errors.Wrap(err, "failed to setup tracing")
 	}
