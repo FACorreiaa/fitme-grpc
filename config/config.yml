@@ -45,16 +45,16 @@ repositories:
 
 #change later
 server:
-  HTTPPort: "7077"
+  HTTPPort: "8001"
   GRPCPort: "8000"
   HTTPTimeout: 15s
 
 UpstreamServices:
-  Customer: "http://customer-service:8080"
-  Auth: "http://auth-service:8080"
-  Activity: "http://activity-service:8080"
-  Calculator: "http://calculator-service:8080"
-  Workout: "http://workout-service:8080"
-  Measurement: "http://measurement-service:8080"
+  Customer: "http://customer-service:8000"
+  Auth: "http://auth-service:8000"
+  Activity: "http://activity-service:8000"
+  Calculator: "http://calculator-service:8000"
+  Workout: "http://workout-service:8000"
+  Measurement: "http://measurement-service:8000"
 
 

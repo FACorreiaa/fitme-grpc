@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -37,8 +38,8 @@ func NewServiceWorkout(ctx context.Context, repo domain.RepositoryWorkout) *Serv
 
 // GetExercises Exercises
 func (s ServiceWorkout) GetExercises(ctx context.Context, req *pbw.GetExercisesReq) (*pbw.GetExercisesRes, error) {
-	tracer := otel.Tracer("FITDEV")
-	ctx, span := tracer.Start(ctx, "Workout/GetExercises")
+	tracer := otel.Tracer("FitME.Workout")
+	ctx, span := tracer.Start(ctx, "GetExercises")
 	defer span.End()
 
 	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
@@ -85,17 +86,11 @@ func (s ServiceWorkout) GetExercises(ctx context.Context, req *pbw.GetExercisesR
 		})
 	}
 
-	if req.GetRequest() != nil {
-		span.SetAttributes(
-			attribute.String("request.id", req.GetRequest().RequestId),
-			attribute.String("request.details", req.GetRequest().String()),
-		)
-	} else {
-		span.SetAttributes(
-			attribute.String("request.id", "unknown"),
-			attribute.String("request.details", "no details available"),
-		)
-	}
+	span.SetAttributes(
+		semconv.ServiceNameKey.String("Workout"),
+		attribute.String("grpc.method", "GetExercises"),
+		attribute.String("request.id", req.GetRequest().RequestId),
+	)
 
 	return &pbw.GetExercisesRes{
 		Success:  true,

@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
@@ -87,6 +88,8 @@ func BootstrapServer(
 			sessionInterceptor,
 			requestGeneratorSession,
 		),
+
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 
 		// Add the stream interceptors
 		grpc.ChainStreamInterceptor(

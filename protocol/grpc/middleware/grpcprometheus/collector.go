@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
+	"google.golang.org/grpc/credentials"
 )
 
 type Collectors struct {
@@ -73,24 +74,39 @@ func NewPrometheusMetricsCollectors() *Collectors {
 //	return tp, nil
 //}
 
-func otelTraceProvider(ctx context.Context, endpoint, apiKey string) (*trace.TracerProvider, error) {
+func otelTraceProvider(ctx context.Context, endpoint, apiKey, caCertPath string, insecure bool) (*trace.TracerProvider, error) {
 	var opts []otlptracegrpc.Option
 
-	// auth header
-	opts = append(opts, otlptracegrpc.WithHeaders(map[string]string{
-		"Authorization": "Bearer " + apiKey,
-	}))
-
+	// Set endpoint
 	opts = append(opts, otlptracegrpc.WithEndpoint(endpoint))
+	opts = append(opts, otlptracegrpc.WithInsecure())
+
+	// Handle insecure or TLS configuration
+	if insecure {
+		opts = append(opts, otlptracegrpc.WithInsecure())
+	} else {
+		creds, err := credentials.NewClientTLSFromFile(caCertPath, "")
+		if err != nil {
+			return nil, fmt.Errorf("failed to create TLS credentials: %w", err)
+		}
+		opts = append(opts, otlptracegrpc.WithTLSCredentials(creds))
+	}
+
+	// Add authorization header if needed (uncomment if using API keys)
+	// opts = append(opts, otlptracegrpc.WithHeaders(map[string]string{
+	// 	"Authorization": "Bearer " + apiKey,
+	// }))
 
 	exp, err := otlptracegrpc.New(ctx, opts...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create OTLP trace exporter: %w", err)
 	}
 
 	res := resource.NewWithAttributes(
 		semconv.SchemaURL,
 		semconv.ServiceNameKey.String("FITDEV"),
+		semconv.ServiceNamespaceKey.String("FitME"),
+		semconv.ServiceVersionKey.String("0.1"),
 		semconv.DeploymentEnvironmentKey.String("production"),
 	)
 
@@ -126,17 +142,19 @@ func RegisterMetrics(registry *prometheus.Registry, collectors *Collectors) erro
 }
 
 func SetupTracing(ctx context.Context) (*trace.TracerProvider, error) {
-	apiKey := os.Getenv("OTEL_EXPORTER_API_KEY")
-	if apiKey == "" {
-		return nil, fmt.Errorf("missing OTEL_EXPORTER_API_KEY environment variable")
+	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if endpoint == "" {
+		return nil, errors.New("missing OTEL_EXPORTER_OTLP_ENDPOINT environment variable")
 	}
 
-	tp, err := otelTraceProvider(ctx, os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"), os.Getenv("OTEL_EXPORTER_API_KEY"))
+	insecure := os.Getenv("OTEL_EXPORTER_INSECURE") == "true"
+	caCertPath := os.Getenv("OTEL_EXPORTER_CA_CERT_PATH")
+
+	tp, err := otelTraceProvider(ctx, endpoint, os.Getenv("OTEL_EXPORTER_API_KEY"), caCertPath, insecure)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create trace provider: %w", err)
 	}
 
-	// Ensure the TracerProvider is properly closed when the application shuts down
 	go func() {
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

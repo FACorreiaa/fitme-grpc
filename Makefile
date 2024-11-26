@@ -37,5 +37,9 @@ test-lint:
 	testifylint --fix ./...
 
 profile:
-	go build -o pprofbin .
-	go tool pprof -http=":6969" pprofbin ./cpu.pprof
+	go tool pprof \
+      -raw -output=cpu.txt \
+      'http://localhost:8080/debug/pprof/profile?seconds=60'
+
+profile-graph:
+	stackcollapse-go.pl cpu.txt | flamegraph.pl > cpu.svg
