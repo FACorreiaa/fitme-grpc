@@ -32,27 +32,30 @@ func BootstrapServer(
 	traceProvider trace.TracerProvider,
 	opts ...grpc.ServerOption,
 ) (*grpc.Server, net.Listener, error) {
+	// setup basic metrics
+
 	// initiate the listener
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to create listener")
 	}
 
-	// -- Prometheus interceptor Setup
-	promCollectors := grpcprometheus.NewPrometheusMetricsCollectors()
-	// Must be called before using Prometheus interceptors
-	err = grpcprometheus.RegisterMetrics(registry, promCollectors)
-	_, promInterceptor, err := grpcprometheus.Interceptors(promCollectors)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to create Prometheus interceptors")
-	}
-
-	// -- OpenTelemetry interceptor setup
 	otel.SetTracerProvider(traceProvider)
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{},
 		propagation.Baggage{},
 	))
+
+	// -- Prometheus interceptor Setup
+	promCollectors := grpcprometheus.NewPrometheusMetricsCollectors()
+	// Must be called before using Prometheus interceptors
+	err = grpcprometheus.RegisterMetrics(registry, promCollectors)
+	_, serverInterceptor, _ := grpcprometheus.Interceptors(promCollectors)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to create Prometheus interceptors")
+	}
+
+	// -- OpenTelemetry interceptor setup
 	_, spanInterceptor := grpcspan.Interceptors()
 
 	// -- Zap logging interceptor setup
@@ -78,11 +81,12 @@ func BootstrapServer(
 		// Add the unary interceptors
 		grpc.ChainUnaryInterceptor(
 			spanInterceptor.Unary,
-			promInterceptor.Unary,
+			serverInterceptor.Unary,
 			logInterceptor.Unary,
 			recoveryInterceptor.Unary,
 			sessionInterceptor,
 			requestGeneratorSession,
+			promCollectors.Server.UnaryServerInterceptor(),
 		),
 
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
@@ -90,9 +94,10 @@ func BootstrapServer(
 		// Add the stream interceptors
 		grpc.ChainStreamInterceptor(
 			spanInterceptor.Stream,
-			promInterceptor.Stream,
+			serverInterceptor.Stream,
 			logInterceptor.Stream,
 			recoveryInterceptor.Stream,
+			promCollectors.Server.StreamServerInterceptor(),
 		),
 	}
 

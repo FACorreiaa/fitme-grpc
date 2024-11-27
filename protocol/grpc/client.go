@@ -1,6 +1,7 @@
 package grpc
 
 import (
+	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
@@ -11,14 +12,21 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpclog"
+	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpcprometheus"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpcspan"
+)
+
+const (
+	component      = "grpc-example"
+	httpAddr       = ":8082"
+	targetGRPCAddr = "localhost:8080"
 )
 
 func BootstrapClient(
 	address string,
 	log *zap.Logger,
 	traceProvider trace.TracerProvider,
-	prometheus *prometheus.Registry,
+	promRegistry *prometheus.Registry,
 	opts ...grpc.DialOption,
 ) (*grpc.ClientConn, error) {
 	// -- OpenTelemetry interceptor setup
@@ -28,10 +36,28 @@ func BootstrapClient(
 		propagation.Baggage{},
 	))
 
+	clMetrics := grpcprom.NewClientMetrics(
+		grpcprom.WithClientHandlingTimeHistogram(
+			grpcprom.WithHistogramBuckets([]float64{0.001, 0.01, 0.1, 0.3, 0.6, 1, 3, 6, 9, 20, 30, 60, 90, 120}),
+		),
+	)
+	promRegistry.MustRegister(clMetrics)
+	//exemplarFromContext := func(ctx context.Context) prometheus.Labels {
+	//	if span := trace.SpanContextFromContext(ctx); span.IsSampled() {
+	//		return prometheus.Labels{"traceID": span.TraceID().String()}
+	//	}
+	//	return nil
+	//}
+
 	spanInterceptor, _ := grpcspan.Interceptors()
 
 	// -- Zap logging interceptor setup
 	logInterceptor, _ := grpclog.Interceptors(log)
+
+	// EXPERIMENTAL
+	promCollectors := grpcprometheus.NewPrometheusMetricsCollectors()
+	_ = grpcprometheus.RegisterMetrics(promRegistry, promCollectors)
+	clientInterceptor, _, _ := grpcprometheus.Interceptors(promCollectors)
 
 	// trace to grafana
 	//ctx := context.Background()
@@ -51,7 +77,6 @@ func BootstrapClient(
 	connOptions := []grpc.DialOption{
 		// We terminate TLS in the linkerd sidecar, so no need for TLS on the listen server
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-
 		// default config
 		grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"round_robin"}`),
 
@@ -69,7 +94,9 @@ func BootstrapClient(
 		grpc.WithChainUnaryInterceptor(
 			spanInterceptor.Unary,
 			logInterceptor.Unary,
-			//clientMetrics.UnaryClientInterceptor(),
+			//clMetrics.UnaryClientInterceptor(grpcprom.WithExemplarFromContext(exemplarFromContext)),
+			promCollectors.Client.UnaryClientInterceptor(),
+			clientInterceptor.Unary,
 		),
 
 		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
@@ -77,7 +104,9 @@ func BootstrapClient(
 		grpc.WithChainStreamInterceptor(
 			spanInterceptor.Stream,
 			logInterceptor.Stream,
-			//clientMetrics.StreamClientInterceptor(),
+			//clMetrics.StreamClientInterceptor(grpcprom.WithExemplarFromContext(exemplarFromContext)),
+			promCollectors.Client.StreamClientInterceptor(),
+			clientInterceptor.Stream,
 		),
 	}
 

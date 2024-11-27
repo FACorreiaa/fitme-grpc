@@ -38,7 +38,7 @@ func NewServiceWorkout(ctx context.Context, repo domain.RepositoryWorkout) *Serv
 
 // GetExercises Exercises
 func (s ServiceWorkout) GetExercises(ctx context.Context, req *pbw.GetExercisesReq) (*pbw.GetExercisesRes, error) {
-	tracer := otel.Tracer("FitME.Workout")
+	tracer := otel.Tracer("fitme-dev")
 	ctx, span := tracer.Start(ctx, "GetExercises")
 	defer span.End()
 

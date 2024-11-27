@@ -12,10 +12,9 @@ import (
 	mpb "github.com/FACorreiaa/fitme-protos/modules/measurement/generated"
 	upb "github.com/FACorreiaa/fitme-protos/modules/user/generated"
 	wpb "github.com/FACorreiaa/fitme-protos/modules/workout/generated"
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/reflection"
 
@@ -35,6 +34,12 @@ func ServeGRPC(ctx context.Context, port string, container *ServiceContainer) er
 	log := logger.Log
 
 	// Configure Prometheus registry and trace provider
+	//srvMetrics := grpcprom.NewServerMetrics(
+	//	grpcprom.WithServerHandlingTimeHistogram(
+	//		grpcprom.WithHistogramBuckets([]float64{0.001, 0.01, 0.1, 0.3, 0.6, 1, 3, 6, 9, 20, 30, 60, 90, 120}),
+	//	),
+	//)
+
 	reg := prometheus.NewRegistry()
 
 	// Initialize OpenTelemetry trace provider with options as needed
@@ -45,7 +50,6 @@ func ServeGRPC(ctx context.Context, port string, container *ServiceContainer) er
 
 	// Ensure TracerProvider shuts down properly on exit
 	go func() {
-
 		if err = traceProvider.Shutdown(ctx); err != nil {
 			log.Error("failed to shut down trace provider")
 		}
@@ -64,8 +68,8 @@ func ServeGRPC(ctx context.Context, port string, container *ServiceContainer) er
 	apb.RegisterActivityServer(server, container.ServiceActivity)
 	wpb.RegisterWorkoutServer(server, container.WorkoutService)
 	mpb.RegisterUserMeasurementsServer(server, container.MeasurementService)
-	// Enable gRPC reflection for easier debugging
 
+	// Enable gRPC reflection for easier debugging
 	reflection.Register(server)
 
 	// Start serving
@@ -77,7 +81,7 @@ func ServeGRPC(ctx context.Context, port string, container *ServiceContainer) er
 	isReady.Store(true)
 	logger.Log.Info("running grpc server", zap.String("port", port))
 
-	return server.Serve(listener)
+	return nil
 }
 
 // ServeHTTP creates a simple server to serve Prometheus metrics for
@@ -110,7 +114,13 @@ func ServeHTTP(port string) error {
 	//	return err
 	//}
 
-	//promRegistry := prometheus.NewRegistry()
+	//reg := prometheus.NewRegistry()
+	//clMetrics := grpcprom.NewClientMetrics(
+	//	grpcprom.WithClientHandlingTimeHistogram(
+	//		grpcprom.WithHistogramBuckets([]float64{0.001, 0.01, 0.1, 0.3, 0.6, 1, 3, 6, 9, 20, 30, 60, 90, 120}),
+	//	),
+	//)
+	//reg.MustRegister(clMetrics)
 	//exporter, err := expo.New(expo.WithRegisterer(promRegistry))
 	//if err != nil {
 	//	return errors.Wrap(err, "failed to create OpenTelemetry Prometheus exporter")
@@ -135,7 +145,7 @@ func ServeHTTP(port string) error {
 	})
 
 	server.HandleFunc("/metrics", promhttp.Handler().ServeHTTP) // This should use the correct registry.
-	//server.Handle("/metrics", promhttp.HandlerFor(promRegistry, promhttp.HandlerOpts{EnableOpenMetrics: true}))
+	//server.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{EnableOpenMetrics: true}))
 
 	listener := &http.Server{
 		Addr:              fmt.Sprintf(":%s", port),

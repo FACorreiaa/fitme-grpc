@@ -57,6 +57,8 @@ services:
       - --config.file=/etc/prometheus.yml
     ports:
       - "9090:9090"
+    networks:
+      fit-me:
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.114.0
@@ -65,11 +67,16 @@ services:
       - ./config/otel-collector.yaml:/etc/otel-collector.yaml
     ports:
       - "4317:4317"
+    networks:
+      fit-me:
 
   jaeger:
     image: jaegertracing/all-in-one:1.60
     ports:
       - "16686:16686"
+    networks:
+      fit-me:
+
 #    networks:
 #      - fit-me
 
