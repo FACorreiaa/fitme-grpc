@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"sync/atomic"
-	"time"
 
 	apb "github.com/FACorreiaa/fitme-protos/modules/activity/generated"
 	ccpb "github.com/FACorreiaa/fitme-protos/modules/calculator/generated"
@@ -45,15 +44,15 @@ func ServeGRPC(ctx context.Context, port string, container *ServiceContainer) er
 	}
 
 	// Ensure TracerProvider shuts down properly on exit
-	go func() {
-		<-ctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		if err = traceProvider.Shutdown(shutdownCtx); err != nil {
-			log.Error("failed to shut down trace provider")
-		}
-	}()
+	//go func() {
+	//	<-ctx.Done()
+	//	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	//	defer cancel()
+	//
+	//	if err = traceProvider.Shutdown(shutdownCtx); err != nil {
+	//		log.Error("failed to shut down trace provider")
+	//	}
+	//}()
 
 	// Bootstrap the gRPC server
 	server, listener, err := grpc.BootstrapServer(port, log, reg, traceProvider)
@@ -74,11 +73,14 @@ func ServeGRPC(ctx context.Context, port string, container *ServiceContainer) er
 
 	// Start serving
 	log.Info("gRPC server starting", zap.String("port", port))
-	if err := server.Serve(listener); err != nil {
+	if err = server.Serve(listener); err != nil {
 		return errors.Wrap(err, "gRPC server failed to serve")
 	}
 
-	return nil
+	isReady.Store(true)
+	logger.Log.Info("running grpc server", zap.String("port", port))
+
+	return server.Serve(listener)
 }
 
 // ServeHTTP creates a simple server to serve Prometheus metrics for

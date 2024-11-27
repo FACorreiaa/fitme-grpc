@@ -17,9 +17,6 @@ import (
 )
 
 func run() (*pgxpool.Pool, *redis.Client, error) {
-	//ctx, cancel := context.WithCancel(context.Background())
-	//defer cancel()
-
 	cfg, err := config.InitConfig()
 	if err != nil {
 		logger.Log.Error("failed to initialize config", zap.Error(err))
@@ -62,18 +59,8 @@ func run() (*pgxpool.Pool, *redis.Client, error) {
 }
 
 func main() {
-	//f, perf := os.Create("cpu.pprof")
-	//if perf != nil {
-	//	log.Fatal(perf)
-	//}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-
-	//err := pprof.StartCPUProfile(f)
-	//if err != nil {
-	//	return
-	//}
-	//defer pprof.StopCPUProfile()
 
 	cfg, err := config.InitConfig()
 	if err != nil {
