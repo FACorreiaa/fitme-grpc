@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"os"
-	"time"
+	"os/signal"
 
 	"github.com/FACorreiaa/fitme-protos/utils"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -59,7 +59,7 @@ func run() (*pgxpool.Pool, *redis.Client, error) {
 }
 
 func main() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
 	cfg, err := config.InitConfig()

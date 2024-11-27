@@ -44,15 +44,12 @@ func ServeGRPC(ctx context.Context, port string, container *ServiceContainer) er
 	}
 
 	// Ensure TracerProvider shuts down properly on exit
-	//go func() {
-	//	<-ctx.Done()
-	//	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	//	defer cancel()
-	//
-	//	if err = traceProvider.Shutdown(shutdownCtx); err != nil {
-	//		log.Error("failed to shut down trace provider")
-	//	}
-	//}()
+	go func() {
+
+		if err = traceProvider.Shutdown(ctx); err != nil {
+			log.Error("failed to shut down trace provider")
+		}
+	}()
 
 	// Bootstrap the gRPC server
 	server, listener, err := grpc.BootstrapServer(port, log, reg, traceProvider)

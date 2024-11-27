@@ -3,9 +3,7 @@ package grpcprometheus
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
-	"time"
 
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/pkg/errors"
@@ -155,15 +153,15 @@ func SetupTracing(ctx context.Context) (*trace.TracerProvider, error) {
 		return nil, fmt.Errorf("failed to create trace provider: %w", err)
 	}
 
-	go func() {
-		<-ctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		if err = tp.Shutdown(shutdownCtx); err != nil {
-			log.Printf("failed to shut down trace provider: %v", err)
-		}
-	}()
+	//go func() {
+	//	<-ctx.Done()
+	//	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	//	defer cancel()
+	//
+	//	if err = tp.Shutdown(shutdownCtx); err != nil {
+	//		log.Printf("failed to shut down trace provider: %v", err)
+	//	}
+	//}()
 
 	return tp, nil
 }
