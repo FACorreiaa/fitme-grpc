@@ -6,7 +6,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
@@ -40,33 +39,30 @@ func BootstrapServer(
 		return nil, nil, errors.Wrap(err, "failed to create listener")
 	}
 
+	// -- Prometheus interceptor Setup
+	promCollectors := grpcprometheus.NewPrometheusMetricsCollectors()
+	// Must be called before using Prometheus interceptors
+	err = grpcprometheus.RegisterMetrics(registry, promCollectors)
+	_, promInterceptor, err := grpcprometheus.Interceptors(promCollectors)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to create Prometheus interceptors")
+	}
+
+	// -- OpenTelemetry interceptor setup
 	otel.SetTracerProvider(traceProvider)
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{},
 		propagation.Baggage{},
 	))
 
-	// -- Prometheus interceptor Setup
-	promCollectors := grpcprometheus.NewPrometheusMetricsCollectors()
-	// Must be called before using Prometheus interceptors
-	err = grpcprometheus.RegisterMetrics(registry, promCollectors)
-	_, serverInterceptor, _ := grpcprometheus.Interceptors(promCollectors)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to create Prometheus interceptors")
-	}
-
-	// -- OpenTelemetry interceptor setup
 	_, spanInterceptor := grpcspan.Interceptors()
-
+	_, serverInterceptor, _ := grpcprometheus.Interceptors(promCollectors)
 	// -- Zap logging interceptor setup
 	_, logInterceptor := grpclog.Interceptors(log)
-
 	// -- Recovery interceptor setup
 	_, recoveryInterceptor := grpcrecovery.Interceptors(grpcrecovery.RegisterMetrics(registry))
-
 	// session
 	sessionInterceptor := session.InterceptorSession()
-
 	requestGeneratorSession := grpcrequest.RequestIDMiddleware()
 
 	// Configure server options from our base configuration
@@ -81,23 +77,24 @@ func BootstrapServer(
 		// Add the unary interceptors
 		grpc.ChainUnaryInterceptor(
 			spanInterceptor.Unary,
+			promInterceptor.Unary,
 			serverInterceptor.Unary,
 			logInterceptor.Unary,
-			recoveryInterceptor.Unary,
 			sessionInterceptor,
 			requestGeneratorSession,
-			promCollectors.Server.UnaryServerInterceptor(),
+			recoveryInterceptor.Unary,
 		),
 
-		grpc.StatsHandler(otelgrpc.NewServerHandler()),
+		//grpc.StatsHandler(otelgrpc.NewServerHandler()),
 
 		// Add the stream interceptors
 		grpc.ChainStreamInterceptor(
 			spanInterceptor.Stream,
+			promInterceptor.Stream,
 			serverInterceptor.Stream,
 			logInterceptor.Stream,
 			recoveryInterceptor.Stream,
-			promCollectors.Server.StreamServerInterceptor(),
+			recoveryInterceptor.Stream,
 		),
 	}
 

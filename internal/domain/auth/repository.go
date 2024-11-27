@@ -46,6 +46,26 @@ func (a *AuthRepository) Register(ctx context.Context, req *pb.RegisterRequest) 
 	return &pb.RegisterResponse{Message: "Registration successful"}, nil
 }
 
+func (s *AuthRepository) RefreshToken(ctx context.Context, req *pb.RefreshTokenRequest) (*pb.TokenResponse, error) {
+	claims := &domain.Claims{}
+	token, err := jwt.ParseWithClaims(req.RefreshToken, claims, func(token *jwt.Token) (interface{}, error) {
+		return domain.JwtRefreshSecretKey, nil
+	})
+	if err != nil || !token.Valid || claims.Scope != "refresh" {
+		return nil, status.Error(codes.Unauthenticated, "invalid or expired refresh token")
+	}
+
+	// Generate new tokens
+	accessToken, refreshToken, err := GenerateTokens(claims.UserID, claims.Role)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to generate new tokens: %v", err)
+	}
+
+	return &pb.TokenResponse{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	}, nil
+}
 func (a *AuthRepository) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResponse, error) {
 	var user User
 	err := a.pgpool.QueryRow(ctx, `SELECT id, password, email FROM "users" WHERE username=$1`, req.Username).Scan(

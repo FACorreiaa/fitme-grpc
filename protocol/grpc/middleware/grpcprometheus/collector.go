@@ -9,10 +9,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
+	"google.golang.org/grpc/credentials"
 )
 
 type Collectors struct {
@@ -27,58 +27,23 @@ func NewPrometheusMetricsCollectors() *Collectors {
 	}
 }
 
-//func otelTraceProvider(ctx context.Context, endpoint, apiKey, caCertPath string, insecure bool) (*trace.TracerProvider, error) {
-//	var opts []otlptracegrpc.Option
-//
-//	// Set endpoint
-//	opts = append(opts, otlptracegrpc.WithEndpoint(endpoint))
-//	opts = append(opts, otlptracegrpc.WithInsecure())
-//
-//	// Handle insecure or TLS configuration
-//	if insecure {
-//		opts = append(opts, otlptracegrpc.WithInsecure())
-//	} else {
-//		creds, err := credentials.NewClientTLSFromFile(caCertPath, "")
-//		if err != nil {
-//			return nil, fmt.Errorf("failed to create TLS credentials: %w", err)
-//		}
-//		opts = append(opts, otlptracegrpc.WithTLSCredentials(creds))
-//	}
-//
-//	// Add authorization header if needed (uncomment if using API keys)
-//	// opts = append(opts, otlptracegrpc.WithHeaders(map[string]string{
-//	// 	"Authorization": "Bearer " + apiKey,
-//	// }))
-//
-//	exp, err := otlptracegrpc.New(ctx, opts...)
-//	if err != nil {
-//		return nil, fmt.Errorf("failed to create OTLP trace exporter: %w", err)
-//	}
-//
-//	res := resource.NewWithAttributes(
-//		semconv.SchemaURL,
-//		semconv.ServiceNameKey.String("FITDEV"),
-//		semconv.ServiceNamespaceKey.String("FitME"),
-//		semconv.ServiceVersionKey.String("0.1"),
-//		semconv.DeploymentEnvironmentKey.String("production"),
-//	)
-//
-//	tp := trace.NewTracerProvider(
-//		trace.WithBatcher(exp),
-//		trace.WithResource(res),
-//	)
-//
-//	otel.SetTracerProvider(tp)
-//
-//	return tp, nil
-//}
-
-func otelTraceProvider(ctx context.Context, endpoint string) (*trace.TracerProvider, error) {
+func otelTraceProvider(ctx context.Context, endpoint, apiKey, caCertPath string, insecure bool) (*trace.TracerProvider, error) {
 	var opts []otlptracegrpc.Option
 
 	// Set endpoint
 	opts = append(opts, otlptracegrpc.WithEndpoint(endpoint))
 	opts = append(opts, otlptracegrpc.WithInsecure())
+
+	// Handle insecure or TLS configuration
+	if insecure {
+		opts = append(opts, otlptracegrpc.WithInsecure())
+	} else {
+		c, err := credentials.NewClientTLSFromFile(caCertPath, "")
+		if err != nil {
+			return nil, fmt.Errorf("failed to create TLS credentials: %w", err)
+		}
+		opts = append(opts, otlptracegrpc.WithTLSCredentials(c))
+	}
 
 	// Add authorization header if needed (uncomment if using API keys)
 	// opts = append(opts, otlptracegrpc.WithHeaders(map[string]string{
@@ -92,7 +57,7 @@ func otelTraceProvider(ctx context.Context, endpoint string) (*trace.TracerProvi
 
 	res := resource.NewWithAttributes(
 		semconv.SchemaURL,
-		semconv.ServiceNameKey.String("fitme-dev"),
+		semconv.ServiceNameKey.String("FITDEV"),
 		semconv.ServiceNamespaceKey.String("FitME"),
 		semconv.ServiceVersionKey.String("0.1"),
 		semconv.DeploymentEnvironmentKey.String("production"),
@@ -101,15 +66,50 @@ func otelTraceProvider(ctx context.Context, endpoint string) (*trace.TracerProvi
 	tp := trace.NewTracerProvider(
 		trace.WithBatcher(exp),
 		trace.WithResource(res),
-		trace.WithSampler(trace.AlwaysSample()),
 	)
 
 	otel.SetTracerProvider(tp)
-	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
-	defer func() { _ = exp.Shutdown(context.Background()) }()
 
 	return tp, nil
 }
+
+//func otelTraceProvider(ctx context.Context, endpoint string) (*trace.TracerProvider, error) {
+//	var opts []otlptracegrpc.Option
+//
+//	// Set endpoint
+//	opts = append(opts, otlptracegrpc.WithEndpoint(endpoint))
+//	opts = append(opts, otlptracegrpc.WithInsecure())
+//
+//	// Add authorization header if needed (uncomment if using API keys)
+//	// opts = append(opts, otlptracegrpc.WithHeaders(map[string]string{
+//	// 	"Authorization": "Bearer " + apiKey,
+//	// }))
+//
+//	exp, err := otlptracegrpc.New(ctx, opts...)
+//	if err != nil {
+//		return nil, fmt.Errorf("failed to create OTLP trace exporter: %w", err)
+//	}
+//
+//	res := resource.NewWithAttributes(
+//		semconv.SchemaURL,
+//		semconv.ServiceNameKey.String("fitme-dev"),
+//		semconv.ServiceNamespaceKey.String("FitME"),
+//		semconv.ServiceVersionKey.String("0.1"),
+//		semconv.DeploymentEnvironmentKey.String("production"),
+//	)
+//
+//	tp := trace.NewTracerProvider(
+//		trace.WithBatcher(exp),
+//		trace.WithResource(res),
+//		trace.WithSampler(trace.AlwaysSample()),
+//	)
+//
+//	otel.SetTracerProvider(tp)
+//	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
+//	defer func() { _ = exp.Shutdown(context.Background()) }()
+//
+//	return tp, nil
+//}
 
 // RegisterMetrics must be called before the Prometheus interceptor is used.
 func RegisterMetrics(registry *prometheus.Registry, collectors *Collectors) error {
@@ -160,7 +160,7 @@ func SetupTracing(ctx context.Context) (*trace.TracerProvider, error) {
 	//caCertPath := os.Getenv("OTEL_EXPORTER_CA_CERT_PATH")
 	//apiKey := os.Getenv("OTEL_EXPORTER_API_KEY")
 
-	tp, err := otelTraceProvider(ctx, "localhost:4317")
+	tp, err := otelTraceProvider(ctx, "http://0.0.0.0:16686/", "", "", true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create trace provider: %w", err)
 	}

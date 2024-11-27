@@ -1,7 +1,6 @@
 package grpc
 
 import (
-	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
@@ -12,7 +11,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpclog"
-	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpcprometheus"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpcspan"
 )
 
@@ -36,12 +34,13 @@ func BootstrapClient(
 		propagation.Baggage{},
 	))
 
-	clMetrics := grpcprom.NewClientMetrics(
-		grpcprom.WithClientHandlingTimeHistogram(
-			grpcprom.WithHistogramBuckets([]float64{0.001, 0.01, 0.1, 0.3, 0.6, 1, 3, 6, 9, 20, 30, 60, 90, 120}),
-		),
-	)
-	promRegistry.MustRegister(clMetrics)
+	//clMetrics := grpcprom.NewClientMetrics(
+	//	grpcprom.WithClientHandlingTimeHistogram(
+	//		grpcprom.WithHistogramBuckets([]float64{0.001, 0.01, 0.1, 0.3, 0.6, 1, 3, 6, 9, 20, 30, 60, 90, 120}),
+	//	),
+	//)
+	//promRegistry.MustRegister(clMetrics)
+
 	//exemplarFromContext := func(ctx context.Context) prometheus.Labels {
 	//	if span := trace.SpanContextFromContext(ctx); span.IsSampled() {
 	//		return prometheus.Labels{"traceID": span.TraceID().String()}
@@ -55,9 +54,9 @@ func BootstrapClient(
 	logInterceptor, _ := grpclog.Interceptors(log)
 
 	// EXPERIMENTAL
-	promCollectors := grpcprometheus.NewPrometheusMetricsCollectors()
-	_ = grpcprometheus.RegisterMetrics(promRegistry, promCollectors)
-	clientInterceptor, _, _ := grpcprometheus.Interceptors(promCollectors)
+	//promCollectors := grpcprometheus.NewPrometheusMetricsCollectors()
+	//_ = grpcprometheus.RegisterMetrics(promRegistry, promCollectors)
+	//clientInterceptor, _, _ := grpcprometheus.Interceptors(promCollectors)
 
 	// trace to grafana
 	//ctx := context.Background()
@@ -95,8 +94,8 @@ func BootstrapClient(
 			spanInterceptor.Unary,
 			logInterceptor.Unary,
 			//clMetrics.UnaryClientInterceptor(grpcprom.WithExemplarFromContext(exemplarFromContext)),
-			promCollectors.Client.UnaryClientInterceptor(),
-			clientInterceptor.Unary,
+			//promCollectors.Client.UnaryClientInterceptor(),
+			//clientInterceptor.Unary,
 		),
 
 		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
@@ -105,8 +104,8 @@ func BootstrapClient(
 			spanInterceptor.Stream,
 			logInterceptor.Stream,
 			//clMetrics.StreamClientInterceptor(grpcprom.WithExemplarFromContext(exemplarFromContext)),
-			promCollectors.Client.StreamClientInterceptor(),
-			clientInterceptor.Stream,
+			//promCollectors.Client.StreamClientInterceptor(),
+			//clientInterceptor.Stream,
 		),
 	}
 

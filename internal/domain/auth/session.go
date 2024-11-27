@@ -6,10 +6,13 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/FACorreiaa/fitme-grpc/internal/domain"
 )
 
 type SessionManager struct {
@@ -21,15 +24,35 @@ func NewSessionManager(pgpool *pgxpool.Pool, redis *redis.Client) *SessionManage
 	return &SessionManager{PgPool: pgpool, Redis: redis}
 }
 
-func (s *SessionManager) GenerateSession(userSession UserSession) (string, error) {
-	sessionId := uuid.NewString()
-	jsonData, _ := json.Marshal(userSession)
-	err := s.Redis.Set(context.Background(), sessionId, string(jsonData), 24*time.Hour).Err()
+func GenerateTokens(userID string, role string) (accessToken string, refreshToken string, err error) {
+	// Access Token
+	accessClaims := &domain.Claims{
+		UserID: userID,
+		Role:   role,
+		Scope:  "access",
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)), // Short-lived
+		},
+	}
+	accessToken, err = jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims).SignedString(domain.JwtSecretKey)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	return sessionId, nil
+	// Refresh Token
+	refreshClaims := &domain.Claims{
+		UserID: userID,
+		Scope:  "refresh",
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)),
+		},
+	}
+	refreshToken, err = jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims).SignedString(domain.JwtRefreshSecretKey)
+	if err != nil {
+		return "", "", err
+	}
+
+	return accessToken, refreshToken, nil
 }
 
 func (s *SessionManager) SignIn(ctx context.Context, email, password string) (string, error) {
