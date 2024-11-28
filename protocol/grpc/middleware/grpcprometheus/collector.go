@@ -151,7 +151,7 @@ func RegisterMetrics(registry *prometheus.Registry, collectors *Collectors) erro
 //}
 
 func SetupTracing(ctx context.Context) (*trace.TracerProvider, error) {
-	tp, err := otelTraceProvider(ctx, "http://jaeger:4317", "", "", true)
+	tp, err := otelTraceProvider(ctx, "http://otel-collector:4317", "", "", true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create trace provider: %w", err)
 	}
