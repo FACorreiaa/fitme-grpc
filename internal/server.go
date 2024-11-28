@@ -30,7 +30,7 @@ import (
 // the gRPC server is ready to handle requests
 var isReady atomic.Value
 
-func ServeGRPC(ctx context.Context, port string, container *ServiceContainer) error {
+func ServeGRPC(ctx context.Context, port string, container *ServiceContainer, reg *prometheus.Registry) error {
 	log := logger.Log
 
 	// Configure Prometheus registry and trace provider
@@ -39,8 +39,6 @@ func ServeGRPC(ctx context.Context, port string, container *ServiceContainer) er
 	//		grpcprom.WithHistogramBuckets([]float64{0.001, 0.01, 0.1, 0.3, 0.6, 1, 3, 6, 9, 20, 30, 60, 90, 120}),
 	//	),
 	//)
-
-	reg := prometheus.NewRegistry()
 
 	// Initialize OpenTelemetry trace provider with options as needed
 	traceProvider, err := grpcprometheus.SetupTracing(ctx)
@@ -87,7 +85,7 @@ func ServeGRPC(ctx context.Context, port string, container *ServiceContainer) er
 // ServeHTTP creates a simple server to serve Prometheus metrics for
 // the collector, and (not included) healthcheck endpoints for K8S to
 // query readiness. By default, these should serve on "/healthz" and "/readyz"
-func ServeHTTP(port string) error {
+func ServeHTTP(port string, reg *prometheus.Registry) error {
 	log := logger.Log
 	log.Info("running http server", zap.String("port", port))
 
@@ -113,8 +111,8 @@ func ServeHTTP(port string) error {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	server.HandleFunc("/metrics", promhttp.Handler().ServeHTTP) // This should use the correct registry.
-	//server.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{EnableOpenMetrics: true}))
+	//server.HandleFunc("/metrics", promhttp.Handler().ServeHTTP) // This should use the correct registry.
+	server.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{EnableOpenMetrics: true}))
 
 	listener := &http.Server{
 		Addr:              fmt.Sprintf(":%s", port),

@@ -7,6 +7,7 @@ import (
 
 	"github.com/FACorreiaa/fitme-protos/utils"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 
@@ -61,6 +62,7 @@ func run() (*pgxpool.Pool, *redis.Client, error) {
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
+	reg := prometheus.NewRegistry()
 
 	cfg, err := config.InitConfig()
 	if err != nil {
@@ -104,7 +106,7 @@ func main() {
 
 	go func() {
 		//defer wg.Done()
-		if err = internal.ServeGRPC(ctx, cfg.Server.GrpcPort, container); err != nil {
+		if err = internal.ServeGRPC(ctx, cfg.Server.GrpcPort, container, reg); err != nil {
 			zapLogger.Error("failed to serve grpc", zap.Error(err))
 			return
 		}
@@ -119,7 +121,7 @@ func main() {
 	//}()
 	//
 	//wg.Wait()
-	if err = internal.ServeHTTP(cfg.Server.HTTPPort); err != nil {
+	if err = internal.ServeHTTP(cfg.Server.HTTPPort, reg); err != nil {
 		zapLogger.Error("failed to serve http", zap.Error(err))
 		return
 	}
