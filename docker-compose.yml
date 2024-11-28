@@ -56,17 +56,19 @@ services:
       - /bin/prometheus
       - --config.file=/etc/prometheus.yml
     ports:
-      - "9091:9091"
+      - "9090:9090"
 
   otel-collector:
+    container_name: otel-collector
     image: otel/opentelemetry-collector-contrib:0.114.0
     command: [ "--config=/etc/otel-collector.yaml" ]
     volumes:
       - ./config/otel-collector.yaml:/etc/otel-collector.yaml
     ports:
-      - 4317:4317
+      - "4317:4317"
 
   jaeger:
+    container_name: jaeger
     image: jaegertracing/all-in-one:1.60
     ports:
       - "16686:16686"

@@ -160,7 +160,7 @@ func SetupTracing(ctx context.Context) (*trace.TracerProvider, error) {
 	//caCertPath := os.Getenv("OTEL_EXPORTER_CA_CERT_PATH")
 	//apiKey := os.Getenv("OTEL_EXPORTER_API_KEY")
 
-	tp, err := otelTraceProvider(ctx, "http://localhost:16686/", "", "", true)
+	tp, err := otelTraceProvider(ctx, "http://0.0.0.0:4137", "", "", true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create trace provider: %w", err)
 	}
