@@ -47,6 +47,7 @@ services:
     networks:
       - fit-me
   prometheus:
+    container_name: prometheus
     image: cstyan/prometheus:exemplars-64206a
     network_mode: "host"
     platform: linux/amd64

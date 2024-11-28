@@ -151,16 +151,7 @@ func RegisterMetrics(registry *prometheus.Registry, collectors *Collectors) erro
 //}
 
 func SetupTracing(ctx context.Context) (*trace.TracerProvider, error) {
-	//endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
-	//if endpoint == "" {
-	//	return nil, errors.New("missing OTEL_EXPORTER_OTLP_ENDPOINT environment variable")
-	//}
-	//
-	//insecure := os.Getenv("OTEL_EXPORTER_INSECURE") == "true"
-	//caCertPath := os.Getenv("OTEL_EXPORTER_CA_CERT_PATH")
-	//apiKey := os.Getenv("OTEL_EXPORTER_API_KEY")
-
-	tp, err := otelTraceProvider(ctx, "http://0.0.0.0:4137", "", "", true)
+	tp, err := otelTraceProvider(ctx, "http://jaeger:4317", "", "", true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create trace provider: %w", err)
 	}
