@@ -56,25 +56,7 @@ services:
       - /bin/prometheus
       - --config.file=/etc/prometheus.yml
     ports:
-      - "9090:9090"
-
-  otel-collector:
-    network_mode: "host"
-    image: otel/opentelemetry-collector-contrib:0.114.0
-    command: [ "--config=/etc/otel-collector.yaml" ]
-    volumes:
-      - ./config/otel-collector.yaml:/etc/otel-collector.yaml
-    ports:
-      - "4317:4317"
-      - "4318:4318"
-      - "8000:8000"
-      - "8001:8001"
-      - "6060:6060"
-      - "9090:9090"
-      - "9100:9100"
-    environment:
-      - DD_API_KEY=${DD_API_KEY}
-      - DD_SITE=${DD_SITE}
+      - "9091:9091"
 
   jaeger:
     image: jaegertracing/all-in-one:1.60

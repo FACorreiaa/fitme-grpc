@@ -1,4 +1,0 @@
-positions:
-  ? path: /Users/fernando_idwell/Documents/Projects/fit-server/fitme-grpc/alloy.log
-    labels: '{collector_id="MacBook-Pro-von-Fernando", job="integrations/alloy"}'
-  : "10636"

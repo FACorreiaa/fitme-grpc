@@ -45,7 +45,7 @@ repositories:
 
 #change later
 server:
-  HTTPPort: "8001"
+  HTTPPort: "9091"
   GRPCPort: "8000"
   HTTPTimeout: 15s
 

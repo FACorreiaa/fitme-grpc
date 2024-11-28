@@ -96,37 +96,6 @@ func ServeHTTP(port string) error {
 		log.Error("failed to initialize config", zap.Error(err))
 		return err
 	}
-	//ctx := context.Background()
-	//collectors := grpcprometheus.NewPrometheusMetricsCollectors()
-	//
-	//// Set up Prometheus registry and register collectors
-	//registry := prometheus.NewRegistry()
-	//if err = grpcprometheus.RegisterMetrics(registry, collectors); err != nil {
-	//	log.Fatal("failed to register Prometheus metrics")
-	//}
-	//
-	//if err = grpcprometheus.SetupTracing(ctx); err != nil {
-	//	log.Fatal("failed to set up tracing")
-	//}
-	//
-	//if err != nil {
-	//	log.Error("failed to initialize config", zap.Error(err))
-	//	return err
-	//}
-
-	//reg := prometheus.NewRegistry()
-	//clMetrics := grpcprom.NewClientMetrics(
-	//	grpcprom.WithClientHandlingTimeHistogram(
-	//		grpcprom.WithHistogramBuckets([]float64{0.001, 0.01, 0.1, 0.3, 0.6, 1, 3, 6, 9, 20, 30, 60, 90, 120}),
-	//	),
-	//)
-	//reg.MustRegister(clMetrics)
-	//exporter, err := expo.New(expo.WithRegisterer(promRegistry))
-	//if err != nil {
-	//	return errors.Wrap(err, "failed to create OpenTelemetry Prometheus exporter")
-	//}
-	//reg := prometheus.NewRegistry()
-	//reg.MustRegister(promRegistry)
 
 	server := http.NewServeMux()
 	// Add healthcheck endpoints
