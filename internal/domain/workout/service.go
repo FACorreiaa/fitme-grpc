@@ -38,8 +38,7 @@ func NewServiceWorkout(ctx context.Context, repo domain.RepositoryWorkout) *Serv
 
 // GetExercises Exercises
 func (s ServiceWorkout) GetExercises(ctx context.Context, req *pbw.GetExercisesReq) (*pbw.GetExercisesRes, error) {
-	tracer := otel.Tracer("fitme-dev")
-	ctx, span := tracer.Start(ctx, "GetExercises")
+	traceContext, span := otel.Tracer("fitme-dev").Start(ctx, "GetExercises")
 	defer span.End()
 
 	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
@@ -53,7 +52,7 @@ func (s ServiceWorkout) GetExercises(ctx context.Context, req *pbw.GetExercisesR
 
 	req.Request.RequestId = requestID
 
-	exercisesResponse, err := s.repo.GetExercises(ctx, req)
+	exercisesResponse, err := s.repo.GetExercises(traceContext, req)
 
 	if err != nil {
 		return &pbw.GetExercisesRes{

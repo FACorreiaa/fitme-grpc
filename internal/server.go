@@ -46,13 +46,6 @@ func ServeGRPC(ctx context.Context, port string, container *ServiceContainer, re
 		return errors.Wrap(err, "failed to configure OpenTelemetry trace provider")
 	}
 
-	// Ensure TracerProvider shuts down properly on exit
-	go func() {
-		if err = traceProvider.Shutdown(ctx); err != nil {
-			log.Error("failed to shut down trace provider")
-		}
-	}()
-
 	// Bootstrap the gRPC server
 	server, listener, err := grpc.BootstrapServer(port, log, reg, traceProvider)
 	if err != nil {

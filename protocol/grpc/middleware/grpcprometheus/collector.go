@@ -3,16 +3,20 @@ package grpcprometheus
 import (
 	"context"
 	"fmt"
+	"os"
 
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 	"google.golang.org/grpc/credentials"
+
+	"github.com/FACorreiaa/fitme-grpc/logger"
 )
 
 type Collectors struct {
@@ -33,7 +37,7 @@ func otelTraceProvider(ctx context.Context, endpoint, apiKey, caCertPath string,
 	// Set endpoint
 	opts = append(opts, otlptracegrpc.WithEndpoint(endpoint))
 	opts = append(opts, otlptracegrpc.WithInsecure())
-
+	//opts = append(opts, otlptracegrpc.WithGRPCConn(conn))
 	// Handle insecure or TLS configuration
 	if insecure {
 		opts = append(opts, otlptracegrpc.WithInsecure())
@@ -69,6 +73,8 @@ func otelTraceProvider(ctx context.Context, endpoint, apiKey, caCertPath string,
 	)
 
 	otel.SetTracerProvider(tp)
+	tp.Tracer("DeezNuts")
+	otel.SetTextMapPropagator(propagation.TraceContext{})
 
 	return tp, nil
 }
@@ -151,10 +157,23 @@ func RegisterMetrics(registry *prometheus.Registry, collectors *Collectors) erro
 //}
 
 func SetupTracing(ctx context.Context) (*trace.TracerProvider, error) {
-	tp, err := otelTraceProvider(ctx, "http://otel-collector:4317", "", "", true)
+	log := logger.Log
+	otlpEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if otlpEndpoint == "" {
+		log.Error("You MUST set OTLP_ENDPOINT env variable!")
+	}
+
+	tp, err := otelTraceProvider(ctx, otlpEndpoint, "", "", true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create trace provider: %w", err)
 	}
+
+	// Ensure TracerProvider shuts down properly on exit
+	go func() {
+		if err = tp.Shutdown(ctx); err != nil {
+			log.Error("failed to shut down trace provider")
+		}
+	}()
 
 	return tp, nil
 }
@@ -162,12 +181,9 @@ func SetupTracing(ctx context.Context) (*trace.TracerProvider, error) {
 // grpcHandlingTimeHistogramBuckets is the default set of buckets used by both
 // server and client histograms.
 var grpcHandlingTimeHistogramBuckets = []float64{
-	0.001, 0.01, 0.1, 0.3,
-	0.6, 1, 3, 6, 9, 20,
-	30, 60, 90, 120,
+	0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10,
 }
 
-// clientMetrics attaches prometheus metrics to the grpc client
 func clientMetrics() *grpcprom.ClientMetrics {
 	return grpcprom.NewClientMetrics(
 		grpcprom.WithClientHandlingTimeHistogram(
@@ -176,7 +192,6 @@ func clientMetrics() *grpcprom.ClientMetrics {
 	)
 }
 
-// clientMetrics attaches prometheus metrics to the grpc server
 func serverMetrics() *grpcprom.ServerMetrics {
 	return grpcprom.NewServerMetrics(
 		grpcprom.WithServerHandlingTimeHistogram(
