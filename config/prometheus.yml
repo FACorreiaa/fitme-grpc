@@ -5,13 +5,17 @@ global:
     monitor: 'kirk-grpc-service-monitor'
 
 scrape_configs:
-  - job_name: "prometheus"
-    scrape_interval: 5s
+  - job_name: aggregated-trace-metrics
     static_configs:
-      - targets: ['otel-collector:9090']
+      - targets: [ 'spm_metrics_source:8889' ]
+
+#  - job_name: "prometheus"
+#    scrape_interval: 5s
+#    static_configs:
+#      - targets: ['otel-collector:9090']
 
   - job_name: "http-fitme-dev"
     metrics_path: "/metrics"
     scrape_interval: 5s
     static_configs:
-      - targets: ['localhost:8001']
+      - targets: ['fitme-dev:8001']

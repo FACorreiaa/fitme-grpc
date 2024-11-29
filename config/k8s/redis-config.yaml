@@ -3,4 +3,4 @@ kind: ConfigMap
 metadata:
   name: redis-config
 data:
-  postgres-url: "fitme-redis-service"
+  redis-url: "redis-service"

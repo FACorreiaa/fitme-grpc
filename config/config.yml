@@ -32,13 +32,13 @@ services:
 
 repositories:
   postgres:
-    port: "5440"
+    port: "5432"
     username: "postgres"
     db: "fit-me-dev"
     SSLMODE: "verify-full"
     MAXCONWAITINGTIME: 10
   redis:
-    host: "localhost"
+    host: "redis"
     port: "6388"
     db: 0
 

@@ -21,7 +21,7 @@ import (
 	config "github.com/FACorreiaa/fitme-grpc/config"
 	"github.com/FACorreiaa/fitme-grpc/logger"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc"
-	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpcprometheus"
+	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpctracing"
 )
 
 // --- Server components
@@ -33,15 +33,8 @@ var isReady atomic.Value
 func ServeGRPC(ctx context.Context, port string, container *ServiceContainer, reg *prometheus.Registry) error {
 	log := logger.Log
 
-	// Configure Prometheus registry and trace provider
-	//srvMetrics := grpcprom.NewServerMetrics(
-	//	grpcprom.WithServerHandlingTimeHistogram(
-	//		grpcprom.WithHistogramBuckets([]float64{0.001, 0.01, 0.1, 0.3, 0.6, 1, 3, 6, 9, 20, 30, 60, 90, 120}),
-	//	),
-	//)
-
 	// Initialize OpenTelemetry trace provider with options as needed
-	traceProvider, err := grpcprometheus.SetupTracing(ctx)
+	traceProvider, err := grpctracing.InitTracer()
 	if err != nil {
 		return errors.Wrap(err, "failed to configure OpenTelemetry trace provider")
 	}

@@ -1,3 +1,8 @@
+VERSION ?= latest
+PREV_VERSION ?= 0.1.4
+image_name = fit-me
+
+
 run-down:
 	docker compose down
 
@@ -43,3 +48,16 @@ profile:
 
 profile-graph:
 	stackcollapse-go.pl cpu.txt | flamegraph.pl > cpu.svg
+
+build-image:
+	docker build --no-cache --platform=linux/amd64 -t fit-me:$(VERSION) -f Dockerfile .
+	docker build --no-cache --platform=linux/amd64 -t fit-me:$(PREV_VERSION) -f Dockerfile .
+
+
+tag-image:
+	docker tag fit-me:$(VERSION) a11199/fit-me:latest
+	docker tag fit-me:$(PREV_VERSION) a11199/fit-me:$(PREV_VERSION)
+
+push-image:
+	docker push a11199/fit-me:latest
+	docker push a11199/fit-me:$(PREV_VERSION)

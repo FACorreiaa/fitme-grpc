@@ -1,17 +1,24 @@
-version: "3.9"
-
 services:
-#  app:
-#    build:
-#      dockerfile: Dockerfile
-#      context: .
-#      target: dev
-#    volumes:
-#      - .:/app
-#  volumes:
-#    - .:/opt/app/api
-#    networks:
-#      - fit-me
+  app:
+    platform: linux/amd64
+    container_name: fitme-dev
+    build:
+      dockerfile: Dockerfile
+      context: .
+      target: dev
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+    environment:
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://jaeger:4318/v1/traces
+    depends_on:
+      - postgres
+      - redis
+      - jaeger
+    networks:
+      fit-me:
   postgres:
     env_file:
       - .env
@@ -48,8 +55,7 @@ services:
       - fit-me
   prometheus:
     container_name: prometheus
-    image: cstyan/prometheus:exemplars-64206a
-    network_mode: "host"
+    image: prom/prometheus:v3.0.1
     platform: linux/amd64
     volumes:
       - ./config/prometheus.yml:/etc/prometheus.yml
@@ -58,22 +64,34 @@ services:
       - --config.file=/etc/prometheus.yml
     ports:
       - "9090:9090"
-
-  otel-collector:
-    container_name: otel-collector
-    image: otel/opentelemetry-collector-contrib:0.114.0
-    command: [ "--config=/etc/otel-collector.yaml" ]
-    volumes:
-      - ./config/otel-collector.yaml:/etc/otel-collector.yaml
-    ports:
-      - "4317:4317"  # OTLP traces ingestion
+    networks:
+      - fit-me
   jaeger:
+    networks:
+      fit-me:
+        aliases: [spm_metrics_source]
     container_name: jaeger
-    image: jaegertracing/all-in-one:1.60
+    image: jaegertracing/jaeger:2.0.0
+    volumes:
+      - ./config/jaeger-ui.json:/etc/jaeger/jaeger-ui.json
+      - ./config/jaeger-config-spm.yaml:/etc/jaeger/config.yml
     ports:
-      - "6831:6831/udp" # UDP port for Jaeger agent
-      - "16686:16686" # Web UI
-      - "14268:14268" # HTTP port for spans
+      - "16686:16686"
+      - "8888:8888"
+      - "8889:8889"
+      - "4317:4317"
+      - "4318:4318"
+#  microsim:
+#    networks:
+#      - fit-me
+#    image: yurishkuro/microsim:v0.4.1
+#    command: "-d 24h -s 500ms"
+#    environment:
+#      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
+#    depends_on:
+#      - jaeger
+
+
 
 #    networks:
 #      - fit-me

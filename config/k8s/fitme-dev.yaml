@@ -19,7 +19,7 @@ spec:
           image: a11199/fit-me:latest
           ports:
             - containerPort: 8000
-            - containerPort: 7077
+            - containerPort: 8001
           env:
             - name: POSTGRES_HOST
               valueFrom:
@@ -42,7 +42,10 @@ spec:
                   name: postgres-secret
                   key: POSTGRES_DB
             - name: POSTGRES_HOST_AUTH_METHOD
-              value: "trust"
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_HOST_AUTH_METHOD
             - name: REDIS_HOST
               valueFrom:
                 secretKeyRef:
@@ -53,7 +56,11 @@ spec:
                 secretKeyRef:
                   name: redis-secret
                   key: REDIS_PORT
-
+      volumes:
+        - name: fitme-volume
+          hostPath:
+            path: /tmp/data
+            type: DirectoryOrCreate
 ---
 apiVersion: v1
 kind: Service
@@ -71,6 +78,6 @@ spec:
       nodePort: 30100
     - name: http
       protocol: TCP
-      port: 7077
-      targetPort: 7077
+      port: 8001
+      targetPort: 8001
       nodePort: 30101

@@ -1,4 +1,4 @@
-FROM golang:1.23.1 AS base
+FROM golang:1.23.1 AS builder
 
 LABEL maintainer="a11199"
 LABEL description="Base image fitme dev"
@@ -9,13 +9,13 @@ COPY go.mod go.sum ./
 RUN go mod download && go mod verify
 
 COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -o /app/fitme ./*.go
+ENTRYPOINT ["/app/fitme"]
 
-ENV CGO_ENABLED=0
-
-RUN go build -o /fitme ./*.go
-
-FROM busybox as dev
-
-COPY --from=base /fitme /usr/bin/fitme
-RUN chmod +x /usr/bin/fitme
-CMD ["/usr/bin/fitme"]
+FROM alpine:latest AS dev
+WORKDIR /app
+RUN apk add --no-cache bash
+COPY --from=builder /app/fitme /usr/bin/fitme
+EXPOSE 8000
+EXPOSE 8001
+CMD ["fitme", "start"]

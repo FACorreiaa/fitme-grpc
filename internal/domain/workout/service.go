@@ -40,7 +40,8 @@ func NewServiceWorkout(ctx context.Context, repo domain.RepositoryWorkout) *Serv
 func (s ServiceWorkout) GetExercises(ctx context.Context, req *pbw.GetExercisesReq) (*pbw.GetExercisesRes, error) {
 	traceContext, span := otel.Tracer("fitme-dev").Start(ctx, "GetExercises")
 	defer span.End()
-
+	traceID := span.SpanContext().TraceID().String()
+	println(traceID)
 	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
 	if !ok {
 		return nil, status.Error(codes.Internal, "request id not found in context")

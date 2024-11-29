@@ -3,4 +3,4 @@ kind: ConfigMap
 metadata:
   name: postgres-config
 data:
-  postgres-url: "fitme-postgres-service"
+  postgres-url: "postgres-service"

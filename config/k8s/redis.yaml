@@ -19,11 +19,22 @@ spec:
           image: redis:latest
           ports:
             - containerPort: 6388
+          env:
+            - name: REDIS_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: REDIS_HOST
+            - name: REDIS_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: REDIS_PORT
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: fitme-redis-service
+  name: redis-service
 spec:
   selector:
     app: redis
