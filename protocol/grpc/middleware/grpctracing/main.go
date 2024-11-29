@@ -22,7 +22,6 @@ func newTracerProvider(endpoint, apiKey, caCertPath string, insecure bool) (*tra
 
 	// Set endpoint
 	opts = append(opts, otlptracegrpc.WithEndpoint(endpoint))
-	opts = append(opts, otlptracegrpc.WithInsecure())
 	//opts = append(opts, otlptracegrpc.WithGRPCConn(conn))
 	// Handle insecure or TLS configuration
 	if insecure {
