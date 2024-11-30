@@ -17,6 +17,11 @@ import (
 	"github.com/FACorreiaa/fitme-grpc/logger"
 )
 
+//func newLocalTracerProvider() (trace.SpanExporter, error) {
+//	exporter, _ := stdouttrace.New()
+//	return exporter, nil
+//}
+
 func newTracerProvider(endpoint, apiKey, caCertPath string, insecure bool) (*trace.TracerProvider, error) {
 	var opts []otlptracegrpc.Option
 
