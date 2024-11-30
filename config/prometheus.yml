@@ -9,13 +9,14 @@ scrape_configs:
     static_configs:
       - targets: [ 'spm_metrics_source:8889' ]
 
-#  - job_name: "prometheus"
-#    scrape_interval: 5s
-#    static_configs:
-#      - targets: ['otel-collector:9090']
-
-  - job_name: "http-fitme-dev"
+  - job_name: "otel-collector-prometheus"
     metrics_path: "/metrics"
-    scrape_interval: 5s
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['otel-collector:9090']
+
+  - job_name: "app-metrics"
+    metrics_path: "/metrics"
+    scrape_interval: 10s
     static_configs:
       - targets: ['fitme-dev:8001']

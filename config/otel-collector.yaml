@@ -2,6 +2,8 @@ receivers:
   otlp:
     protocols:
       grpc:
+        endpoint: 0.0.0.0:4317
+      http:
         endpoint: 0.0.0.0:4318
 processors:
 extensions:
@@ -9,25 +11,23 @@ extensions:
 
 exporters:
   otlp:
-    endpoint: jaeger:4317
+    endpoint: otel-collector:4318
     tls:
       insecure: true
   prometheus:
-    endpoint: 0.0.0.0:8889
+    endpoint: 0.0.0.0:9090
+    namespace: testapp
   debug:
-
-connectors:
-  spanmetrics:
 
 service:
   extensions: [health_check]
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [batch]
-      exporters: [spanmetrics, otlp]
+      processors: []
+      exporters: [otlp, debug]
 
     metrics:
-      receivers: [spanmetrics]
+      receivers: [otlp]
       processors: []
-      exporters: [prometheus]
+      exporters: [prometheus, debug]

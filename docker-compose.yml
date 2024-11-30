@@ -16,8 +16,9 @@ services:
     depends_on:
       - postgres
       - redis
-      - jaeger
+      - otel-collector
       - prometheus
+      - jaeger
     networks:
       fit-me:
   postgres:
@@ -75,13 +76,11 @@ services:
     image: jaegertracing/jaeger:2.0.0
     volumes:
       - ./config/jaeger-ui.json:/etc/jaeger/jaeger-ui.json
-      - ./config/jaeger-config-spm.yaml:/etc/jaeger/config.yml
+      - ./config/jaeger-config-spm.yaml:/etc/jaeger/jaeger-config-spm.yml
+    command: [ "--config", "/etc/jaeger/jaeger-config-spm.yml" ]
     ports:
       - "16686:16686"
-      - "8888:8888"
-      - "8889:8889"
-      - "4317:4317"
-      - "4318:4318"
+
 #  microsim:
 #    networks:
 #      - fit-me
@@ -160,17 +159,18 @@ services:
 #
 
 
-#  otel-collector:
-#    image: otel/opentelemetry-collector:latest
-#    ports:
-#      - "4317:4317"    # For OTLP/gRPC receiver (traces and metrics)
-#      - "4318:4318"    # For OTLP/HTTP receiver
-#      - "8888:8888"    # For Prometheus metrics scraping
-#    volumes:
-#      - ./config/otel-config.yaml:/etc/otel-config.yaml
-#    command: [ "--config", "/etc/otel-config.yaml" ]
-#    networks:
-#      - fit-me
+  otel-collector:
+    image: otel/opentelemetry-collector:latest
+    ports:
+      - "8888:8888"
+      - "8889:8889"
+      - "4317:4317"
+      - "4318:4318"
+    volumes:
+      - ./config/otel-config.yaml:/etc/otel-collector.yaml
+    command: [ "--config", "/etc/otel-collector.yaml" ]
+    networks:
+      - fit-me
 
 networks:
   fit-me:
