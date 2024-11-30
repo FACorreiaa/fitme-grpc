@@ -17,6 +17,7 @@ services:
       - postgres
       - redis
       - jaeger
+      - prometheus
     networks:
       fit-me:
   postgres:
