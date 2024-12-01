@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"runtime/pprof"
 
 	"github.com/FACorreiaa/fitme-protos/utils"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -60,8 +61,24 @@ func run() (*pgxpool.Pool, *redis.Client, error) {
 }
 
 func main() {
+
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
+
+	// Create a CPU profile file
+	f, err := os.Create("profile.prof")
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
+	// Start CPU profiling
+	if err := pprof.StartCPUProfile(f); err != nil {
+		panic(err)
+	}
+	defer pprof.StopCPUProfile()
+
+	// prometheus registry
 	reg := prometheus.NewRegistry()
 
 	cfg, err := config.InitConfig()

@@ -5,9 +5,20 @@ receivers:
         endpoint: 0.0.0.0:4317
       http:
         endpoint: 0.0.0.0:4318
+
 processors:
+  batch:  # Adds a batch processor to optimize the export of telemetry data
+  memory_limiter:  # Prevents high memory consumption
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+
 extensions:
   health_check: {}
+  pprof:
+    endpoint: 0.0.0.0:1888
+  zpages:  
+    endpoint: 0.0.0.0:55679
 
 exporters:
   otlp:
@@ -17,17 +28,20 @@ exporters:
   prometheus:
     endpoint: 0.0.0.0:9090
     namespace: testapp
-  debug:
+  tempo:
+    endpoint: http://tempo:3100
+  logging:
+    loglevel: debug
 
 service:
-  extensions: [health_check]
+  extensions: [health_check, pprof, zpages]
   pipelines:
     traces:
       receivers: [otlp]
-      processors: []
-      exporters: [otlp, debug]
+      processors: [batch, memory_limiter]
+      exporters: [tempo, logging]
 
     metrics:
       receivers: [otlp]
-      processors: []
-      exporters: [prometheus, debug]
+      processors: [batch, memory_limiter]
+      exporters: [prometheus, logging]
