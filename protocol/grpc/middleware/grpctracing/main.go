@@ -77,6 +77,7 @@ func InitTracer() (*trace.TracerProvider, error) {
 	}
 
 	tp, err := newTracerProvider(otlpEndpoint, "", "", true)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to create trace provider: %w", err)
 	}

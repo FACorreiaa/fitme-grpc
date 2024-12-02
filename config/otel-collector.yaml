@@ -3,9 +3,18 @@ receivers:
     protocols:
       grpc:
         endpoint: 0.0.0.0:4317
+        max_recv_msg_size_mib: 64
       http:
         endpoint: 0.0.0.0:4318
-
+exporters:
+  otlp:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  prometheus:
+    endpoint: 0.0.0.0:9090
+    namespace: otel-collector-prometheus
+  debug: {}
 processors:
   batch:  # Adds a batch processor to optimize the export of telemetry data
   memory_limiter:  # Prevents high memory consumption
@@ -17,21 +26,8 @@ extensions:
   health_check: {}
   pprof:
     endpoint: 0.0.0.0:1888
-  zpages:  
+  zpages:
     endpoint: 0.0.0.0:55679
-
-exporters:
-  otlp:
-    endpoint: otel-collector:4318
-    tls:
-      insecure: true
-  prometheus:
-    endpoint: 0.0.0.0:9090
-    namespace: testapp
-  tempo:
-    endpoint: http://tempo:3100
-  logging:
-    loglevel: debug
 
 service:
   extensions: [health_check, pprof, zpages]
@@ -39,9 +35,9 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch, memory_limiter]
-      exporters: [tempo, logging]
+      exporters: [otlp, debug]
 
     metrics:
       receivers: [otlp]
       processors: [batch, memory_limiter]
-      exporters: [prometheus, logging]
+      exporters: [prometheus, debug]
