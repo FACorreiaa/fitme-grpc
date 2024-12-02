@@ -22,18 +22,22 @@ services:
       - "8000:8000"
       - "8001:8001"
     environment:
-      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4318/v1/traces
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=otel-collector:4317
+      #- OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=tempo:4317
+
     depends_on:
       - postgres
       - redis
       - otel-collector
       - prometheus
+      - grafana
     logging:
       driver: loki
       options:
         loki-url: http://localhost:3100/loki/api/v1/push
     networks:
       fit-me:
+
   postgres:
     env_file:
       - .env
@@ -69,6 +73,7 @@ services:
     networks:
       - fit-me
   tempo:
+    container_name: tempo
     image: *tempoImage
     command: [ "-config.file=/etc/tempo.yaml" ]
     volumes:
@@ -80,21 +85,22 @@ services:
       - "4317"  # otlp grpc
       - "4318"  # otlp http
       - "9411"   # zipkin
+    restart: unless-stopped
     depends_on:
       - init
     networks:
       fit-me:
 
   # Generate fake traces...
-  k6-tracing:
-    image: ghcr.io/grafana/xk6-client-tracing:v0.0.5
-    environment:
-      - ENDPOINT=otel-collector:4317
-    restart: always
-    depends_on:
-      - otel-collector
-    networks:
-      fit-me:
+#  k6-tracing:
+#    image: ghcr.io/grafana/xk6-client-tracing:v0.0.5
+#    environment:
+#      - ENDPOINT=otel-collector:4317
+#    restart: always
+#    depends_on:
+#      - otel-collector
+#    networks:
+#      fit-me:
 
   # And put them in an OTEL collector pipeline...
   otel-collector:
@@ -107,7 +113,6 @@ services:
       - "55679:55679"
     networks:
       fit-me:
-
   prometheus:
     image: prom/prometheus:latest
     command:
@@ -121,7 +126,6 @@ services:
       - "9090:9090"
     networks:
       fit-me:
-
   grafana:
     image: grafana/grafana:11.0.0
     volumes:
@@ -135,6 +139,36 @@ services:
       - "3000:3000"
     networks:
       fit-me:
+  loki:
+    image: grafana/loki:main
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./config/loki-config.yaml:/etc/loki/local-config.yaml
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - fit-me
 
+# DONT NEED THIS
+#  minio:
+#    container_name: minio
+#    image: minio/minio
+#    entrypoint: [ "" ]
+#    command: [ "sh", "-c", "mkdir -p /data/mimir && minio server --quiet /data" ]
+#    environment:
+#      - MINIO_ROOT_USER=mimir
+#      - MINIO_ROOT_PASSWORD=supersecret
+#    ports:
+#      - "9000:9000"
+#    networks:
+#      - fit-me
+#  mimir:
+#    container_name: mimir
+#    image: grafana/mimir:latest
+#    command: [ "-config.file=/etc/mimir.yaml" ]
+#    hostname: mimir
+#    volumes:
+#      - ./config/mimir/mimir.yaml:/etc/mimir.yaml
+#      - ./config/mimir/alertmanager-fallback-config.yaml:/etc/alertmanager-fallback-config.yaml
 networks:
   fit-me:
