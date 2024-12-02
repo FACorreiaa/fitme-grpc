@@ -1,6 +1,7 @@
 stream_over_http_enabled: true
 server:
   http_listen_port: 3200
+  grpc_listen_port: 4317
   log_level: info
 
 query_frontend:
@@ -12,6 +13,7 @@ query_frontend:
       throughput_bytes_slo: 1.073741824e+09
   trace_by_id:
     duration_slo: 5s
+
 
 distributor:
   receivers:                           # this configuration will listen on all ports and protocols that tempo is capable of.

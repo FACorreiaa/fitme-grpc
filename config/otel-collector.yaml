@@ -7,7 +7,12 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
 exporters:
+  otlphttp/logs:
+    endpoint: "http://loki:3100/otlp"
+    tls:
+      insecure: true
   otlp:
+    # change later
     endpoint: tempo:4317
     tls:
       insecure: true
@@ -35,7 +40,7 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch, memory_limiter]
-      exporters: [otlp, debug]
+      exporters: [otlphttp/logs, otlp, debug]
 
     metrics:
       receivers: [otlp]
