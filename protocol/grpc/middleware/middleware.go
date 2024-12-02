@@ -20,6 +20,7 @@ var (
 
 func initializeLogger() {
 	// Initialize Zap logger
+	// add adapter later
 	Log, _ = zap.NewProduction()
 	defer func(Log *zap.Logger) {
 		err := Log.Sync()

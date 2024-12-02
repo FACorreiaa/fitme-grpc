@@ -22,7 +22,7 @@ services:
       - "8000:8000"
       - "8001:8001"
     environment:
-      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=otel-collector:4317
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=jaeger:4317
       #- OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=tempo:4317
 
     depends_on:
@@ -88,6 +88,23 @@ services:
     restart: unless-stopped
     depends_on:
       - init
+    networks:
+      fit-me:
+  tempo-query:
+    container_name: tempo-query
+    image: grafana/tempo-query:0.7.0
+    environment:
+      - BACKEND=tempo:3200
+    volumes:
+      - ./etc/tempo-query.yaml:/etc/tempo-query.yaml
+    ports:
+      - "16686:16686"  # jaeger-ui
+    depends_on:
+      - tempo
+    logging:
+      driver: loki
+      options:
+        loki-url: 'http://localhost:3100/api/prom/push'
     networks:
       fit-me:
 
@@ -170,5 +187,17 @@ services:
 #    volumes:
 #      - ./config/mimir/mimir.yaml:/etc/mimir.yaml
 #      - ./config/mimir/alertmanager-fallback-config.yaml:/etc/alertmanager-fallback-config.yaml
+#  jaeger:
+#    networks:
+#      fit-me:
+#        aliases: [spm_metrics_source]
+#    container_name: jaeger
+#    image: jaegertracing/jaeger:2.0.0
+#    volumes:
+#      - ./config/jaeger/jaeger-ui.json:/etc/jaeger/jaeger-ui.json
+#      - ./config/jaeger/jaeger-config-spm.yaml:/etc/jaeger/jaeger-config-spm.yml
+#    command: [ "--config", "/etc/jaeger/jaeger-config-spm.yml" ]
+#    ports:
+#      - "16686:16686"
 networks:
   fit-me:
