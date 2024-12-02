@@ -14,9 +14,12 @@ spec:
       labels:
         app: fitme
     spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
       containers:
         - name: fitme
           image: a11199/fit-me:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
             - containerPort: 8001
