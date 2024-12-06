@@ -72,11 +72,13 @@ type Config struct {
 func InitConfig() (Config, error) {
 	var config Config
 	v := viper.New()
+	v.AddConfigPath(".")
 	v.AddConfigPath("config")
 	v.AddConfigPath("/app/config")
 	v.AddConfigPath("/usr/local/bin")
-	//
-	//v.SetConfigName("config")
+	v.AddConfigPath("/usr/local/bin/fitme")
+
+	v.SetConfigName("config")
 	v.SetConfigType("yaml")
 
 	if err := v.ReadInConfig(); err != nil {
