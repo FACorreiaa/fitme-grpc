@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: postgres-deployment
+  namespace: fitme-app-dev
   labels:
     app: postgres
 spec:
@@ -14,7 +15,9 @@ spec:
       labels:
         app: postgres
     spec:
+
       containers:
+
         - name: postgres
           image: postgres:alpine
           ports:
@@ -50,6 +53,7 @@ spec:
                 secretKeyRef:
                   name: postgres-secret
                   key: POSTGRES_HOST_AUTH_METHOD
+
 ---
 apiVersion: v1
 kind: Service

@@ -1,0 +1,29 @@
+ARG GO_VERSION=1.23.1
+
+FROM golang:${GO_VERSION}-alpine AS builder
+WORKDIR /app
+COPY ./go.mod ./go.sum ./
+RUN go mod download && go mod verify
+COPY . /app
+RUN echo "Contents of /app after COPY:" && ls -al /app && sleep 10
+RUN echo "Listing contents of /app after COPY:" && ls -al /app && sleep 10
+RUN echo "Contents of /app/config:" && ls -al /app/config || echo "/app/config does not exist" && sleep 10
+RUN ls -al /app/internal || echo "No /app/internal found"
+
+RUN GOOS=linux go build -o fitme -ldflags="-w -s" .
+RUN echo "Testing the binary inside the build environment:" && ./fitme --help || echo "Binary failed to execute"
+
+FROM alpine:latest AS dev
+WORKDIR /app
+RUN apk add --no-cache bash busybox
+LABEL maintainer="a11199"
+LABEL description="Fit me dev image"
+COPY --from=builder /app/fitme /usr/local/bin/fitme
+COPY --from=builder /app/config ./config
+RUN chmod +x /usr/local/bin/fitme
+ENV PATH="/usr/local/bin:${PATH}"
+#RUN echo "Contents of /app/config:" && ls -al /app/config || echo "/app/config does not exist"
+
+EXPOSE 8000
+EXPOSE 8001
+CMD ["fitme"]

@@ -24,9 +24,9 @@ type service struct {
 
 var (
 	address  = os.Getenv("DB_ADDRESS")
-	port     = os.Getenv("DB_PORT")
-	password = os.Getenv("DB_PASSWORD")
-	database = os.Getenv("DB_DATABASE")
+	port     = os.Getenv("POSTGRES_PORT")
+	password = os.Getenv("POSTGRES_PASSWORDWORD")
+	database = os.Getenv("POSTGRES_DB")
 )
 
 func New() Service {

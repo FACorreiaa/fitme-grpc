@@ -20,7 +20,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/joho/godotenv"
 	_ "github.com/joho/godotenv/autoload"
 	"github.com/redis/go-redis/v9"
 	uuid "github.com/vgarvardt/pgx-google-uuid/v5"
@@ -49,13 +48,10 @@ type DatabaseConfig struct {
 
 var (
 	// pg
-	database   = os.Getenv("DB_DATABASE")
-	password   = os.Getenv("DB_PASSWORD")
-	username   = os.Getenv("DB_USER")
-	port       = os.Getenv("DB_PORT")
-	host       = os.Getenv("DB_HOST")
-	schema     = os.Getenv("DB_SCHEMA")
-	dbInstance *pgService
+	database = os.Getenv("POSTGRES_DB")
+	password = os.Getenv("POSTGRES_PASSWORD")
+	host     = os.Getenv("POSTGRES_HOST")
+	schema   = os.Getenv("POSTGRES_SCHEMA")
 
 	// redis
 	redisPassword = os.Getenv("REDIS_PASSWORD")
@@ -85,11 +81,11 @@ func NewDatabaseConfig() (*DatabaseConfig, error) {
 		log.Error("Failed loading Postgres config", zap.Error(err))
 		log.Fatal("Error initializing config", zap.Error(err))
 	}
-	err = godotenv.Load(".env")
-	if err != nil {
-		log.Error("Error loading .env file", zap.Error(err))
-		log.Fatal("Failed to load .env file")
-	}
+	//err = godotenv.Load(".env")
+	//if err != nil {
+	//	log.Error("Error loading .env file", zap.Error(err))
+	//	log.Fatal("Failed to load .env file")
+	//}
 
 	query := url.Values{
 		"sslmode":  []string{"disable"},

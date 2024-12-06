@@ -1,0 +1,22 @@
+# syntax=docker/dockerfile:1
+ARG GO_VERSION=1.23.1
+
+FROM golang:${GO_VERSION}-alpine AS builder
+WORKDIR /app
+COPY ./go.mod ./go.sum ./
+RUN go mod download && go mod verify
+COPY . .
+RUN echo "Contents of /app after COPY:" && ls -al /app && sleep 1
+RUN echo "Listing contents of /app after COPY:" && ls -al /app && sleep 1
+RUN echo "Contents of /app/config:" && ls -al /app/config || echo "/app/config does not exist" && sleep 1
+RUN ls -al /app/internal || echo "No /app/internal found"
+
+RUN CGO_ENABLED=0 GOOS=linux go build -o fitme -ldflags="-w -s" .
+
+FROM scratch AS dev
+LABEL maintainer="a11199"
+LABEL description="FitMe server docker image"
+COPY --from=builder /app/fitme /fitme
+EXPOSE 8000
+EXPOSE 8001
+CMD ["/fitme"]

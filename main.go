@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"os/signal"
-	"runtime/pprof"
 
 	"github.com/FACorreiaa/fitme-protos/utils"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -39,7 +38,7 @@ func run() (*pgxpool.Pool, *redis.Client, error) {
 		return nil, nil, err
 	}
 	internal.WaitForDB(pool)
-	zapLogger.Info("Connected to Postgres", zap.String("host", os.Getenv("DB_HOST")), zap.String("port", os.Getenv("DB_PORT")))
+	zapLogger.Info("Connected to Postgres", zap.String("host", os.Getenv("POSTGRES_HOST")), zap.String("port", os.Getenv("POSTGRES_PORT")))
 
 	redisClient, err := internal.NewRedisConfig()
 	if err != nil {
@@ -61,25 +60,13 @@ func run() (*pgxpool.Pool, *redis.Client, error) {
 }
 
 func main() {
-
+	println("Fitme dev app starting...")
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	// Create a CPU profile file
-	f, err := os.Create("profile.prof")
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
-
-	// Start CPU profiling
-	if err := pprof.StartCPUProfile(f); err != nil {
-		panic(err)
-	}
-	defer pprof.StopCPUProfile()
-
 	// prometheus registry
 	reg := prometheus.NewRegistry()
+	println("Loaded prometheus registry")
 
 	cfg, err := config.InitConfig()
 	if err != nil {
@@ -129,6 +116,8 @@ func main() {
 		}
 	}()
 
+	zapLogger.Info("Serving grpc on port " + cfg.Server.GrpcPort)
+
 	//go func() {
 	//	defer wg.Done()
 	//	if err = internal.ServeHTTP(cfg.Server.HTTPPort); err != nil {
@@ -142,4 +131,5 @@ func main() {
 		zapLogger.Error("failed to serve http", zap.Error(err))
 		return
 	}
+	zapLogger.Info("Serving http on port " + cfg.Server.HTTPPort)
 }

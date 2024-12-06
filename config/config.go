@@ -1,11 +1,19 @@
 package config
 
 import (
+	"bytes"
+	_ "embed"
+	"fmt"
 	"time"
 
 	"github.com/FACorreiaa/fitme-protos/modules/customer"
+	_ "github.com/joho/godotenv"
 	"github.com/spf13/viper"
+	_ "go.uber.org/zap"
 )
+
+//go:embed config.yml
+var embeddedConfig []byte
 
 type Config struct {
 	Mode     string `mapstructure:"mode"`
@@ -65,13 +73,23 @@ func InitConfig() (Config, error) {
 	var config Config
 	v := viper.New()
 	v.AddConfigPath("config")
-	v.SetConfigName("config")
+	v.AddConfigPath("/app/config")
+	v.AddConfigPath("/usr/local/bin")
+	//
+	//v.SetConfigName("config")
+	v.SetConfigType("yaml")
 
 	if err := v.ReadInConfig(); err != nil {
-		return config, err
+		return Config{}, fmt.Errorf("failed to read embedded config: %s", err)
 	}
+
+	if err := v.ReadConfig(bytes.NewReader(embeddedConfig)); err != nil {
+		return Config{}, fmt.Errorf("failed to read embedded config: %s", err)
+	}
+
 	if err := v.Unmarshal(&config); err != nil {
-		return config, err
+		return Config{}, fmt.Errorf("failed to unmarshal config: %s", err)
 	}
+	println("Successfully loaded app configs..")
 	return config, nil
 }

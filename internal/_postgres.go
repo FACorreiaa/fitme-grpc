@@ -29,12 +29,12 @@ type service struct {
 }
 
 var (
-	database   = os.Getenv("DB_DATABASE")
-	password   = os.Getenv("DB_PASSWORD")
-	username   = os.Getenv("DB_USERNAME")
-	port       = os.Getenv("DB_PORT")
-	host       = os.Getenv("DB_HOST")
-	schema     = os.Getenv("DB_SCHEMA")
+	database   = os.Getenv("POSTGRES_DB")
+	password   = os.Getenv("POSTGRES_PASSWORDWORD")
+	username   = os.Getenv("POSTGRES_USERNAME")
+	port       = os.Getenv("POSTGRES_PORT")
+	host       = os.Getenv("POSTGRES_HOST")
+	schema     = os.Getenv("POSTGRES_SCHEMA")
 	dbInstance *service
 )
 

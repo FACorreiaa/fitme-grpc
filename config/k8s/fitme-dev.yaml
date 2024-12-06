@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: fitme-deployment
+  namespace: fitme-app-dev
   labels:
     app: fitme
 spec:
@@ -15,7 +16,7 @@ spec:
         app: fitme
     spec:
       nodeSelector:
-        kubernetes.io/arch: amd64
+        kubernetes.io/arch: arm64
       containers:
         - name: fitme
           image: a11199/fit-me:latest
@@ -23,6 +24,13 @@ spec:
           ports:
             - containerPort: 8000
             - containerPort: 8001
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+            requests:
+              cpu: "250m"
+              memory: "128Mi"
           env:
             - name: POSTGRES_HOST
               valueFrom:
@@ -78,9 +86,9 @@ spec:
       protocol: TCP
       port: 8000
       targetPort: 8000
-      nodePort: 30100
+      nodePort: 30102
     - name: http
       protocol: TCP
       port: 8001
       targetPort: 8001
-      nodePort: 30101
+      nodePort: 30103
