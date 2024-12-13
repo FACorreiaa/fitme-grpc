@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: fitme-deployment
-  namespace: fitme-app-dev
+  namespace: fitmeapp
   labels:
     app: fitme
 spec:
@@ -68,7 +68,7 @@ spec:
                   name: redis-secret
                   key: REDIS_PORT
             - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
-              value: tempo.fitme-app-dev.svc.cluster.local:4317
+              value: tempo.monitoring.svc.cluster.local:4317
       volumes:
         - name: fitme-volume
           hostPath:
@@ -78,8 +78,8 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: fitme-service
-  namespace: fitme-app-dev
+  name: fitme
+  namespace: fitmeapp
 spec:
   type: NodePort
   selector:

@@ -127,4 +127,4 @@ run-debug-arm:
 	docker run -it --rm --entrypoint sh a11199/fit-me:0.1.4
 
 namespace:
-	kubectl config set-context --current --namespace=fitme-app-dev
+	kubectl config set-context --current --namespace=fitmeapp

@@ -2,15 +2,36 @@
 # helm repo update
 #
 # helm install prometheus prometheus-community/prometheus \
-# --namespace fitme-app-dev \
+# --namespace fitmeapp \
 # --create-namespace --values terraform/values/prometheus.yaml
+
+#helm install prometheus prometheus-community/kube-prometheus-stack --version "66.5.0" --namespace fitmeapp
+
 resource "helm_release" "prometheus" {
   name             = "prometheus"
   repository       = "https://prometheus-community.github.io/helm-charts"
-  chart            = "prometheus"
-  namespace        = "fitme-app-dev"
-  version          = "15.11.1"
+  chart            = "kube-prometheus-stack"
+  namespace        = "fitmeapp"
+  version          = "66.5.0"
   create_namespace = true
 
-  values = [file("values/prometheus.yaml")] # Define your Prometheus configuration here
+  values = [
+    yamlencode({
+      additionalServiceMonitors = [{
+        name      = "fitme-service-monitor"
+        namespace = "fitmeapp"
+        selector  = {
+          matchLabels = {
+            app = "fitme"
+          }
+        }
+
+        endpoints = [{
+          port     = "http"
+          interval = "30s"
+          path     = "/metrics"
+        }]
+      }]
+    })
+  ]
 }

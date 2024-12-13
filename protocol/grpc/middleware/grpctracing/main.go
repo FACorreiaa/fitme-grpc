@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	sdktrace "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
@@ -43,8 +43,8 @@ import (
 //
 //	res := resource.NewWithAttributes(
 //		semconv.SchemaURL,
-//		semconv.ServiceNameKey.String("fitme-app-dev"),
-//		semconv.ServiceName("fitme-app-dev"),
+//		semconv.ServiceNameKey.String("fitmeapp"),
+//		semconv.ServiceName("fitmeapp"),
 //		semconv.ServiceVersionKey.String("0.1"),
 //	)
 //
@@ -94,14 +94,14 @@ func NewOTLPExporter(ctx context.Context) (trace.SpanExporter, error) {
 		log.Error("You MUST set OTEL_EXPORTER_OTLP_TRACES_ENDPOINT env variable!")
 	}
 
-	insecureOpt := otlptracehttp.WithInsecure()
+	insecureOpt := sdktrace.WithInsecure()
 
 	// Update default OTLP reciver endpoint
-	endpointOpt := otlptracehttp.WithEndpoint(otlpEndpoint)
+	endpointOpt := sdktrace.WithEndpoint(otlpEndpoint)
 
 	//timeout := otlptracehttp.WithTimeout(30 * time.Second)
 
-	return otlptracehttp.New(ctx, insecureOpt, endpointOpt)
+	return sdktrace.New(ctx, insecureOpt, endpointOpt)
 }
 
 func NewTraceProvider(exp trace.SpanExporter) *trace.TracerProvider {
@@ -109,7 +109,7 @@ func NewTraceProvider(exp trace.SpanExporter) *trace.TracerProvider {
 		resource.Default(),
 		resource.NewWithAttributes(
 			semconv.SchemaURL,
-			semconv.ServiceNameKey.String("fitme-app-dev")))
+			semconv.ServiceNameKey.String("fitmeapp")))
 
 	if err != nil {
 		panic(err)

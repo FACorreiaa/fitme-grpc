@@ -9,7 +9,7 @@ TODO
  - Fix Prometheus
  - Loki
  - Tempo
- - Complete Grafana
+ - Complete Grafana (In production, configure ingres and point to prometheus-grafana)
  - All above with Kubernetes
  - Finish all services
  - Message system to communicate between PT and its clients (add communications between Institution and PTs?)
