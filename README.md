@@ -28,3 +28,8 @@ TODO
 - Importers: SwiftMetricsShim
 ## Logs
 - Exporters: OpenTelemetry (OTLP) collector
+
+For dev:
+Tempo => kubectl port-forward svc/tempo 4317 -n monitoring
+Grafana => kubectl port-forward svc/grafana 3000:80 -n monitoring
+Prometheus => kubectl port-forward prometheus-prometheus-kube-prometheus-prometheus-0 9090 -n monitoring

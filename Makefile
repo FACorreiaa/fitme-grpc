@@ -1,5 +1,5 @@
 VERSION ?= latest
-PREV_VERSION ?= 0.1.4
+PREV_VERSION ?= 0.1.5
 image_name = fit-me
 
 
@@ -128,3 +128,12 @@ run-debug-arm:
 
 namespace:
 	kubectl config set-context --current --namespace=fitmeapp
+
+watch-tempo:
+	kubectl port-forward svc/tempo 4317 -n monitoring
+
+watch-grafana:
+	kubectl port-forward svc/grafana 3000:80 -n monitoring
+
+watch-prometheus:
+	kubectl port-forward prometheus-prometheus-kube-prometheus-prometheus-0 9090 -n monitoring
