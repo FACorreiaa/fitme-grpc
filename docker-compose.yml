@@ -77,7 +77,7 @@ services:
     image: *tempoImage
     command: [ "-config.file=/etc/tempo.yaml" ]
     volumes:
-      - ./config/tempo.yaml:/etc/tempo.yaml
+      - ./config/docker/tempo.yaml:/etc/tempo.yaml
       - ./tempo-data:/var/tempo
     ports:
       - "14268"  # jaeger ingest
@@ -124,7 +124,7 @@ services:
     image: otel/opentelemetry-collector:0.86.0
     command: [ "--config=/etc/otel-collector.yaml" ]
     volumes:
-      - ./config/otel-collector.yaml:/etc/otel-collector.yaml
+      - ./config/docker/otel-collector.yaml:/etc/otel-collector.yaml
     ports:
       - "1888:1888"
       - "55679:55679"
@@ -138,7 +138,7 @@ services:
       - --enable-feature=exemplar-storage
       - --enable-feature=native-histograms
     volumes:
-      - ./config/prometheus.yml:/etc/prometheus.yml
+      - ./config/docker/prometheus.yml:/etc/prometheus.yml
     ports:
       - "9090:9090"
     networks:
@@ -146,7 +146,7 @@ services:
   grafana:
     image: grafana/grafana:11.0.0
     volumes:
-      - ./config/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+      - ./config/docker/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
     environment:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
@@ -161,7 +161,7 @@ services:
     ports:
       - "3100:3100"
     volumes:
-      - ./config/loki-config.yaml:/etc/loki/local-config.yaml
+      - ./config/docker/loki-config.yaml:/etc/loki/local-config.yaml
     command: -config.file=/etc/loki/local-config.yaml
     networks:
       - fit-me
@@ -185,8 +185,8 @@ services:
 #    command: [ "-config.file=/etc/mimir.yaml" ]
 #    hostname: mimir
 #    volumes:
-#      - ./config/mimir/mimir.yaml:/etc/mimir.yaml
-#      - ./config/mimir/alertmanager-fallback-config.yaml:/etc/alertmanager-fallback-config.yaml
+#      - ./config/docker/mimir/mimir.yaml:/etc/mimir.yaml
+#      - ./config/docker/mimir/alertmanager-fallback-config.yaml:/etc/alertmanager-fallback-config.yaml
 #  jaeger:
 #    networks:
 #      fit-me:
@@ -194,8 +194,8 @@ services:
 #    container_name: jaeger
 #    image: jaegertracing/jaeger:2.0.0
 #    volumes:
-#      - ./config/jaeger/jaeger-ui.json:/etc/jaeger/jaeger-ui.json
-#      - ./config/jaeger/jaeger-config-spm.yaml:/etc/jaeger/jaeger-config-spm.yml
+#      - ./config/docker/jaeger/jaeger-ui.json:/etc/jaeger/jaeger-ui.json
+#      - ./config/docker/jaeger/jaeger-config-spm.yaml:/etc/jaeger/jaeger-config-spm.yml
 #    command: [ "--config", "/etc/jaeger/jaeger-config-spm.yml" ]
 #    ports:
 #      - "16686:16686"

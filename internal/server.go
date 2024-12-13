@@ -15,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/reflection"
 
@@ -34,13 +35,18 @@ func ServeGRPC(ctx context.Context, port string, container *ServiceContainer, re
 	log := logger.Log
 
 	// Initialize OpenTelemetry trace provider with options as needed
-	traceProvider, err := grpctracing.InitTracer()
+	exp, err := grpctracing.NewOTLPExporter(ctx)
 	if err != nil {
 		return errors.Wrap(err, "failed to configure OpenTelemetry trace provider")
 	}
+	tp := grpctracing.NewTraceProvider(exp)
+	defer func() { _ = tp.Shutdown(ctx) }()
+
+	otel.SetTracerProvider(tp)
+	//tracer = tp.Tracer("myapp")
 
 	// Bootstrap the gRPC server
-	server, listener, err := grpc.BootstrapServer(port, log, reg, traceProvider)
+	server, listener, err := grpc.BootstrapServer(port, log, reg, tp)
 	if err != nil {
 		return errors.Wrap(err, "failed to configure gRPC server")
 	}

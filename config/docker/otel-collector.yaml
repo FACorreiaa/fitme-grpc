@@ -1,0 +1,48 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+        max_recv_msg_size_mib: 64
+      http:
+        endpoint: 0.0.0.0:4318
+exporters:
+  otlphttp/logs:
+    endpoint: "http://loki:3100/otlp"
+    tls:
+      insecure: true
+  otlp:
+    # change later
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  prometheus:
+    endpoint: 0.0.0.0:9090
+    namespace: otel-collector-prometheus
+  debug: {}
+processors:
+  batch:  # Adds a batch processor to optimize the export of telemetry data
+  memory_limiter:  # Prevents high memory consumption
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+
+extensions:
+  health_check: {}
+  pprof:
+    endpoint: 0.0.0.0:1888
+  zpages:
+    endpoint: 0.0.0.0:55679
+
+service:
+  extensions: [health_check, pprof, zpages]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch, memory_limiter]
+      exporters: [otlphttp/logs, otlp, debug]
+
+    metrics:
+      receivers: [otlp]
+      processors: [batch, memory_limiter]
+      exporters: [prometheus, debug]

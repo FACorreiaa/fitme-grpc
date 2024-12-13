@@ -6,8 +6,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -49,11 +47,11 @@ func BootstrapServer(
 	}
 
 	// -- OpenTelemetry interceptor setup
-	otel.SetTracerProvider(traceProvider)
-	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
-		propagation.TraceContext{},
-		propagation.Baggage{},
-	))
+	//otel.SetTracerProvider(traceProvider)
+	//otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+	//	propagation.TraceContext{},
+	//	propagation.Baggage{},
+	//))
 
 	_, spanInterceptor := grpcspan.Interceptors()
 	_, serverInterceptor, _ := grpcprometheus.Interceptors(promCollectors)

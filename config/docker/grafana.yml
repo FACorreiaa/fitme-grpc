@@ -1,0 +1,13 @@
+exporters:
+  otlp:
+    endpoint: "127.0.0.1:12345"  # Replace with your Grafana Alloy host
+    insecure: true  # Use insecure connection
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [otlp]
+    metrics:
+      receivers: [otlp]
+      exporters: [otlp]

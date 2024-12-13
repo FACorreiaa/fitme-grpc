@@ -3,8 +3,6 @@ package grpc
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -12,12 +10,6 @@ import (
 
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpclog"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpcspan"
-)
-
-const (
-	component      = "grpc-example"
-	httpAddr       = ":8082"
-	targetGRPCAddr = "localhost:8080"
 )
 
 func BootstrapClient(
@@ -28,11 +20,11 @@ func BootstrapClient(
 	opts ...grpc.DialOption,
 ) (*grpc.ClientConn, error) {
 	// -- OpenTelemetry interceptor setup
-	otel.SetTracerProvider(traceProvider)
-	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
-		propagation.TraceContext{},
-		propagation.Baggage{},
-	))
+	//otel.SetTracerProvider(traceProvider)
+	//otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+	//	propagation.TraceContext{},
+	//	propagation.Baggage{},
+	//))
 
 	//clMetrics := grpcprom.NewClientMetrics(
 	//	grpcprom.WithClientHandlingTimeHistogram(
