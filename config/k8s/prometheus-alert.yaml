@@ -1,0 +1,19 @@
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: alert-config
+  labels:
+    resource: prometheus
+spec:
+  route:
+    groupBy: ["severity"]
+    groupWait: 30s
+    groupInterval: 5m
+    repeatInterval: 12h
+    receiver: "webhook"
+  receivers:
+    - name: "webhook"
+      webhookConfigs:
+        - url: "http://google.com"
+
+# port forward 9003

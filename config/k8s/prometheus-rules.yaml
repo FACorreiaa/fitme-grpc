@@ -1,0 +1,17 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    release: prometheus
+  name: api-rules
+spec:
+  groups:
+    - name: fitme
+      rules:
+        - alert: down
+          expr: up == 0
+          for: 0m
+          labels:
+            severity: critical
+          annotations:
+            summary: Prometheus target missing {{$labels.instance}}

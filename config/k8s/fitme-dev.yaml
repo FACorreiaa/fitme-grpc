@@ -4,6 +4,7 @@ metadata:
   name: fitme-deployment
   namespace: fitmeapp
   labels:
+    job: go-api
     app: fitme
 spec:
   replicas: 1

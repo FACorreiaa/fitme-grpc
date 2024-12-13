@@ -5,7 +5,7 @@
 # --namespace fitmeapp \
 # --create-namespace --values terraform/values/prometheus.yaml
 
-#helm install prometheus prometheus-community/kube-prometheus-stack --version "66.5.0" --namespace fitmeapp
+#helm install prometheus prometheus-community/kube-prometheus-stack --version "66.5.0" --namespace monitoring
 
 resource "helm_release" "prometheus" {
   name             = "prometheus"
@@ -14,24 +14,5 @@ resource "helm_release" "prometheus" {
   namespace        = "monitoring"
   version          = "66.5.0"
   create_namespace = true
-
-  values = [
-    yamlencode({
-      additionalServiceMonitors = [{
-        name      = "fitme-service-monitor"
-        namespace = "fitmeapp"
-        selector  = {
-          matchLabels = {
-            app = "fitme"
-          }
-        }
-
-        endpoints = [{
-          port     = "http"
-          interval = "30s"
-          path     = "/metrics"
-        }]
-      }]
-    })
-  ]
+  values = [file("values/prometheus.yaml")]
 }
