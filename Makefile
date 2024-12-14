@@ -140,3 +140,4 @@ watch-prometheus:
 
 watch-postgres-exporter:
 	kubectl port-forward service/postgres-exporter-prometheus-postgres-exporter 8080:80 -n monitoring
+

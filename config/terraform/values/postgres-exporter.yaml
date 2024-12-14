@@ -174,7 +174,7 @@ config:
     # If pgpassfile is set, it is used to initialize the PGPASSFILE environment variable.
     # See https://www.postgresql.org/docs/14/libpq-pgpass.html for more info.
     port: "5432"
-    database: ''
+    database: fit-me-dev
     sslmode: disable
     extraParams: ''
   datasourceSecret: {}
@@ -197,14 +197,14 @@ config:
 
   # postgres_exporter.yml
   postgresExporter: ""
-    # auth_modules:
-    #   first:
-    #     type: userpass
-    #     userpass:
-    #       username: first
-    #       password: firstpass
-    #     options:
-    #       sslmode: disable
+#     auth_modules:
+#       first:
+#         type: userpass
+#         userpass:
+#           username: postgres
+#           password: postgres
+#         options:
+#           sslmode: disable
 
   # define an existing secret to be mounted as the config file
   # needs to have the key 'postgres_exporter.yml'
@@ -248,6 +248,13 @@ deployment:
 
 # ExtraEnvs
 extraEnvs: []
+#extraEnvs:
+#    - name: DATA_SOURCE_NAME
+#      value: "postgresql://postgres:postgres@postgres-service.fitmeapp.svc.cluster.local:5432/fit-me-dev"
+#extraEnvs:
+#  - name: DATA_SOURCE_NAME
+#    #value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)"
+#    value: "postgresql://postgres:postgres@postgres-service.fitmeapp.svc.cluster.local:5432/fit-me-dev"
   # - name: EXTRA_ENV
   #   value: value
   # - name: POD_NAMESPACE
