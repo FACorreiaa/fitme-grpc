@@ -4,6 +4,7 @@ metadata:
   name: postgres-deployment
   namespace: fitmeapp
   labels:
+    job: postgres-db
     app: postgres
 spec:
   replicas: 1

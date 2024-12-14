@@ -4,6 +4,7 @@ metadata:
   name: redis-deployment
   namespace: fitmeapp
   labels:
+    job: redis-db
     app: redis
 spec:
   replicas: 1

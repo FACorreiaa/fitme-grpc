@@ -6,11 +6,12 @@ The use of a shared proto directory and containerized service architecture gives
 The approach to middleware management—ensuring correct ordering for context propagation, handling panics, and managing logs and metrics, wrapping OpenTelemetry's middleware for future-proofing against breaking changes.
 
 TODO
- - Fix Prometheus
- - Loki
- - Tempo
+ - Fix Prometheus [x]
+ - Loki [x]
+ - Tempo [x]
  - Complete Grafana (In production, configure ingres and point to prometheus-grafana)
- - All above with Kubernetes
+ - All above with Kubernetes [x]
+ - Finish postgres and redis exporter
  - Finish all services
  - Message system to communicate between PT and its clients (add communications between Institution and PTs?)
  - Kafka (?) message queue system and notifications between users and PTs
@@ -33,3 +34,4 @@ For dev:
 Tempo => kubectl port-forward svc/tempo 4317 -n monitoring
 Grafana => kubectl port-forward svc/grafana 3000:80 -n monitoring
 Prometheus => kubectl port-forward prometheus-prometheus-kube-prometheus-prometheus-0 9090 -n monitoring
+

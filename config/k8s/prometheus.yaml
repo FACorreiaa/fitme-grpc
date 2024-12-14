@@ -15,3 +15,40 @@ spec:
   selector:
     matchLabels:
       app: fitme
+# unsure
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: postgres-service-monitor
+  namespace: monitoring
+  labels:
+    release: prometheus
+    app: postgres
+spec:
+  jobLabel: job
+  endpoints:
+    - interval: 30s
+      port: http
+      path: /metrics
+  selector:
+    matchLabels:
+      app: postgres
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: redis-service-monitor
+  namespace: monitoring
+  labels:
+    release: prometheus
+    app: redis
+spec:
+  jobLabel: job
+  endpoints:
+    - interval: 30s
+      port: http
+      path: /metrics
+  selector:
+    matchLabels:
+      app: redis
