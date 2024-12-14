@@ -34,3 +34,12 @@ datasources:
         url: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
         basicAuth: false
         isDefault: false
+      - name: Mimir
+        type: prometheus
+        uid: mimir
+        access: proxy
+        orgId: 1
+        url: http://mimir-nginx.monitoring.svc/prometheus
+        basicAuth: false
+        isDefault: false
+
