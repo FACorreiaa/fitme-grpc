@@ -137,3 +137,6 @@ watch-grafana:
 
 watch-prometheus:
 	kubectl port-forward prometheus-prometheus-kube-prometheus-prometheus-0 9090 -n monitoring
+
+watch-postgres-exporter:
+	kubectl port-forward service/postgres-exporter-prometheus-postgres-exporter 8080:80 -n monitoring
