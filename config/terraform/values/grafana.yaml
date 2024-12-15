@@ -31,7 +31,7 @@ datasources:
         uid: prometheus
         access: proxy
         orgId: 1
-        url: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
+        url: http://otel-collector.monitoring.svc.cluster.local:8888
         basicAuth: false
         isDefault: false
       - name: Mimir

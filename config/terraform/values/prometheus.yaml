@@ -1184,11 +1184,12 @@ grafana:
     ipFamilies: []
     ipFamilyPolicy: ""
 
+  # TODO
   serviceMonitor:
     # If true, a ServiceMonitor CRD is created for a prometheus operator
     # https://github.com/coreos/prometheus-operator
     #
-    enabled: true
+    enabled: false
 
     # Path to use for scraping metrics. Might be different if server.root_url is set
     # in grafana.ini
@@ -3989,7 +3990,13 @@ prometheus:
     ## The scrape configuration example below will find master nodes, provided they have the name .*mst.*, relabel the
     ## port to 2379 and allow etcd scraping provided it is running on all Kubernetes master nodes
     ##
-    additionalScrapeConfigs: []
+    additionalScrapeConfigs:
+      - job_name: "otel-collector-service"
+        static_configs:
+          - targets: ["otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:8088"]
+      - job_name: "otel-collector"
+        static_configs:
+          - targets: [ "otel-collector:8888" ]
     # - job_name: kube-etcd
     #   kubernetes_sd_configs:
     #     - role: node

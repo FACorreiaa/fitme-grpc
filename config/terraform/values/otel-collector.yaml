@@ -1,0 +1,128 @@
+# OpenTelemetry Collector configuration YAML for Kubernetes
+
+# Helm chart specific configuration for OpenTelemetry Collector deployment
+mode: daemonset  # Can be 'daemonset', 'deployment', or 'statefulset'
+
+namespaceOverride: monitoring  # Specify the Kubernetes namespace
+
+# Preset configuration for collectors
+presets:
+  logsCollection:
+    enabled: true  # Enable logs collection from the containers
+  hostMetrics:
+    enabled: true  # Enable host metrics collection
+
+# ConfigMap creation and configuration
+configMap:
+  create: true
+  existingName: ""
+  existingPath: ""
+
+# OpenTelemetry Collector Configuration
+config:
+  receivers:
+    prometheus:
+      config:
+        scrape_configs:
+          - job_name: 'otel-collector'
+            scrape_interval: 10s
+            static_configs:
+              - targets:
+                  - "otel-collector:8888"  # Scraping from OpenTelemetry Collector metrics
+
+    otlp:
+      protocols:
+        grpc:
+          endpoint: "${env:MY_POD_IP}:4317"  # OTLP gRPC receiver
+        http:
+          endpoint: "${env:MY_POD_IP}:4318"  # OTLP HTTP receiver
+
+    jaeger:
+      protocols:
+        grpc:
+          endpoint: "${env:MY_POD_IP}:14250"  # Jaeger gRPC receiver
+        thrift_http:
+          endpoint: "${env:MY_POD_IP}:14268"  # Jaeger HTTP receiver
+
+  processors:
+    batch: {}  # Enables batch processing for traces and logs
+    memory_limiter:
+      check_interval: 5s
+      limit_percentage: 80  # Limit memory usage to 80% of the defined limits
+      spike_limit_percentage: 25  # Set spike limit to 25%
+
+  exporters:
+    prometheus:
+      endpoint: "0.0.0.0:8888"  # Metrics exporter to Prometheus
+    loki:
+      endpoint: "http://loki.monitoring:3100/loki/api/v1/push"  # Export logs to Loki
+    otlp/tempo:
+      endpoint: "tempo.monitoring:4317"  # Export traces to Tempo
+
+  extensions:
+    health_check:
+      endpoint: ${env:MY_POD_IP}:13133  # Health check endpoint for the collector
+    zpages:
+      endpoint: ${env:MY_POD_IP}:55679  # ZPages endpoint for debugging and tracing
+
+  service:
+    extensions: [health_check, zpages]  # Attach extensions to the service
+    pipelines:
+      logs:
+        exporters: [loki]  # Export logs to Loki
+        receivers: [otlp]
+        processors: [batch, memory_limiter]
+      metrics:
+        exporters: [prometheus]  # Export metrics to Prometheus
+        receivers: [otlp, prometheus]
+        processors: [batch, memory_limiter]
+      traces:
+        exporters: [otlp/tempo]  # Export traces to Tempo
+        receivers: [otlp, jaeger]
+        processors: [batch, memory_limiter]
+
+# Additional settings for ports and services
+ports:
+  otlp:
+    enabled: true
+    containerPort: 4317
+    servicePort: 4317
+    protocol: TCP
+  otlp-http:
+    enabled: true
+    containerPort: 4318
+    servicePort: 4318
+    protocol: TCP
+  jaeger-grpc:
+    enabled: true
+    containerPort: 14250
+    servicePort: 14250
+    protocol: TCP
+  metrics:
+    enabled: true
+    containerPort: 8888
+    servicePort: 8888
+    protocol: TCP
+
+# Resource limits and requests for the OpenTelemetry Collector pods
+resources:
+  limits:
+    cpu: 1
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+# Enable health checks and readiness probes
+livenessProbe:
+  httpGet:
+    port: 13133
+    path: /  # Health check endpoint
+
+readinessProbe:
+  httpGet:
+    port: 13133
+    path: /  # Readiness check endpoint
+
+# Deployment mode configuration
+replicaCount: 1  # Number of replicas for the deployment
