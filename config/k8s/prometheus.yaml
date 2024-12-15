@@ -1,7 +1,7 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: grpc-api-service-monitor
+  name: fitme-deployment-monitor
   namespace: monitoring
   labels:
     release: prometheus
@@ -12,43 +12,9 @@ spec:
     - interval: 30s
       port: http
       path: /metrics
+  namespaceSelector:
+    matchNames:
+      - fitmeapp
   selector:
     matchLabels:
       app: fitme
-# unsure
----
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: postgres-service-monitor
-  namespace: monitoring
-  labels:
-    release: prometheus
-    app: postgres
-spec:
-  jobLabel: job
-  endpoints:
-    - interval: 30s
-      port: http
-      path: /metrics
-  selector:
-    matchLabels:
-      app: postgres
----
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: redis-service-monitor
-  namespace: monitoring
-  labels:
-    release: prometheus
-    app: redis
-spec:
-  jobLabel: job
-  endpoints:
-    - interval: 30s
-      port: http
-      path: /metrics
-  selector:
-    matchLabels:
-      app: redis

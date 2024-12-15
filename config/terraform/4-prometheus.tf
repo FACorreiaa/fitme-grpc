@@ -14,5 +14,5 @@ resource "helm_release" "prometheus" {
   namespace        = "monitoring"
   version          = "66.5.0"
   create_namespace = true
-  values = [file("values/prometheus.yaml")]
+  #values = [file("values/prometheus.yaml")]
 }

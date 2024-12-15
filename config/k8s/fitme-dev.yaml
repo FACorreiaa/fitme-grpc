@@ -4,7 +4,7 @@ metadata:
   name: fitme-deployment
   namespace: fitmeapp
   labels:
-    job: go-api
+    job: fitme
     app: fitme
 spec:
   replicas: 1
@@ -81,6 +81,9 @@ kind: Service
 metadata:
   name: fitme
   namespace: fitmeapp
+  labels:
+    job: grpc-api
+    app: fitme
 spec:
   type: NodePort
   selector:
@@ -96,3 +99,24 @@ spec:
       port: 8001
       targetPort: 8001
       nodePort: 30103
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: fitme-deployment-monitor
+  namespace: monitoring
+  labels:
+    release: prometheus
+    app: prometheus
+spec:
+  jobLabel: job
+  endpoints:
+    - interval: 30s
+      port: http
+      path: /metrics
+  namespaceSelector:
+    matchNames:
+      - fitmeapp
+  selector:
+    matchLabels:
+      app: fitme
