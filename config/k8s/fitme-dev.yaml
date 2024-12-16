@@ -69,7 +69,8 @@ spec:
                   name: redis-secret
                   key: REDIS_PORT
             - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
-              value: tempo.monitoring.svc.cluster.local:4317
+              value: simplest-collector.monitoring.svc.cluster.local:4317
+              #value: tempo.monitoring.svc.cluster.local:4317
       volumes:
         - name: fitme-volume
           hostPath:
