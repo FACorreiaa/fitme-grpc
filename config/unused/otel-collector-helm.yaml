@@ -1,0 +1,57 @@
+mode: deployment  # Gateway mode (use daemonset for agent mode)
+
+config:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+        http:
+    prometheus:
+      config:
+        scrape_configs:
+          - job_name: 'k8s-metrics'
+            kubernetes_sd_configs:
+              - role: pod
+            relabel_configs:
+              - source_labels: [__meta_kubernetes_pod_label_app]
+                action: keep
+                regex: fitme  # Scrape pods with the label 'app: fitme'
+    filelog:  # Collect logs from containers
+      include:
+        - /var/log/containers/*.log
+      operators:
+        - type: json_parser
+          id: json-logs
+          output: parsed
+          timestamp:
+            parse_from: attributes.time
+          severity:
+            parse_from: attributes.level
+
+  processors:
+    batch:  # Group telemetry data into batches
+    k8sattributes:  # Add Kubernetes metadata to logs, metrics, and traces
+      auth_type: serviceAccount
+
+  exporters:
+    prometheus:
+      endpoint: "0.0.0.0:9464"  # Expose metrics for Prometheus scraping
+    loki:
+      endpoint: http://loki.monitoring:3100/loki/api/v1/push
+    otlp:
+      endpoint: tempo.monitoring.svc.cluster.local:4317
+
+  service:
+    pipelines:
+      metrics:
+        receivers: [prometheus, otlp]
+        processors: [batch, k8sattributes]
+        exporters: [prometheus]
+      logs:
+        receivers: [filelog, otlp]
+        processors: [batch, k8sattributes]
+        exporters: [loki]
+      traces:
+        receivers: [otlp]
+        processors: [batch, k8sattributes]
+        exporters: [otlp]

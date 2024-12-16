@@ -153,8 +153,8 @@ services:
       - "4317:4317"
       - "4318:4318"
     volumes:
-      - ./config/otel-collector.yaml:/etc/otel-collector.yaml
-    command: [ "--config", "/etc/otel-collector.yaml" ]
+      - ./config/otel-collector-helm.yaml:/etc/otel-collector-helm.yaml
+    command: [ "--config", "/etc/otel-collector-helm.yaml" ]
     networks:
       - fit-me
   minio:
