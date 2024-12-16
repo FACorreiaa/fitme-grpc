@@ -1,48 +1,49 @@
-receivers:
-  otlp:
-    protocols:
-      grpc:
-        endpoint: 0.0.0.0:4317
-        max_recv_msg_size_mib: 64
-      http:
-        endpoint: 0.0.0.0:4318
-exporters:
-  otlphttp/logs:
-    endpoint: "http://loki:3100/otlp"
-    tls:
-      insecure: true
-  otlp:
-    # change later
-    endpoint: tempo:4317
-    tls:
-      insecure: true
-  prometheus:
-    endpoint: 0.0.0.0:9090
-    namespace: otel-collector-prometheus
-  debug: {}
-processors:
-  batch:  # Adds a batch processor to optimize the export of telemetry data
-  memory_limiter:  # Prevents high memory consumption
-    check_interval: 1s
-    limit_mib: 512
-    spike_limit_mib: 128
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: otel-collector
+  namespace: monitoring
+spec:
+  mode: deployment
+  config:
+    receivers:
+      otlp:
+        protocols:
+          grpc: {}
+          http: {}
+      prometheus:
+        config:
+          scrape_configs:
+            - job_name: 'k8s-metrics'
+              kubernetes_sd_configs:
+                - role: pod
+              relabel_configs:
+                - source_labels: [__meta_kubernetes_pod_label_app]
+                  action: keep
+                  regex: fitme
 
-extensions:
-  health_check: {}
-  pprof:
-    endpoint: 0.0.0.0:1888
-  zpages:
-    endpoint: 0.0.0.0:55679
+    processors:
+      batch: {}  # Group telemetry data into batches
 
-service:
-  extensions: [health_check, pprof, zpages]
-  pipelines:
-    traces:
-      receivers: [otlp]
-      processors: [batch, memory_limiter]
-      exporters: [otlphttp/logs, otlp, debug]
+    exporters:
+      prometheus:
+        endpoint: "0.0.0.0:9464"  # Expose metrics for Prometheus scraping
+      otlphttp/loki:
+        endpoint: http://loki.monitoring:3100/loki/api/v1/push
+      otlp:
+        endpoint: tempo.monitoring.svc.cluster.local:4317  # Send traces to Tempo
 
-    metrics:
-      receivers: [otlp]
-      processors: [batch, memory_limiter]
-      exporters: [prometheus, debug]
+    service:
+      pipelines:
+        metrics:
+          receivers: [prometheus, otlp]
+          processors: [batch, k8sattributes]
+          exporters: [prometheus]
+        logs:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [otlphttp/loki]
+        traces:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [otlp]

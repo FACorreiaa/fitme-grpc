@@ -122,9 +122,9 @@ services:
   # And put them in an OTEL collector pipeline...
   otel-collector:
     image: otel/opentelemetry-collector:0.86.0
-    command: [ "--config=/etc/otel-collector.yaml" ]
+    command: [ "--config=/etc/otel-collector-helm.yaml" ]
     volumes:
-      - ./config/docker/otel-collector.yaml:/etc/otel-collector.yaml
+      - ./config/docker/otel-collector-helm.yaml:/etc/otel-collector-helm.yaml
     ports:
       - "1888:1888"
       - "55679:55679"

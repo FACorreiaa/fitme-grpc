@@ -2,6 +2,7 @@ apiVersion: monitoring.coreos.com/v1alpha1
 kind: AlertmanagerConfig
 metadata:
   name: alert-config
+  namespace: monitoring
   labels:
     resource: prometheus
 spec:
