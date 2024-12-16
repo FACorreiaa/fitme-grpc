@@ -15,6 +15,8 @@ spec:
     metadata:
       labels:
         app: fitme
+      annotations:
+        sidecar.opentelemetry.io/inject: "true"
     spec:
       nodeSelector:
         kubernetes.io/arch: arm64
