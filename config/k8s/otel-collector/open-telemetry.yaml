@@ -82,7 +82,8 @@ spec:
             - k8s.node.name
     exporters:
       prometheus:
-        endpoint: "prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
+        #endpoint: "localhost:9090"
+        endpoint: "http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090/metrics"
       loki:
         endpoint: http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push
         labels:
