@@ -22,15 +22,13 @@ services:
       - "8000:8000"
       - "8001:8001"
     environment:
+      #- OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=otel-collector:4317
       - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=tempo:4317
-      #- OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=tempo:4317
 
     depends_on:
       - postgres
       - redis
       - otel-collector
-      - prometheus
-      - grafana
     logging:
       driver: loki
       options:
@@ -80,33 +78,32 @@ services:
       - ./config/docker/tempo.yaml:/etc/tempo.yaml
       - ./tempo-data:/var/tempo
     ports:
-      - "14268"  # jaeger ingest
-      - "3200"   # tempo
-      - "4317"  # otlp grpc
-      - "4318"  # otlp http
-      - "9411"   # zipkin
+      - "3200:3200"  # Tempo API
+      #- "9411:9411"  # Zipkin
+      # - "4317:4317"  # OTLP
     restart: unless-stopped
     depends_on:
       - init
     networks:
       fit-me:
-  tempo-query:
-    container_name: tempo-query
-    image: grafana/tempo-query:0.7.0
-    environment:
-      - BACKEND=tempo:3200
-    volumes:
-      - ./etc/tempo-query.yaml:/etc/tempo-query.yaml
-    ports:
-      - "16686:16686"  # jaeger-ui
-    depends_on:
-      - tempo
-    logging:
-      driver: loki
-      options:
-        loki-url: 'http://localhost:3100/api/prom/push'
-    networks:
-      fit-me:
+
+#  tempo-query:
+#    container_name: tempo-query
+#    image: grafana/tempo-query:0.7.0
+#    environment:
+#      - BACKEND=tempo:3200
+#    volumes:
+#      - ./etc/tempo-query.yaml:/etc/tempo-query.yaml
+#    ports:
+#      - "16686:16686"  # jaeger-ui
+#    depends_on:
+#      - tempo
+#    logging:
+#      driver: loki
+#      options:
+#        loki-url: 'http://localhost:3100/api/prom/push'
+#    networks:
+#      fit-me:
 
   # Generate fake traces...
 #  k6-tracing:
@@ -119,18 +116,34 @@ services:
 #    networks:
 #      fit-me:
 
+  jaeger:
+    image: jaegertracing/all-in-one:1.46
+    container_name: jaeger
+    environment:
+      COLLECTOR_ZIPKIN_HTTP_PORT: 9411  # Enable Zipkin endpoint
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "14268:14268"  # Jaeger HTTP ingestion
+      - "14250:14250"  # OTLP gRPC ingestion
+      # - "9411:9411"    # Zipkin HTTP ingestion
+    networks:
+      - fit-me
+
   # And put them in an OTEL collector pipeline...
   otel-collector:
     image: otel/opentelemetry-collector:0.86.0
-    command: [ "--config=/etc/otel-collector-helm.yaml" ]
+    container_name: otel-collector
+    command: [ "--config=/etc/otel-collector.yaml" ]
     volumes:
-      - ./config/docker/otel-collector-helm.yaml:/etc/otel-collector-helm.yaml
+      - ./config/docker/otel-collector.yaml:/etc/otel-collector.yaml
     ports:
-      - "1888:1888"
-      - "55679:55679"
+      - "4317:4317"  # OTLP gRPC
+      - "4318:4318"  # OTLP HTTP
+      - "9464:9464"  # Prometheus metrics
     networks:
       fit-me:
   prometheus:
+    container_name: prometheus
     image: prom/prometheus:latest
     command:
       - --config.file=/etc/prometheus.yml
@@ -144,6 +157,7 @@ services:
     networks:
       fit-me:
   grafana:
+    container_name: grafana
     image: grafana/grafana:11.0.0
     volumes:
       - ./config/docker/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
@@ -152,11 +166,16 @@ services:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
       - GF_AUTH_DISABLE_LOGIN_FORM=true
       - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
     ports:
       - "3000:3000"
     networks:
       fit-me:
   loki:
+    container_name: loki
     image: grafana/loki:main
     ports:
       - "3100:3100"

@@ -1,48 +1,31 @@
 receivers:
   otlp:
     protocols:
-      grpc:
-        endpoint: 0.0.0.0:4317
-        max_recv_msg_size_mib: 64
-      http:
-        endpoint: 0.0.0.0:4318
-exporters:
-  otlphttp/logs:
-    endpoint: "http://loki:3100/otlp"
-    tls:
-      insecure: true
-  otlp:
-    # change later
-    endpoint: tempo:4317
-    tls:
-      insecure: true
+      grpc: {}
+      http: {}
   prometheus:
-    endpoint: 0.0.0.0:9090
-    namespace: otel-collector-prometheus
-  debug: {}
-processors:
-  batch:  # Adds a batch processor to optimize the export of telemetry data
-  memory_limiter:  # Prevents high memory consumption
-    check_interval: 1s
-    limit_mib: 512
-    spike_limit_mib: 128
+    config:
+      scrape_configs:
+        - job_name: 'fitme'
+          static_configs:
+            - targets: ['fitme-dev:8001']  # Replace with the actual service name and port
 
-extensions:
-  health_check: {}
-  pprof:
-    endpoint: 0.0.0.0:1888
-  zpages:
-    endpoint: 0.0.0.0:55679
+processors:
+  batch: {}  # Simplified to only use the batch processor
+
+exporters:
+  otlp:
+    endpoint: tempo:4317  # Replace 'tempo' with the actual service name if using Jaeger
+  prometheus:
+    endpoint: "0.0.0.0:9464"  # Expose metrics for Prometheus
 
 service:
-  extensions: [health_check, pprof, zpages]
   pipelines:
+    metrics:
+      receivers: [prometheus, otlp]
+      processors: [batch]
+      exporters: [prometheus]
     traces:
       receivers: [otlp]
-      processors: [batch, memory_limiter]
-      exporters: [otlphttp/logs, otlp, debug]
-
-    metrics:
-      receivers: [otlp]
-      processors: [batch, memory_limiter]
-      exporters: [prometheus, debug]
+      processors: [batch]
+      exporters: [otlp]

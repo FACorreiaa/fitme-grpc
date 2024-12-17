@@ -11,7 +11,7 @@ TODO
  - Tempo [x]
  - Complete Grafana (In production, configure ingres and point to prometheus-grafana)
  - All above with Kubernetes [x]
- - Finish postgres and redis exporter
+ - Finish postgres and redis exporter [x]
  - Finish all services
  - Message system to communicate between PT and its clients (add communications between Institution and PTs?)
  - Kafka (?) message queue system and notifications between users and PTs
@@ -30,6 +30,7 @@ TODO
 ## Logs
 - Exporters: OpenTelemetry (OTLP) collector
 
+Docker compose just for local testing, telemetry services not relevant in there but all working within Kubernetes.
 For dev:
 Tempo => kubectl port-forward svc/tempo 4317 -n monitoring
 Grafana => kubectl port-forward svc/grafana 3000:80 -n monitoring

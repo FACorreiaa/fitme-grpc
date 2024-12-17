@@ -26,7 +26,14 @@ scrape_configs:
     scrape_interval: 10s
     static_configs:
       - targets: [ 'tempo:3200' ]
+  - job_name: 'otel-collector-v2'
+    static_configs:
+      - targets: [ 'otel-collector:9464' ]
 #  - job_name: "prometheus"
 #    honor_labels: true
 #    static_configs:
 #      - targets: ["localhost:9090"]
+
+
+
+
