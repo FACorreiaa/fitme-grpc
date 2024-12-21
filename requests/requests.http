@@ -1,9 +1,0 @@
-GRPC 198.19.249.2:30102 Auth/Login
-Content-Type: application/grpc
-timeout: 10s
-
-{
-    "username":"admin",
-	"email": "admin@email.com",
-	"password": "elitahadmin!2024"
-}
