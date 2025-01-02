@@ -41,6 +41,7 @@ repositories:
     host: "redis"
     port: "6388"
     db: 0
+    ttl: 120s
 
 
 #change later

@@ -13,6 +13,7 @@ import (
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpclog"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpcprometheus"
+	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpcratelimit"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpcrecovery"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpcrequest"
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/grpcspan"
@@ -36,6 +37,9 @@ func BootstrapServer(
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to create listener")
 	}
+
+	// set redis cache
+	//newCache, _ := grpccacherequests.NewCache()
 
 	// -- Prometheus interceptor Setup
 	promCollectors := grpcprometheus.NewPrometheusMetricsCollectors()
@@ -64,6 +68,8 @@ func BootstrapServer(
 	requestGeneratorSession := grpcrequest.RequestIDMiddleware()
 	//globalRateLimiter := grpcratelimit.Interceptors()
 
+	rateLimiter := grpcratelimit.NewRateLimiter(10, 20)
+	//cache := grpccacherequests.UnaryCachingInterceptor(newCache)
 	// Configure server options from our base configuration
 	serverOptions := []grpc.ServerOption{
 		grpc.KeepaliveEnforcementPolicy(middleware.KeepaliveEnforcementPolicy()),
@@ -82,6 +88,7 @@ func BootstrapServer(
 			sessionInterceptor,
 			requestGeneratorSession,
 			recoveryInterceptor.Unary,
+			rateLimiter.UnaryServerInterceptor(),
 		),
 
 		//grpc.StatsHandler(otelgrpc.NewServerHandler()),
@@ -94,6 +101,7 @@ func BootstrapServer(
 			logInterceptor.Stream,
 			recoveryInterceptor.Stream,
 			recoveryInterceptor.Stream,
+			//rateLimiter.UnaryServerInterceptor(),
 		),
 	}
 

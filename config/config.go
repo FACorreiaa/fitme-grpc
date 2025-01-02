@@ -47,10 +47,11 @@ type Config struct {
 			MAXCONWAITINGTIME int    `mapstructure:"MAXCONWAITINGTIME"`
 		}
 		Redis struct {
-			Host string `mapstructure:"host"`
-			Port string `mapstructure:"port"`
-			Pass string `mapstructure:"pass"`
-			DB   int    `mapstructure:"db"`
+			Host string        `mapstructure:"host"`
+			Port string        `mapstructure:"port"`
+			Pass string        `mapstructure:"pass"`
+			DB   int           `mapstructure:"db"`
+			TTL  time.Duration `mapstructure:"ttl"`
 		}
 	}
 	Server struct {
