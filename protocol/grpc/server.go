@@ -62,6 +62,7 @@ func BootstrapServer(
 	// session
 	sessionInterceptor := session.InterceptorSession()
 	requestGeneratorSession := grpcrequest.RequestIDMiddleware()
+	//globalRateLimiter := grpcratelimit.Interceptors()
 
 	// Configure server options from our base configuration
 	serverOptions := []grpc.ServerOption{

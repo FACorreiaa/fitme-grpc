@@ -1,4 +1,4 @@
-INSERT INTO food(
+INSERT INTO ingredients(
     id,
     name,
     calories,

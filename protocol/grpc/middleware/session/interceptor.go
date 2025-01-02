@@ -24,9 +24,9 @@ func InterceptorSession() grpc.UnaryServerInterceptor {
 		handler grpc.UnaryHandler,
 	) (interface{}, error) {
 		unauthenticatedMethods := map[string]bool{
-			"/auth.Auth/Register":                  true,
-			"/auth.Auth/Login":                     true,
-			"/auth.Auth/GetAllUsers":               true,
+			"/fitSphere.auth.Auth/Register":        true,
+			"/fitSphere.auth.Auth/Login":           true,
+			"/fitSphere.auth.Auth/GetAllUsers":     true,
 			"calculator.Calculator/GetUsersMacros": true,
 			"CalculatorService/GetUserMacros":      true,
 			"CalculatorService/GetUserMacrosAll":   true,
@@ -46,6 +46,7 @@ func InterceptorSession() grpc.UnaryServerInterceptor {
 		//}
 		//
 		//tokenString := authHeader[0][7:]
+		println(authHeader)
 		if len(authHeader) == 0 {
 			return nil, status.Error(codes.Unauthenticated, "missing or invalid auth token")
 		}

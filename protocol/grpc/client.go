@@ -45,6 +45,8 @@ func BootstrapClient(
 	// -- Zap logging interceptor setup
 	logInterceptor, _ := grpclog.Interceptors(log)
 
+	//cacheInterceptor, _ := grpccache.Interceptors(log)
+
 	// EXPERIMENTAL
 	//promCollectors := grpcprometheus.NewPrometheusMetricsCollectors()
 	//_ = grpcprometheus.RegisterMetrics(promRegistry, promCollectors)
@@ -85,9 +87,6 @@ func BootstrapClient(
 		grpc.WithChainUnaryInterceptor(
 			spanInterceptor.Unary,
 			logInterceptor.Unary,
-			//clMetrics.UnaryClientInterceptor(grpcprom.WithExemplarFromContext(exemplarFromContext)),
-			//promCollectors.Client.UnaryClientInterceptor(),
-			//clientInterceptor.Unary,
 		),
 
 		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
