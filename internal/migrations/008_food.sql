@@ -15,7 +15,7 @@ CREATE TABLE "ingredients" (
                         "created_at" timestamp DEFAULT (now()),
                         "updated_at" timestamp DEFAULT null
 );
-
+--
 CREATE TABLE "meals" (
                        "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
                        "user_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
@@ -138,6 +138,42 @@ CREATE TABLE IF NOT EXISTS "user_macro_distribution" (
                                                        "tdee" INTEGER NOT NULL,
                                                        "goal" INTEGER NOT NULL,
                                                        "created_at" TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE "food_logs" (
+                           "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                           "user_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
+                           "meal_id" UUID REFERENCES "meals" ("id") ON DELETE CASCADE,
+                           "quantity" FLOAT(8) NOT NULL, -- Quantity of food logged
+                           "log_date" TIMESTAMP NOT NULL, -- When the food was logged
+                           "created_at" TIMESTAMP DEFAULT NOW(),
+                           "updated_at" TIMESTAMP DEFAULT NULL
+);
+
+CREATE TABLE "food_logs" (
+                           "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                           "user_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
+                           "meal_id" UUID REFERENCES "meals" ("id") ON DELETE CASCADE,
+                           "quantity" FLOAT(8) NOT NULL, -- Quantity of food logged
+                           "log_date" TIMESTAMP NOT NULL, -- When the food was logged
+                           "created_at" TIMESTAMP DEFAULT NOW(),
+                           "updated_at" TIMESTAMP DEFAULT NULL
+);
+
+CREATE TABLE "diet_preferences" (
+                                  "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                                  "user_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
+                                  "diet_type" VARCHAR(50) NOT NULL, -- E.g., vegan, keto
+                                  "diet_description" VARCHAR(255),
+                                  "created_at" TIMESTAMP DEFAULT NOW(),
+                                  "updated_at" TIMESTAMP DEFAULT NULL
+);
+
+CREATE TABLE "user_diet_preferences" (
+                                       "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                                       "user_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
+                                       "diet_preference_id" UUID NOT NULL REFERENCES "diet_preferences" ("id") ON DELETE CASCADE,
+                                       "created_at" TIMESTAMP DEFAULT NOW()
 );
 
 

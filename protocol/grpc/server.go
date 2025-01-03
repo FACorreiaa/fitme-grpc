@@ -101,7 +101,6 @@ func BootstrapServer(
 			logInterceptor.Stream,
 			recoveryInterceptor.Stream,
 			recoveryInterceptor.Stream,
-			//rateLimiter.UnaryServerInterceptor(),
 		),
 	}
 
