@@ -194,7 +194,7 @@ func (r *RepositoryWorkout) CreateExercise(ctx context.Context, req *pbw.CreateE
 		}
 	}()
 
-	createdExerciseListQuery := `
+	query := `
 				INSERT INTO exercise_list (name, type, muscle, equipment, difficulty,
                                    instructions, video,
                                    created_at, updated_at)
@@ -204,7 +204,7 @@ func (r *RepositoryWorkout) CreateExercise(ctx context.Context, req *pbw.CreateE
 	currentTime := time.Now()
 
 	var exerciseID string
-	err = tx.QueryRow(ctx, createdExerciseListQuery,
+	err = tx.QueryRow(ctx, query,
 		req.Exercise.Name,
 		req.Exercise.ExerciseType,
 		req.Exercise.MuscleGroup,

@@ -5,15 +5,20 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
+	"time"
 
-	"github.com/FACorreiaa/fitme-grpc/internal/domain/auth"
 	pbml "github.com/FACorreiaa/fitme-protos/modules/meal/generated"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/FACorreiaa/fitme-grpc/internal/domain/auth"
 )
 
 type MealPlanRepository struct {
@@ -161,18 +166,13 @@ func (i *IngredientRepository) GetIngredient(ctx context.Context, req *pbml.GetI
 	}
 
 	return &pbml.GetIngredientRes{
-		//Success:  true,
-		// Message:  "Ingredients retrieved successfully",
+		Success:    true,
+		Message:    "Ingredients retrieved successfully",
 		Ingredient: ingredientProto,
 		Response: &pbml.BaseResponse{
 			Upstream: "workout-service",
 		},
 	}, nil
-
-	//return &pbml.GetIngredientsRes{
-	//	Ingredients: []*pbml.XIngredient{ingredient},
-	//	Response:    {},
-	//}, nil
 }
 
 func (i *IngredientRepository) GetIngredients(ctx context.Context, req *pbml.GetIngredientsReq) (*pbml.GetIngredientsRes, error) {
@@ -226,22 +226,226 @@ func (i *IngredientRepository) GetIngredients(ctx context.Context, req *pbml.Get
 	}
 
 	return &pbml.GetIngredientsRes{
+		Success:     true,
+		Message:     "Ingredients retrieved successfully",
 		Ingredients: ingredients,
 		Response:    &pbml.BaseResponse{Upstream: "workout-service"},
 	}, nil
 
 }
 
-func (i *IngredientRepository) CreateIngredient(ctx context.Context, req *pbml.CreateIngredientReq) (*pbml.CreateIngredientRes, error) {
-	return nil, nil
+func (i *IngredientRepository) CreateIngredient(ctx context.Context, req *pbml.CreateIngredientReq) (*pbml.XIngredient, error) {
+	ingredientProto := &pbml.XIngredient{}
+	ingredient := &Ingredient{}
+
+	tx, err := i.pgpool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to start transaction")
+	}
+	defer tx.Rollback(ctx)
+
+	query := `
+		INSERT INTO ingredients (name, calories, serving_size,
+			protein, fat_total, fat_saturated, carbohydrates_total, fiber, sugar, sodium, potassium, cholesterol,
+			created_at, user_id
+		)
+		Values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		RETURNING id
+	`
+
+	currentTime := time.Now()
+	var ingredientID uuid.UUID
+
+	err = tx.QueryRow(ctx, query,
+		req.Name,
+		req.Calories,
+		req.ServingSize,
+		req.Protein,
+		req.FatTotal,
+		req.FatSaturated,
+		req.CarbohydratesTotal,
+		req.Fiber,
+		req.Sugar,
+		req.Sodium,
+		req.Potassium,
+		req.Cholesterol,
+		currentTime,
+		req.UserId).Scan(&ingredientID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to create ingredient: %v", err)
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to commit transaction: %v", err)
+	}
+
+	createdAt := timestamppb.New(ingredient.CreatedAt)
+	var updatedAt sql.NullTime
+
+	if ingredient.UpdatedAt.Valid {
+		updatedAt = ingredient.UpdatedAt
+	} else {
+		updatedAt = sql.NullTime{Valid: false}
+	}
+
+	ingredientProto.IngredientId = ingredientID.String()
+	ingredientProto.Name = ingredient.Name
+	ingredientProto.Calories = ingredient.Calories
+	ingredientProto.Protein = ingredient.Protein
+	ingredientProto.CarbohydratesTotal = ingredient.CarbohydratesTotal
+	ingredientProto.FatTotal = ingredient.FatTotal
+	ingredientProto.CreatedAt = createdAt
+	ingredientProto.UpdatedAt = nullTimeToTimestamppb(updatedAt)
+	ingredientProto.UserId = req.UserId
+	return ingredientProto, nil
 }
 
-func (i *IngredientRepository) UpdateIngredient(ctx context.Context, req *pbml.UpdateIngredientReq) (*pbml.UpdateIngredientRes, error) {
-	return nil, nil
+func (i *IngredientRepository) UpdateIngredient(ctx context.Context, req *pbml.UpdateIngredientReq) (*pbml.XIngredient, error) {
+	query := `UPDATE ingredients SET `
+	var setClauses []string
+	var args []interface{}
+	argIndex := 1
+	updatedIngredient := &pbml.XIngredient{}
+
+	for _, update := range req.Updates {
+		switch update.Field {
+		case "name":
+			setClauses = append(setClauses, fmt.Sprintf("name = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedIngredient.Name = update.NewValue
+		case "calories":
+			calories, err := strconv.ParseFloat(update.NewValue, 64)
+			if err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "invalid calories value: %v", err)
+			}
+			setClauses = append(setClauses, fmt.Sprintf("calories = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedIngredient.Calories = calories
+		case "serving_size":
+			servingSize, err := strconv.ParseFloat(update.NewValue, 64)
+			if err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "invalid serving size value: %v", err)
+			}
+			setClauses = append(setClauses, fmt.Sprintf("serving_size = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedIngredient.ServingSize = servingSize
+		case "protein":
+			protein, err := strconv.ParseFloat(update.NewValue, 64)
+			if err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "invalid protein value: %v", err)
+			}
+			setClauses = append(setClauses, fmt.Sprintf("protein = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedIngredient.Protein = protein
+		case "fat_total":
+			fatTotal, err := strconv.ParseFloat(update.NewValue, 64)
+			if err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "invalid fat total value: %v", err)
+			}
+			setClauses = append(setClauses, fmt.Sprintf("fat_total = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedIngredient.FatTotal = fatTotal
+		case "fat_saturated":
+			fatSaturated, err := strconv.ParseFloat(update.NewValue, 64)
+			if err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "invalid fat saturated value: %v", err)
+			}
+			setClauses = append(setClauses, fmt.Sprintf("fat_saturated = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedIngredient.FatSaturated = fatSaturated
+		case "carbohydrates_total":
+			carbohydratesTotal, err := strconv.ParseFloat(update.NewValue, 64)
+			if err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "invalid carbohydrates total value: %v", err)
+			}
+			setClauses = append(setClauses, fmt.Sprintf("carbohydrates_total = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedIngredient.CarbohydratesTotal = carbohydratesTotal
+		case "fiber":
+			fiber, err := strconv.ParseFloat(update.NewValue, 64)
+			if err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "invalid fiber value: %v", err)
+			}
+			setClauses = append(setClauses, fmt.Sprintf("fiber = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedIngredient.Fiber = fiber
+		case "sugar":
+			sugar, err := strconv.ParseFloat(update.NewValue, 64)
+			if err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "invalid sugar value: %v", err)
+			}
+			setClauses = append(setClauses, fmt.Sprintf("sugar = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedIngredient.Sugar = sugar
+		case "sodium":
+			sodium, err := strconv.ParseFloat(update.NewValue, 64)
+			if err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "invalid sodium value: %v", err)
+			}
+			setClauses = append(setClauses, fmt.Sprintf("sodium = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedIngredient.Sodium = sodium
+		case "potassium":
+			potassium, err := strconv.ParseFloat(update.NewValue, 64)
+			if err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "invalid potassium value: %v", err)
+			}
+			setClauses = append(setClauses, fmt.Sprintf("potassium = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedIngredient.Potassium = potassium
+		case "cholesterol":
+			cholesterol, err := strconv.ParseFloat(update.NewValue, 64)
+			if err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "invalid cholesterol value: %v", err)
+			}
+			setClauses = append(setClauses, fmt.Sprintf("cholesterol = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedIngredient.Cholesterol = cholesterol
+		default:
+			return nil, fmt.Errorf("unsupported update field: %s", update.Field)
+		}
+	}
+
+	if len(setClauses) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "no updates provided")
+	}
+
+	query += strings.Join(setClauses, ", ")
+	query += fmt.Sprintf(" WHERE id = $%d AND user_id = $%d", argIndex, argIndex+1)
+	args = append(args, req.IngredientId, req.UserId)
+
+	_, err := i.pgpool.Exec(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update exercise: %w", err)
+	}
+
+	return updatedIngredient, nil
 }
 
 func (i *IngredientRepository) DeleteIngredient(ctx context.Context, req *pbml.DeleteIngredientReq) (*pbml.NilRes, error) {
-	return nil, nil
+	query := `
+		DELETE FROM ingredients
+		WHERE id = $1 AND user_id = $2
+	`
+
+	_, err := i.pgpool.Exec(ctx, query, req.IngredientId, req.UserId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to delete exercise: %w", err)
+	}
+	return &pbml.NilRes{}, nil
 }
 
 //func (m *MealRepository) CreateMeal(ctx context.Context, req *pbml.CreateMealReq) (*pbml.CreateMealRes, error) {

@@ -494,8 +494,8 @@ func (i *IngredientService) GetIngredient(ctx context.Context, req *pbml.GetIngr
 	ingredient, err := i.repo.GetIngredient(ctx, req)
 	if err != nil {
 		return &pbml.GetIngredientRes{
-			//Success: false,
-			//Message: "Workout plan fetch failed",
+			Success: false,
+			Message: "Ingredient fetch failed",
 			Response: &pbml.BaseResponse{
 				Upstream:  "ingredient-service",
 				RequestId: requestID,
@@ -539,8 +539,8 @@ func (i *IngredientService) GetIngredients(ctx context.Context, req *pbml.GetIng
 	ingredients, err := i.repo.GetIngredients(ctx, req)
 	if err != nil {
 		return &pbml.GetIngredientsRes{
-			//Success: false,
-			//Message: "Workout plan fetch failed",
+			Success: false,
+			Message: "Ingredients fetch failed",
 			Response: &pbml.BaseResponse{
 				Upstream:  "ingredient-service",
 				RequestId: requestID,
@@ -554,4 +554,139 @@ func (i *IngredientService) GetIngredients(ctx context.Context, req *pbml.GetIng
 	)
 
 	return ingredients, nil
+}
+
+func (i *IngredientService) CreateIngredient(ctx context.Context, req *pbml.CreateIngredientReq) (*pbml.CreateIngredientRes, error) {
+	tracer := otel.Tracer("FitSphere")
+	ctx, span := tracer.Start(ctx, "Ingrediet/CreateIngredient")
+	defer span.End()
+
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pbml.BaseRequest{}
+	}
+
+	userID := ctx.Value("userID").(string)
+	if userID == "" {
+		return nil, status.Error(codes.Unauthenticated, "userID is missing in metadata")
+	}
+
+	req.Request.RequestId = requestID
+	req.UserId = userID
+
+	ingredient, err := i.repo.CreateIngredient(ctx, req)
+	if err != nil {
+		return &pbml.CreateIngredientRes{
+			Success: false,
+			Message: "Ingredient creation failed",
+			Response: &pbml.BaseResponse{
+				Upstream:  "ingredient-service",
+				RequestId: requestID,
+			},
+		}, status.Errorf(codes.Internal, "failed to create ingredient: %v", err)
+	}
+
+	span.SetAttributes(
+		attribute.String("request.id", req.Request.RequestId),
+		attribute.String("request.details", req.String()),
+	)
+
+	return &pbml.CreateIngredientRes{
+		Success:    true,
+		Message:    "Ingredient created successfully",
+		Ingredient: ingredient,
+		Response: &pbml.BaseResponse{
+			Upstream:  "ingredient-service",
+			RequestId: requestID,
+		},
+	}, nil
+}
+
+func (i *IngredientService) DeleteIngredient(ctx context.Context, req *pbml.DeleteIngredientReq) (*pbml.NilRes, error) {
+	tracer := otel.Tracer("FitSphere")
+	ctx, span := tracer.Start(ctx, "Ingrediet/DeleteIngredient")
+	defer span.End()
+
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pbml.BaseRequest{}
+	}
+
+	userID := ctx.Value("userID").(string)
+	if userID == "" {
+		return nil, status.Error(codes.Unauthenticated, "userID is missing in metadata")
+	}
+
+	req.Request.RequestId = requestID
+	req.UserId = userID
+
+	_, err := i.repo.DeleteIngredient(ctx, req)
+	if err != nil {
+		return &pbml.NilRes{}, status.Errorf(codes.Internal, "failed to delete ingredient: %v", err)
+	}
+
+	span.SetAttributes(
+		attribute.String("request.id", req.Request.RequestId),
+		attribute.String("request.details", req.String()),
+	)
+
+	return &pbml.NilRes{}, nil
+}
+
+func (i *IngredientService) UpdateIngredient(ctx context.Context, req *pbml.UpdateIngredientReq) (*pbml.UpdateIngredientRes, error) {
+	tracer := otel.Tracer("FitSphere")
+	ctx, span := tracer.Start(ctx, "Ingrediet/UpdateIngredient")
+	defer span.End()
+
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pbml.BaseRequest{}
+	}
+
+	userID := ctx.Value("userID").(string)
+	if userID == "" {
+		return nil, status.Error(codes.Unauthenticated, "userID is missing in metadata")
+	}
+
+	req.Request.RequestId = requestID
+	req.UserId = userID
+
+	ingredient, err := i.repo.UpdateIngredient(ctx, req)
+	if err != nil {
+		return &pbml.UpdateIngredientRes{
+			Success: false,
+			Message: "Ingredient update failed",
+			Response: &pbml.BaseResponse{
+				Upstream:  "ingredient-service",
+				RequestId: requestID,
+			},
+		}, status.Errorf(codes.Internal, "failed to update ingredient: %v", err)
+	}
+
+	span.SetAttributes(
+		attribute.String("request.id", req.Request.RequestId),
+		attribute.String("request.details", req.String()),
+	)
+
+	return &pbml.UpdateIngredientRes{
+		Success:    true,
+		Message:    "Ingredient updated successfully",
+		Ingredient: ingredient,
+		Response: &pbml.BaseResponse{
+			Upstream:  "ingredient-service",
+			RequestId: requestID,
+		},
+	}, nil
 }
