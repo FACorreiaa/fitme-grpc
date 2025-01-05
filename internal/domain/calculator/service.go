@@ -301,7 +301,7 @@ func validateUserInput(ctx context.Context, params UserParams) (UserData, error)
 
 func (s *CalculatorService) CreateUserMacro(ctx context.Context, req *pb.CreateUserMacroRequest) (*pb.CreateUserMacroResponse, error) {
 	// Extracting request data
-	tracer := otel.Tracer("FITDEV")
+	tracer := otel.Tracer("FitSphere")
 
 	ctx, span := tracer.Start(ctx, "CreateUserMacro")
 	defer span.End()

@@ -55,3 +55,5 @@ func (s *CustomerService) DeleteCustomer(ctx context.Context, req *pb.DeleteCust
 // AuthService
 
 // Calculator service
+
+// Meal service

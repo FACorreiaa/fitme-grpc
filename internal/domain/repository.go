@@ -5,7 +5,9 @@ import (
 
 	pba "github.com/FACorreiaa/fitme-protos/modules/activity/generated"
 	pbc "github.com/FACorreiaa/fitme-protos/modules/calculator/generated"
+	pbml "github.com/FACorreiaa/fitme-protos/modules/meal/generated"
 	pbm "github.com/FACorreiaa/fitme-protos/modules/measurement/generated"
+
 	pb "github.com/FACorreiaa/fitme-protos/modules/user/generated"
 	pbw "github.com/FACorreiaa/fitme-protos/modules/workout/generated"
 )
@@ -89,4 +91,73 @@ type RepositoryMeasurement interface {
 	GetWasteLineMeasurement(ctx context.Context, req *pbm.GetWasteLineReq) (*pbm.XWasteLine, error)
 	DeleteWasteLineMeasurement(ctx context.Context, req *pbm.DeleteWasteLineReq) (*pbm.NilRes, error)
 	UpdateWasteLineMeasurement(ctx context.Context, req *pbm.UpdateWasteLineReq) (*pbm.XWasteLine, error)
+}
+
+// TrackMealProgressRepository interface
+type TrackMealProgressRepository interface {
+	GetUserProgress(ctx context.Context, req *pbml.GetUserProgressReq) (*pbml.GetUserProgressRes, error)
+	GetAllProgress(ctx context.Context, req *pbml.GetAllProgressReq) (*pbml.GetAllProgressRes, error)
+	GetAllStatistics(ctx context.Context, req *pbml.GetAllStatisticsReq) (*pbml.GetAllStatisticsRes, error)
+}
+
+// MealPlanRepository interface
+type MealPlanRepository interface {
+	GetMealPlan(ctx context.Context, req *pbml.GetMealPlanReq) (*pbml.GetMealPlanRes, error)
+	GetMealPlans(ctx context.Context, req *pbml.GetMealPlansReq) (*pbml.GetMealPlansRes, error)
+	CreateMealPlan(ctx context.Context, req *pbml.CreateMealPlanReq) (*pbml.CreateMealPlanRes, error)
+	UpdateMealPlan(ctx context.Context, req *pbml.UpdateMealPlanReq) (*pbml.UpdateMealPlanRes, error)
+	DeleteMealPlan(ctx context.Context, req *pbml.DeleteMealPlanReq) (*pbml.NilRes, error)
+	AddIngredientToMealPlan(ctx context.Context, req *pbml.AddIngredientReq) (*pbml.NilRes, error)
+	DeleteIngredientFromMealPlan(ctx context.Context, req *pbml.DeleteIngredientReq) (*pbml.NilRes, error)
+	CreateCalorieIntakeObjective(ctx context.Context, req *pbml.CreateCalorieIntakeObjectiveReq) (*pbml.CreateCalorieIntakeObjectiveRes, error)
+	UpdateCalorieIntakeObjective(ctx context.Context, req *pbml.UpdateCalorieIntakeObjectiveReq) (*pbml.UpdateCalorieIntakeObjectiveRes, error)
+	DeleteCalorieIntakeObjective(ctx context.Context, req *pbml.DeleteCalorieIntakeObjectiveReq) (*pbml.NilRes, error)
+}
+
+// MealRepository interface
+type MealRepository interface {
+	GetMeal(ctx context.Context, req *pbml.GetMealReq) (*pbml.GetMealRes, error)
+	GetMeals(ctx context.Context, req *pbml.GetMealsReq) (*pbml.GetMealsRes, error)
+	CreateMeal(ctx context.Context, req *pbml.CreateMealReq) (*pbml.CreateMealRes, error)
+	UpdateMeal(ctx context.Context, req *pbml.UpdateMealReq) (*pbml.UpdateMealRes, error)
+	DeleteMeal(ctx context.Context, req *pbml.DeleteMealReq) (*pbml.NilRes, error)
+	AddIngredientToMeal(ctx context.Context, req *pbml.AddIngredientReq) (*pbml.NilRes, error)
+	RemoveIngredientFromMeal(ctx context.Context, req *pbml.DeleteIngredientReq) (*pbml.NilRes, error)
+}
+
+// IngredientsRepository interface
+type IngredientsRepository interface {
+	GetIngredients(ctx context.Context, req *pbml.GetIngredientsReq) (*pbml.GetIngredientsRes, error)
+	GetIngredient(ctx context.Context, req *pbml.GetIngredientReq) (*pbml.GetIngredientRes, error)
+	CreateIngredient(ctx context.Context, req *pbml.CreateIngredientReq) (*pbml.CreateIngredientRes, error)
+	UpdateIngredient(ctx context.Context, req *pbml.UpdateIngredientReq) (*pbml.UpdateIngredientRes, error)
+	DeleteIngredient(ctx context.Context, req *pbml.DeleteIngredientReq) (*pbml.NilRes, error)
+}
+
+// MealReminderRepository interface
+type MealReminderRepository interface {
+	CreateReminder(ctx context.Context, req *pbml.CreateReminderReq) (*pbml.CreateReminderRes, error)
+	GetReminders(ctx context.Context, req *pbml.GetRemindersReq) (*pbml.GetRemindersRes, error)
+	UpdateReminder(ctx context.Context, req *pbml.UpdateReminderReq) (*pbml.UpdateReminderRes, error)
+	DeleteReminder(ctx context.Context, req *pbml.DeleteReminderReq) (*pbml.NilRes, error)
+}
+
+// GoalRecommendationRepository interface
+type GoalRecommendationRepository interface {
+	RecommendCalorieObjective(ctx context.Context, req *pbml.RecommendCalorieObjectiveReq) (*pbml.RecommendCalorieObjectiveRes, error)
+	AdjustGoals(ctx context.Context, req *pbml.AdjustGoalsReq) (*pbml.AdjustGoalsRes, error)
+	GetGoalSuggestions(ctx context.Context, req *pbml.GetGoalSuggestionsReq) (*pbml.GetGoalSuggestionsRes, error)
+}
+
+// FoodLogRepository interface
+type FoodLogRepository interface {
+	LogFood(ctx context.Context, req *pbml.LogFoodReq) (*pbml.LogFoodRes, error)
+	GetFoodLogs(ctx context.Context, req *pbml.GetFoodLogsReq) (*pbml.GetFoodLogsRes, error)
+	DeleteFoodLog(ctx context.Context, req *pbml.DeleteFoodLogReq) (*pbml.NilRes, error)
+}
+
+// DietPreferenceRepository interface
+type DietPreferenceRepository interface {
+	SetDietPreferences(ctx context.Context, req *pbml.UpdateDietPreferencesReq) (*pbml.UpdateDietPreferencesRes, error)
+	GetDietPreferences(ctx context.Context, req *pbml.GetDietPreferencesReq) (*pbml.GetDietPreferencesRes, error)
 }

@@ -99,7 +99,7 @@ func (a *ServiceActivity) GetActivity(ctx context.Context, req *pba.GetActivityR
 }
 
 func (a *ServiceActivity) GetActivitiesByID(ctx context.Context, req *pba.GetActivityIDReq) (*pba.GetActivityIDRes, error) {
-	tracer := otel.Tracer("FITDEV")
+	tracer := otel.Tracer("FitSphere")
 	ctx, span := tracer.Start(ctx, "Activity/GetActivitiesByID")
 	defer span.End()
 
@@ -155,7 +155,7 @@ func (a *ServiceActivity) GetActivitiesByID(ctx context.Context, req *pba.GetAct
 }
 
 func (a *ServiceActivity) GetActivitiesByName(ctx context.Context, req *pba.GetActivityNameReq) (*pba.GetActivityNameRes, error) {
-	tracer := otel.Tracer("FITDEV")
+	tracer := otel.Tracer("FitSphere")
 	ctx, span := tracer.Start(ctx, "Activity/GetActivitiesByName")
 	defer span.End()
 
@@ -215,7 +215,7 @@ func (a *ServiceActivity) GetActivitiesByName(ctx context.Context, req *pba.GetA
 // so the userID comes from a session
 // but a PT can search and select several userID on its network
 func (a *ServiceActivity) GetUserExerciseSession(ctx context.Context, req *pba.GetUserExerciseSessionReq) (*pba.GetUserExerciseSessionRes, error) {
-	tracer := otel.Tracer("FITDEV")
+	tracer := otel.Tracer("FitSphere")
 	ctx, span := tracer.Start(ctx, "Activity/GetUserExerciseSession")
 	defer span.End()
 
@@ -273,7 +273,7 @@ func (a *ServiceActivity) GetUserExerciseTotalData(ctx context.Context, req *pba
 	//	return nil, status.Error(codes.Unauthenticated, "failed to retrieve user session")
 	//}
 
-	tracer := otel.Tracer("FITDEV")
+	tracer := otel.Tracer("FitSphere")
 	ctx, span := tracer.Start(ctx, "Activity/GetUserExerciseTotalData")
 	defer span.End()
 
@@ -321,7 +321,7 @@ func (a *ServiceActivity) GetUserExerciseTotalData(ctx context.Context, req *pba
 }
 
 func (a *ServiceActivity) GetUserExerciseSessionStats(ctx context.Context, req *pba.GetUserExerciseSessionStatsReq) (*pba.GetUserExerciseSessionStatsRes, error) {
-	tracer := otel.Tracer("FITDEV")
+	tracer := otel.Tracer("FitSphere")
 	ctx, span := tracer.Start(ctx, "Activity/GetUserExerciseSessionStats")
 	defer span.End()
 
@@ -379,7 +379,7 @@ func (a *ServiceActivity) GetUserExerciseSessionStats(ctx context.Context, req *
 //}
 
 func (a *ServiceActivity) StartActivityTracker(ctx context.Context, req *pba.StartActivityTrackerReq) (*pba.StartActivityTrackerRes, error) {
-	tracer := otel.Tracer("FITDEV")
+	tracer := otel.Tracer("FitSphere")
 	ctx, span := tracer.Start(ctx, "Activity/StartActivityTracker")
 	defer span.End()
 
@@ -432,7 +432,7 @@ func (a *ServiceActivity) StartActivityTracker(ctx context.Context, req *pba.Sta
 func (a *ServiceActivity) PauseActivityTracker(ctx context.Context, req *pba.PauseActivityTrackerReq) (*pba.PauseActivityTrackerRes, error) {
 	// this is the user session! change after
 
-	tracer := otel.Tracer("FITDEV")
+	tracer := otel.Tracer("FitSphere")
 	ctx, span := tracer.Start(ctx, "Activity/PauseActivityTracker")
 	defer span.End()
 
@@ -452,7 +452,7 @@ func (a *ServiceActivity) PauseActivityTracker(ctx context.Context, req *pba.Pau
 }
 
 func (a *ServiceActivity) ResumeActivityTracker(ctx context.Context, req *pba.ResumeActivityTrackerReq) (*pba.ResumeActivityTrackerRes, error) {
-	tracer := otel.Tracer("FITDEV")
+	tracer := otel.Tracer("FitSphere")
 	ctx, span := tracer.Start(ctx, "Activity/ResumeActivityTracker")
 	defer span.End()
 
@@ -499,7 +499,7 @@ func (a *ServiceActivity) ResumeActivityTracker(ctx context.Context, req *pba.Re
 }
 
 func (a *ServiceActivity) StopActivityTracker(ctx context.Context, req *pba.StopActivityTrackerReq) (*pba.StopActivityTrackerRes, error) {
-	tracer := otel.Tracer("FITDEV")
+	tracer := otel.Tracer("FitSphere")
 	ctx, span := tracer.Start(ctx, "Activity/StopActivityTracker")
 	defer span.End()
 
@@ -546,7 +546,7 @@ func (a *ServiceActivity) StopActivityTracker(ctx context.Context, req *pba.Stop
 }
 
 func (a *ServiceActivity) DeleteExerciseSession(ctx context.Context, req *pba.DeleteExerciseSessionReq) (*pba.NilRes, error) {
-	tracer := otel.Tracer("FITDEV")
+	tracer := otel.Tracer("FitSphere")
 	ctx, span := tracer.Start(ctx, "Activity/DeleteExerciseSession")
 	defer span.End()
 
@@ -565,7 +565,7 @@ func (a *ServiceActivity) DeleteExerciseSession(ctx context.Context, req *pba.De
 }
 
 func (a *ServiceActivity) DeleteAllExercisesSession(ctx context.Context, req *pba.DeleteAllExercisesSessionReq) (*pba.NilRes, error) {
-	tracer := otel.Tracer("FITDEV")
+	tracer := otel.Tracer("FitSphere")
 	ctx, span := tracer.Start(ctx, "Activity/DeleteAllExercisesSession")
 	defer span.End()
 

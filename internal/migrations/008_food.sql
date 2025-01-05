@@ -13,8 +13,11 @@ CREATE TABLE "ingredients" (
                         "potassium" float(8),
                         "cholesterol" float(8),
                         "created_at" timestamp DEFAULT (now()),
-                        "updated_at" timestamp DEFAULT null
+                        "updated_at" timestamp DEFAULT null,
+                        "user_id" UUID DEFAULT NULL, -- Associates ingredient with a user
+                        CONSTRAINT fk_user FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE
 );
+
 --
 CREATE TABLE "meals" (
                        "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -150,23 +153,11 @@ CREATE TABLE "food_logs" (
                            "updated_at" TIMESTAMP DEFAULT NULL
 );
 
-CREATE TABLE "food_logs" (
-                           "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                           "user_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
-                           "meal_id" UUID REFERENCES "meals" ("id") ON DELETE CASCADE,
-                           "quantity" FLOAT(8) NOT NULL, -- Quantity of food logged
-                           "log_date" TIMESTAMP NOT NULL, -- When the food was logged
-                           "created_at" TIMESTAMP DEFAULT NOW(),
-                           "updated_at" TIMESTAMP DEFAULT NULL
-);
-
 CREATE TABLE "diet_preferences" (
                                   "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                                  "user_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
-                                  "diet_type" VARCHAR(50) NOT NULL, -- E.g., vegan, keto
-                                  "diet_description" VARCHAR(255),
-                                  "created_at" TIMESTAMP DEFAULT NOW(),
-                                  "updated_at" TIMESTAMP DEFAULT NULL
+                                  "name" VARCHAR(255) NOT NULL,
+                                  "description" VARCHAR(255) NOT NULL,
+                                  "created_at" TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE "user_diet_preferences" (
@@ -174,6 +165,147 @@ CREATE TABLE "user_diet_preferences" (
                                        "user_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
                                        "diet_preference_id" UUID NOT NULL REFERENCES "diet_preferences" ("id") ON DELETE CASCADE,
                                        "created_at" TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE "diseases" (
+                           "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                           "name" VARCHAR(255) NOT NULL,
+                           "description" VARCHAR(255) NOT NULL,
+                           "created_at" TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE "allergies" (
+                               "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                               "user_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
+                               "disease_id" UUID NOT NULL REFERENCES "diseases" ("id") ON DELETE CASCADE,
+                               "created_at" TIMESTAMP DEFAULT NOW()
+);
+
+-- to do later
+CREATE TABLE "user_allergies" (
+                                "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                                "user_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
+                                "allergy_id" UUID NOT NULL REFERENCES "allergies" ("id") ON DELETE CASCADE,
+                                "created_at" TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE "ingredient_categories" (
+    "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    "name" VARCHAR(255) NOT NULL,
+    "description" VARCHAR(255),
+    "created_at" TIMESTAMP DEFAULT NOW(),
+    "updated_at" TIMESTAMP DEFAULT NULL
+);
+
+ALTER TABLE "ingredients" ADD COLUMN "category_id" UUID REFERENCES "ingredient_categories" ("id");
+
+CREATE TABLE "meal_tags" (
+    "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    "name" VARCHAR(255) NOT NULL,
+    "created_at" TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE "meal_meal_tags" (
+    "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    "meal_id" UUID NOT NULL REFERENCES "meals" ("id") ON DELETE CASCADE,
+    "tag_id" UUID NOT NULL REFERENCES "meal_tags" ("id") ON DELETE CASCADE,
+    "created_at" TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE "user_meal_history" (
+    "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    "user_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
+    "meal_id" UUID NOT NULL REFERENCES "meals" ("id") ON DELETE CASCADE,
+    "log_date" TIMESTAMP NOT NULL DEFAULT NOW(),
+    "created_at" TIMESTAMP DEFAULT NOW(),
+    "updated_at" TIMESTAMP DEFAULT NULL
+);
+
+CREATE TABLE "user_food_preferences" (
+    "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    "user_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
+    "ingredient_id" UUID REFERENCES "ingredients" ("id") ON DELETE CASCADE,
+    "category_id" UUID REFERENCES "ingredient_categories" ("id"),
+    "preference" VARCHAR(255) NOT NULL CHECK (preference IN ('like', 'dislike', 'intolerance')),
+    "created_at" TIMESTAMP DEFAULT NOW(),
+    "updated_at" TIMESTAMP DEFAULT NULL
+);
+
+CREATE TABLE "meal_nutritional_goals" (
+    "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    "user_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
+    "meal_id" UUID NOT NULL REFERENCES "meals" ("id") ON DELETE CASCADE,
+    "calories" FLOAT(8),
+    "protein" FLOAT(8),
+    "fat" FLOAT(8),
+    "carbs" FLOAT(8),
+    "created_at" TIMESTAMP DEFAULT NOW(),
+    "updated_at" TIMESTAMP DEFAULT NULL
+);
+
+CREATE TABLE "shopping_lists" (
+    "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    "user_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
+    "meal_plan_id" UUID REFERENCES "meal_plans" ("id") ON DELETE CASCADE,
+    "created_at" TIMESTAMP DEFAULT NOW(),
+    "updated_at" TIMESTAMP DEFAULT NULL
+);
+
+CREATE TABLE "shopping_list_items" (
+    "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    "shopping_list_id" UUID NOT NULL REFERENCES "shopping_lists" ("id") ON DELETE CASCADE,
+    "ingredient_id" UUID NOT NULL REFERENCES "ingredients" ("id"),
+    "quantity" FLOAT(8) NOT NULL,
+    "created_at" TIMESTAMP DEFAULT NOW(),
+    "updated_at" TIMESTAMP DEFAULT NULL
+);
+
+CREATE TABLE "meal_feedback" (
+    "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    "meal_id" UUID NOT NULL REFERENCES "meals" ("id") ON DELETE CASCADE,
+    "user_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
+    "rating" INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    "comments" TEXT,
+    "created_at" TIMESTAMP DEFAULT NOW(),
+    "updated_at" TIMESTAMP DEFAULT NULL
+);
+
+CREATE TABLE "meal_plan_feedback" (
+    "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    "meal_plan_id" UUID NOT NULL REFERENCES "meal_plans" ("id") ON DELETE CASCADE,
+    "user_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
+    "rating" INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    "comments" TEXT,
+    "created_at" TIMESTAMP DEFAULT NOW(),
+    "updated_at" TIMESTAMP DEFAULT NULL
+);
+
+CREATE TABLE "activity_logs" (
+    "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    "user_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
+    "activity_type" VARCHAR(255) NOT NULL,
+    "description" TEXT NOT NULL,
+    "activity_time" TIMESTAMP DEFAULT NOW(),
+    "created_at" TIMESTAMP DEFAULT NOW(),
+    "updated_at" TIMESTAMP DEFAULT NULL
+);
+
+CREATE TABLE "meal_schedules" (
+    "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    "user_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
+    "meal_id" UUID NOT NULL REFERENCES "meals" ("id") ON DELETE CASCADE,
+    "scheduled_date" TIMESTAMP NOT NULL,
+    "created_at" TIMESTAMP DEFAULT NOW(),
+    "updated_at" TIMESTAMP DEFAULT NULL
+);
+
+CREATE TABLE "custom_meal_plans" (
+    "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    "trainer_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE, -- Trainer or dietician
+    "user_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
+    "meal_plan_id" UUID NOT NULL REFERENCES "meal_plans" ("id") ON DELETE CASCADE,
+    "created_at" TIMESTAMP DEFAULT NOW(),
+    "updated_at" TIMESTAMP DEFAULT NULL
 );
 
 
@@ -187,3 +319,4 @@ COMMENT ON COLUMN "ingredients"."sugar" IS 'grams';
 COMMENT ON COLUMN "ingredients"."sodium" IS 'miligrams';
 COMMENT ON COLUMN "ingredients"."potassium" IS 'miligrams';
 COMMENT ON COLUMN "ingredients"."cholesterol" IS 'miligrams';
+CREATE INDEX idx_ingredients_user_id ON "ingredients" ("user_id");

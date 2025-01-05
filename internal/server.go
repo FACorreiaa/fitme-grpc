@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
+	"os/signal"
 	"sync/atomic"
 
 	apb "github.com/FACorreiaa/fitme-protos/modules/activity/generated"
 	ccpb "github.com/FACorreiaa/fitme-protos/modules/calculator/generated"
-	cpb "github.com/FACorreiaa/fitme-protos/modules/customer/generated"
+	mlpb "github.com/FACorreiaa/fitme-protos/modules/meal/generated"
 	mpb "github.com/FACorreiaa/fitme-protos/modules/measurement/generated"
 	upb "github.com/FACorreiaa/fitme-protos/modules/user/generated"
 	wpb "github.com/FACorreiaa/fitme-protos/modules/workout/generated"
@@ -52,15 +54,51 @@ func ServeGRPC(ctx context.Context, port string, container *ServiceContainer, re
 	}
 
 	// Register your services
-	cpb.RegisterCustomerServer(server, container.CustomerService)
+	//cpb.RegisterCustomerServer(server, container.CustomerService)
 	upb.RegisterAuthServer(server, container.AuthService)
 	ccpb.RegisterCalculatorServer(server, container.CalculatorService)
 	apb.RegisterActivityServer(server, container.ServiceActivity)
 	wpb.RegisterWorkoutServer(server, container.WorkoutService)
 	mpb.RegisterUserMeasurementsServer(server, container.MeasurementService)
 
+	mlpb.RegisterMealServer(server, container.MealServices.MealService)
+	mlpb.RegisterMealPlanServer(server, container.MealServices.MealPlanService)
+	mlpb.RegisterDietPreferenceServiceServer(server, container.MealServices.DietPreferenceService)
+	mlpb.RegisterFoodLogServiceServer(server, container.MealServices.FoodLogService)
+	mlpb.RegisterIngredientsServer(server, container.MealServices.IngredientService)
+	mlpb.RegisterTrackMealProgressServer(server, container.MealServices.TrackMealProgressService)
+	mlpb.RegisterGoalRecommendationServer(server, container.MealServices.GoalRecommendationService)
+	mlpb.RegisterMealReminderServer(server, container.MealServices.MealReminderService)
+
+	// meal services
+	//mealServices := []mlpb.MealServer{
+	//	container.MealServices.MealPlanService,
+	//	container.MealServices.MealService,
+	//	container.MealServices.DietPreferenceService,
+	//	container.MealServices.FoodLogService,
+	//	container.MealServices.IngredientService,
+	//	container.MealServices.TrackMealProgressService,
+	//	container.MealServices.GoalRecommendationService,
+	//	container.MealServices.MealReminderService,
+	//}
+	//
+	//for _, service := range mealServices {
+	//	mlpb.RegisterMealServer(server, service)
+	//}
+
+	//mlpb.RegisterMealServer(server, container.MealServices.MealService)
 	// Enable gRPC reflection for easier debugging
 	reflection.Register(server)
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		for range c {
+			logger.Log.Warn("shutting down grpc server")
+			server.GracefulStop()
+			<-ctx.Done()
+		}
+	}()
 
 	// Start serving
 	log.Info("gRPC server starting", zap.String("port", port))
@@ -71,7 +109,7 @@ func ServeGRPC(ctx context.Context, port string, container *ServiceContainer, re
 	isReady.Store(true)
 	logger.Log.Info("running grpc server", zap.String("port", port))
 
-	return nil
+	return server.Serve(listener)
 }
 
 // ServeHTTP creates a simple server to serve Prometheus metrics for

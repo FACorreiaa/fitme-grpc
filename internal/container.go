@@ -7,22 +7,34 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/FACorreiaa/fitme-grpc/internal/domain"
 	"github.com/FACorreiaa/fitme-grpc/internal/domain/activity"
 	"github.com/FACorreiaa/fitme-grpc/internal/domain/auth"
 	"github.com/FACorreiaa/fitme-grpc/internal/domain/calculator"
+	"github.com/FACorreiaa/fitme-grpc/internal/domain/meals"
 	"github.com/FACorreiaa/fitme-grpc/internal/domain/measurements"
 	"github.com/FACorreiaa/fitme-grpc/internal/domain/workout"
 )
 
+type MealServiceContainer struct {
+	MealPlanService           *meals.MealPlanService
+	MealService               *meals.MealService
+	DietPreferenceService     *meals.DietPreferenceService
+	FoodLogService            *meals.FoodLogService
+	IngredientService         *meals.IngredientService
+	TrackMealProgressService  *meals.TrackMealProgressService
+	GoalRecommendationService *meals.GoalRecommendationService
+	MealReminderService       *meals.MealReminderService
+}
+
 type ServiceContainer struct {
-	Brokers            *container.Brokers
-	AuthService        *auth.AuthService
-	CustomerService    *domain.CustomerService
+	Brokers     *container.Brokers
+	AuthService *auth.AuthService
+	//CustomerService    *domain.CustomerService
 	CalculatorService  *calculator.CalculatorService
 	ServiceActivity    *activity.ServiceActivity
 	WorkoutService     *workout.ServiceWorkout
 	MeasurementService *measurements.ServiceMeasurement
+	MealServices       *MealServiceContainer
 }
 
 func NewServiceContainer(ctx context.Context, pgPool *pgxpool.Pool, redisClient *redis.Client, brokers *container.Brokers) *ServiceContainer {
@@ -33,19 +45,41 @@ func NewServiceContainer(ctx context.Context, pgPool *pgxpool.Pool, redisClient 
 	workoutRepo := workout.NewRepositoryWorkout(pgPool, redisClient, sessionManager)
 	measurementRepo := measurements.NewRepositoryMeasurement(pgPool, redisClient, sessionManager)
 	authService := auth.NewAuthService(ctx, authRepo, pgPool, redisClient, sessionManager)
-	customerService := domain.NewCustomerService(ctx, pgPool, redisClient)
+	//customerService := domain.NewCustomerService(ctx, pgPool, redisClient)
 	calculatorService := calculator.NewCalculatorService(ctx, calculatorRepo)
 	activityService := activity.NewCalculatorService(ctx, activityRepo)
 	workoutService := workout.NewServiceWorkout(ctx, workoutRepo)
 	measurementService := measurements.NewMeasurementService(ctx, measurementRepo)
 
+	// meals
+	mealPlanRepo := meals.NewMealPlanRepository(pgPool, redisClient, sessionManager)
+	mealRepo := meals.NewMealRepository(pgPool, redisClient, sessionManager)
+	dietPreferenceRepo := meals.NewDietPreferenceRepository(pgPool, redisClient, sessionManager)
+	foodLogRepo := meals.NewFoodLogRepository(pgPool, redisClient, sessionManager)
+	ingredientRepo := meals.NewIngredientRepository(pgPool, redisClient, sessionManager)
+	trackMealProgressRepo := meals.NewTrackMealProgressRepository(pgPool, redisClient, sessionManager)
+	goalRecommendationRepo := meals.NewGoalRecommendationRepository(pgPool, redisClient, sessionManager)
+	mealReminderRepo := meals.NewMealReminderRepository(pgPool, redisClient, sessionManager)
+
+	mealServices := &MealServiceContainer{
+		MealPlanService:           meals.NewMealPlanService(ctx, mealPlanRepo),
+		MealService:               meals.NewMealService(ctx, mealRepo),
+		DietPreferenceService:     meals.NewDietPreferenceService(ctx, dietPreferenceRepo),
+		FoodLogService:            meals.NewFoodLogService(ctx, foodLogRepo),
+		IngredientService:         meals.NewIngredientService(ctx, ingredientRepo),
+		TrackMealProgressService:  meals.NewTrackMealProgressService(ctx, trackMealProgressRepo),
+		GoalRecommendationService: meals.NewGoalRecommendationService(ctx, goalRecommendationRepo),
+		MealReminderService:       meals.NewMealReminderService(ctx, mealReminderRepo),
+	}
+
 	return &ServiceContainer{
-		Brokers:            brokers,
-		AuthService:        authService,
-		CustomerService:    customerService,
+		Brokers:     brokers,
+		AuthService: authService,
+		//CustomerService:    customerService,
 		CalculatorService:  calculatorService,
 		ServiceActivity:    activityService,
 		WorkoutService:     workoutService,
 		MeasurementService: measurementService,
+		MealServices:       mealServices,
 	}
 }
