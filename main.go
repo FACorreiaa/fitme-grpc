@@ -27,7 +27,7 @@ func initializeLogger() error {
 	)
 }
 
-func setupDatabases(cfg *config.Config) (*pgxpool.Pool, *redis.Client, error) {
+func setupDatabases(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, *redis.Client, error) {
 	dbConfig, err := internal.NewDatabaseConfig()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initialize database configuration: %w", err)
@@ -38,7 +38,7 @@ func setupDatabases(cfg *config.Config) (*pgxpool.Pool, *redis.Client, error) {
 		return nil, nil, fmt.Errorf("failed to initialize database pool: %w", err)
 	}
 
-	internal.WaitForDB(pool)
+	internal.WaitForDB(ctx, pool)
 	logger.Log.Info("Connected to Postgres",
 		zap.String("host", os.Getenv("POSTGRES_HOST")),
 		zap.String("port", os.Getenv("POSTGRES_PORT")))
@@ -92,8 +92,8 @@ func startServices(ctx context.Context, cfg *config.Config, container *internal.
 	}
 }
 
-func run(cfg *config.Config) (*pgxpool.Pool, *redis.Client, error) {
-	pool, redisClient, err := setupDatabases(cfg)
+func run(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, *redis.Client, error) {
+	pool, redisClient, err := setupDatabases(ctx, cfg)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -118,7 +118,7 @@ func main() {
 		return
 	}
 
-	pool, redisClient, err := run(&cfg)
+	pool, redisClient, err := run(ctx, &cfg)
 	if err != nil {
 		logger.Log.Error("failed to run the application", zap.Error(err))
 		return

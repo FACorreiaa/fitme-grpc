@@ -121,9 +121,7 @@ func Init(connectionURL string) (*pgxpool.Pool, error) {
 	return pgxpool.NewWithConfig(context.Background(), cfg)
 }
 
-func WaitForDB(pgpool *pgxpool.Pool) {
-	ctx := context.Background()
-
+func WaitForDB(ctx context.Context, pgpool *pgxpool.Pool) {
 	for attempts := 1; ; attempts++ {
 		if attempts > retries {
 			break
