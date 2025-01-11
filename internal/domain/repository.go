@@ -116,10 +116,10 @@ type MealPlanRepository interface {
 
 // MealRepository interface
 type MealRepository interface {
-	GetMeal(ctx context.Context, req *pbml.GetMealReq) (*pbml.GetMealRes, error)
-	GetMeals(ctx context.Context, req *pbml.GetMealsReq) (*pbml.GetMealsRes, error)
-	CreateMeal(ctx context.Context, req *pbml.CreateMealReq) (*pbml.CreateMealRes, error)
-	UpdateMeal(ctx context.Context, req *pbml.UpdateMealReq) (*pbml.UpdateMealRes, error)
+	GetMeal(ctx context.Context, req *pbml.GetMealReq) (*pbml.XMeal, error)
+	GetMeals(ctx context.Context, req *pbml.GetMealsReq) ([]*pbml.XMeal, error)
+	CreateMeal(ctx context.Context, req *pbml.CreateMealReq) (*pbml.XMeal, error)
+	UpdateMeal(ctx context.Context, req *pbml.UpdateMealReq) (*pbml.XMeal, error)
 	DeleteMeal(ctx context.Context, req *pbml.DeleteMealReq) (*pbml.NilRes, error)
 	AddIngredientToMeal(ctx context.Context, req *pbml.AddIngredientReq) (*pbml.NilRes, error)
 	RemoveIngredientFromMeal(ctx context.Context, req *pbml.DeleteIngredientReq) (*pbml.NilRes, error)

@@ -19,7 +19,17 @@ RUN ls -al /app/internal || echo "No /app/internal found" && sleep 1
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /app/fitme -ldflags="-w -s" ./*.go
 ENTRYPOINT ["/app/fitme"]
 
-FROM alpine:latest AS dev
+# Development stage with hot reload
+FROM golang:1.23-alpine AS dev
+WORKDIR /app
+RUN go install github.com/air-verse/air@latest
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+EXPOSE 8080
+CMD ["air"]
+
+FROM alpine:latest AS prod
 WORKDIR /app
 
 RUN apk add --no-cache bash

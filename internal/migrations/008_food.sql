@@ -20,22 +20,37 @@ CREATE TABLE "ingredients" (
 
 --
 CREATE TABLE "meals" (
-                       "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                       "user_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
-                       "meal_number" INTEGER NOT NULL, -- E.g., breakfast, lunch, dinner
-                       "meal_description" VARCHAR(255),
-                       "created_at" TIMESTAMP DEFAULT NOW(),
-                       "updated_at" TIMESTAMP DEFAULT NULL
+    "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    "user_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
+    "meal_number" INTEGER NOT NULL, -- E.g., breakfast, lunch, dinner
+    "meal_description" VARCHAR(255),
+     -- "meal_ingredients" uuid[], -- Array of ingredient IDs
+    "created_at" TIMESTAMP DEFAULT NOW(),
+    "updated_at" TIMESTAMP DEFAULT NULL
 );
 
+
 CREATE TABLE "meal_ingredients" (
-                                  "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                                  "meal_id" UUID NOT NULL REFERENCES "meals" ("id") ON DELETE CASCADE,
-                                  "ingredient_id" UUID NOT NULL REFERENCES "ingredients" ("id") ON DELETE CASCADE,
-                                  "quantity" FLOAT(8) NOT NULL, -- Quantity of the ingredient in grams
-                                  "created_at" TIMESTAMP DEFAULT NOW(),
-                                  "updated_at" TIMESTAMP DEFAULT NULL
+    "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    "meal_id" UUID NOT NULL REFERENCES "meals" ("id") ON DELETE CASCADE,
+    "ingredient_id" UUID NOT NULL REFERENCES "ingredients" ("id") ON DELETE CASCADE,
+    "quantity" FLOAT(8) NOT NULL, -- Quantity of the ingredient in grams
+    "calories" FLOAT(8) NOT NULL, -- Computed calories for the quantity
+    "protein" FLOAT(8) NOT NULL, -- Computed protein for the quantity
+    "carbohydrates_total" FLOAT(8) NOT NULL, -- Computed carbs for the quantity
+    "fat_total" FLOAT(8) NOT NULL, -- Computed fat for the quantity
+    "fat_saturated" FLOAT(8) NOT NULL, -- Computed saturated fat
+    "fiber" FLOAT(8) NOT NULL, -- Computed fiber
+    "sugar" FLOAT(8) NOT NULL, -- Computed sugar
+    "sodium" FLOAT(8) NOT NULL, -- Computed sodium
+    "potassium" FLOAT(8) NOT NULL, -- Computed potassium
+    "cholesterol" FLOAT(8) NOT NULL, -- Computed cholesterol
+    "created_at" TIMESTAMP DEFAULT NOW(),
+    "updated_at" TIMESTAMP DEFAULT NULL
 );
+
+ALTER TABLE "meals" ADD COLUMN "total_macros" JSONB DEFAULT NULL;
+
 
 CREATE TABLE "meal_plans" (
                             "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,

@@ -43,7 +43,6 @@ repositories:
     db: 0
     ttl: 120s
 
-
 #change later
 server:
   HTTPPort: "8001"
@@ -57,5 +56,5 @@ UpstreamServices:
   Calculator: "http://calculator-service:8000"
   Workout: "http://workout-service:8000"
   Measurement: "http://measurement-service:8000"
-
-
+  Ingredients: "http://ingredients-service:8000"
+  Meals: "http://meals-service:8000"

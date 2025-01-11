@@ -25,3 +25,13 @@ type Ingredient struct {
 	UpdatedAt          sql.NullTime `protobuf:"bytes,15,opt,name=updated_at,json=updatedAt" db:"updated_at"`                             // Timestamp when updated (nullable)
 	UserID             *uuid.UUID   `protobuf:"bytes,16,opt,name=user_id,json=userId" db:"user_id"`                                      // Foreign key for user (nullable)
 }
+type Meal struct {
+	ID              uuid.UUID    `protobuf:"bytes,1,opt,name=meal_id,json=meal_id" db:"id"` // Primary Key
+	MealNumber      int          `protobuf:"fixed32,3,opt,name=meal_number,json=mealNumber" db:"number"`
+	MealDescription string       `protobuf:"bytes,4,opt,name=meal_description,json=mealDescription" db:"description"` // Description
+	Ingredients     []Ingredient `protobuf:"bytes,4,rep,name=ingredients" db:"ingredients"`                           // Ingredients
+	CreatedAt       time.Time    `protobuf:"bytes,5,opt,name=created_at,json=createdAt" db:"created_at"`              // Timestamp when created
+	UpdatedAt       sql.NullTime `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt" db:"updated_at"`              // Timestamp when updated (nullable)
+	UserID          *uuid.UUID   `protobuf:"bytes,7,opt,name=user_id,json=userId" db:"user_id"`
+	TotalMacros     []string     `protobuf:"bytes,8,rep,name=total_macros,json=totalMacros" db:"total_macros"`
+}

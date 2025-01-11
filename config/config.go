@@ -67,6 +67,8 @@ type Config struct {
 		Activity    string `mapstructure:"activity"`
 		Workout     string `mapstructure:"workout"`
 		Measurement string `mapstructure:"measurement"`
+		Ingredients string `mapstructure:"ingredients"`
+		Meals       string `mapstructure:"meals"`
 	} `mapstructure:"upstreamServices"`
 }
 

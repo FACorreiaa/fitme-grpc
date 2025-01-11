@@ -690,3 +690,242 @@ func (i *IngredientService) UpdateIngredient(ctx context.Context, req *pbml.Upda
 		},
 	}, nil
 }
+
+// TODO GetIngredientsByName
+// TODO GetMealsByDate
+
+func (m *MealService) CreateMeal(ctx context.Context, req *pbml.CreateMealReq) (*pbml.CreateMealRes, error) {
+
+	tracer := otel.Tracer("FitSphere")
+	ctx, span := tracer.Start(ctx, "Meal/CreateMeal")
+	defer span.End()
+
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pbml.BaseRequest{}
+	}
+
+	userID := ctx.Value("userID").(string)
+	if userID == "" {
+		return nil, status.Error(codes.Unauthenticated, "userID is missing in metadata")
+	}
+
+	req.Request.RequestId = requestID
+	req.UserId = userID
+
+	meal, err := m.repo.CreateMeal(ctx, req)
+	if err != nil {
+		return &pbml.CreateMealRes{
+			Success: false,
+			Message: "Meal creation failed",
+			Response: &pbml.BaseResponse{
+				Upstream:  "meal-service",
+				RequestId: requestID,
+			},
+		}, status.Errorf(codes.Internal, "failed to create meal: %v", err)
+	}
+
+	span.SetAttributes(
+		attribute.String("request.id", req.Request.RequestId),
+		attribute.String("request.details", req.String()),
+	)
+
+	return &pbml.CreateMealRes{
+		Success: true,
+		Message: "Meal created successfully",
+		Meal:    meal,
+		Response: &pbml.BaseResponse{
+			Upstream:  "meal-service",
+			RequestId: requestID,
+		},
+	}, nil
+}
+
+func (m *MealService) GetMeal(ctx context.Context, req *pbml.GetMealReq) (*pbml.GetMealRes, error) {
+	tracer := otel.Tracer("FitSphere")
+	ctx, span := tracer.Start(ctx, "Meal/GetMeal")
+	defer span.End()
+
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pbml.BaseRequest{}
+	}
+
+	userID := ctx.Value("userID").(string)
+	if userID == "" {
+		return nil, status.Error(codes.Unauthenticated, "userID is missing in metadata")
+	}
+
+	req.Request.RequestId = requestID
+	req.UserId = userID
+
+	meal, err := m.repo.GetMeal(ctx, req)
+	if err != nil {
+		return &pbml.GetMealRes{
+			Success: false,
+			Message: "Meal creation failed",
+			Response: &pbml.BaseResponse{
+				Upstream:  "meal-service",
+				RequestId: requestID,
+			},
+		}, status.Errorf(codes.Internal, "failed to get meal: %v", err)
+	}
+
+	span.SetAttributes(
+		attribute.String("request.id", req.Request.RequestId),
+		attribute.String("request.details", req.String()),
+	)
+
+	return &pbml.GetMealRes{
+		Success: true,
+		Message: "Meal fetched successfully",
+		Meal:    meal,
+		Response: &pbml.BaseResponse{
+			Upstream:  "meal-service",
+			RequestId: requestID,
+		},
+	}, nil
+}
+
+func (m *MealService) GetMeals(ctx context.Context, req *pbml.GetMealsReq) (*pbml.GetMealsRes, error) {
+	tracer := otel.Tracer("FitSphere")
+	ctx, span := tracer.Start(ctx, "Meal/GetMeals")
+	defer span.End()
+
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pbml.BaseRequest{}
+	}
+
+	userID := ctx.Value("userID").(string)
+	if userID == "" {
+		return nil, status.Error(codes.Unauthenticated, "userID is missing in metadata")
+	}
+
+	req.Request.RequestId = requestID
+	req.UserId = userID
+
+	meals, err := m.repo.GetMeals(ctx, req)
+	if err != nil {
+		return &pbml.GetMealsRes{
+			Success: false,
+			Message: "Meal creation failed",
+			Response: &pbml.BaseResponse{
+				Upstream:  "meal-service",
+				RequestId: requestID,
+			},
+		}, status.Errorf(codes.Internal, "failed to get meals: %v", err)
+	}
+
+	span.SetAttributes(
+		attribute.String("request.id", req.Request.RequestId),
+		attribute.String("request.details", req.String()),
+	)
+
+	return &pbml.GetMealsRes{
+		Success: true,
+		Message: "Meals fetched successfully",
+		Meals:   meals,
+		Response: &pbml.BaseResponse{
+			Upstream:  "meal-service",
+			RequestId: requestID,
+		},
+	}, nil
+}
+
+func (m *MealService) DeleteMeal(ctx context.Context, req *pbml.DeleteMealReq) (*pbml.NilRes, error) {
+	tracer := otel.Tracer("FitSphere")
+	ctx, span := tracer.Start(ctx, "Meal/DeleteMeal")
+	defer span.End()
+
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pbml.BaseRequest{}
+	}
+
+	userID := ctx.Value("userID").(string)
+	if userID == "" {
+		return nil, status.Error(codes.Unauthenticated, "userID is missing in metadata")
+	}
+
+	req.Request.RequestId = requestID
+	req.UserId = userID
+
+	_, err := m.repo.DeleteMeal(ctx, req)
+	if err != nil {
+		return &pbml.NilRes{}, status.Errorf(codes.Internal, "failed to delete meal: %v", err)
+	}
+
+	span.SetAttributes(
+		attribute.String("request.id", req.Request.RequestId),
+		attribute.String("request.details", req.String()),
+	)
+
+	return &pbml.NilRes{}, nil
+}
+
+func (m *MealService) UpdateMeal(ctx context.Context, req *pbml.UpdateMealReq) (*pbml.UpdateMealRes, error) {
+	tracer := otel.Tracer("FitSphere")
+	ctx, span := tracer.Start(ctx, "Meal/UpdateMeal")
+	defer span.End()
+
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pbml.BaseRequest{}
+	}
+
+	userID := ctx.Value("userID").(string)
+	if userID == "" {
+		return nil, status.Error(codes.Unauthenticated, "userID is missing in metadata")
+	}
+
+	req.Request.RequestId = requestID
+	req.UserId = userID
+
+	meal, err := m.repo.UpdateMeal(ctx, req)
+	if err != nil {
+		return &pbml.UpdateMealRes{
+			Success: false,
+			Message: "Meal update failed",
+			Response: &pbml.BaseResponse{
+				Upstream:  "meal-service",
+				RequestId: requestID,
+			},
+		}, status.Errorf(codes.Internal, "failed to update meal: %v", err)
+	}
+
+	span.SetAttributes(
+		attribute.String("request.id", req.Request.RequestId),
+		attribute.String("request.details", req.String()),
+	)
+
+	return &pbml.UpdateMealRes{
+		Success: true,
+		Message: "Meal updated successfully",
+		Meal:    meal,
+		Response: &pbml.BaseResponse{
+			Upstream:  "meal-service",
+			RequestId: requestID,
+		},
+	}, nil
+}
