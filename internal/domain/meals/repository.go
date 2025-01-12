@@ -593,11 +593,67 @@ func (m *MealRepository) GetMeal(ctx context.Context, req *pbml.GetMealReq) (*pb
 		return nil, status.Errorf(codes.InvalidArgument, "meal ID cannot be empty")
 	}
 
+	//query := `SELECT * FROM meals WHERE id = $1`
 	query := `
-		SELECT * FROM meals WHERE id = $1`
+		SELECT 
+			m.id,
+			m.user_id,
+			m.meal_number,
+			m.meal_description,
+			(m.total_macros->>'calories')::DOUBLE PRECISION as total_calories,
+			(m.total_macros->>'protein')::DOUBLE PRECISION as total_protein,
+			(m.total_macros->>'carbohydrates_total')::DOUBLE PRECISION as total_carbs,
+			(m.total_macros->>'fat_total')::DOUBLE PRECISION as total_fat,
+			(m.total_macros->>'fiber')::DOUBLE PRECISION as total_fiber,
+			(m.total_macros->>'sugar')::DOUBLE PRECISION as total_sugar,
+			(m.total_macros->>'sodium')::DOUBLE PRECISION as total_sodium,
+			(m.total_macros->>'potassium')::DOUBLE PRECISION as total_potassium,
+			(m.total_macros->>'cholesterol')::DOUBLE PRECISION as total_cholesterol,
+			(m.total_macros->>'fat_saturated')::DOUBLE PRECISION as total_fat_saturated,
+			
+			m.created_at,
+			m.updated_at
+		FROM meals m
+		LEFT JOIN meal_ingredients mi ON m.id = mi.meal_id
+		WHERE m.user_id = $1 AND m.id = $2
+		GROUP BY m.id, m.user_id, m.meal_number, m.meal_description, m.total_macros
+	`
+	// ARRAY_AGG(
+	// 	jsonb_build_object(
+	// 		'ingredient_id', mi.ingredient_id,
+	// 		'quantity', mi.quantity,
+	// 		'calories', mi.calories
+	// 	)
+	// ) as ingredients,
 
-	if err := m.pgpool.QueryRow(ctx, query, id).Scan(&meal.ID, &meal.UserID,
-		&meal.MealNumber, &meal.MealDescription, &meal.CreatedAt, &meal.UpdatedAt, &nutritionData); err != nil {
+	calories := nutritionData["calories"]
+	protein := nutritionData["protein"]
+	carbohydratesTotal := nutritionData["carbohydrates_total"]
+	fatTotal := nutritionData["fat_total"]
+	fatSaturated := nutritionData["fat_saturated"]
+	fiber := nutritionData["fiber"]
+	sugar := nutritionData["sugar"]
+	sodium := nutritionData["sodium"]
+	potassium := nutritionData["potassium"]
+	cholesterol := nutritionData["cholesterol"]
+
+	if err := m.pgpool.QueryRow(ctx, query, req.UserId, id).Scan(&meal.ID,
+		&meal.UserID,
+		&meal.MealNumber,
+		&meal.MealDescription,
+		&calories,
+		&protein,
+		&carbohydratesTotal,
+		&fatTotal,
+		&fiber,
+		&sugar,
+		&sodium,
+		&potassium,
+		&cholesterol,
+		&fatSaturated,
+		//&nutritionData,
+		&meal.CreatedAt,
+		&meal.UpdatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, status.Errorf(codes.NotFound, "meal with id %s not found", id)
 		}
@@ -618,7 +674,21 @@ func (m *MealRepository) GetMeal(ctx context.Context, req *pbml.GetMealReq) (*pb
 	mealProto.MealDescription = meal.MealDescription
 	mealProto.CreatedAt = createdAt
 	mealProto.UpdatedAt = nullTimeToTimestamppb(updatedAt)
+	for m := range mealProto.MealIngredients {
+		m.MealId = id
+		m.Calories = float32(calories)
+		m.protein = float32(protein)
+		m.carbohydratesTotal = float32(carbohydratesTotal)
+		m.fatTotal = float32(fatTotal)
+		m.fatSaturated = float32(fatSaturated)
+		m.fiber = float32(fiber)
+		m.sugar = float32(sugar)
+		m.sodium = float32(sodium)
+		m.potassium = float32(potassium)
+		m.cholesterol = float32(cholesterol)
+		mealProto.MealIngredients = append(mealProto.MealIngredients, m)
 
+	}
 	return mealProto, nil
 }
 
@@ -670,6 +740,12 @@ func (m *MealRepository) GetMeals(ctx context.Context, req *pbml.GetMealsReq) ([
 }
 
 func (m *MealRepository) UpdateMeal(ctx context.Context, req *pbml.UpdateMealReq) (*pbml.XMeal, error) {
+	tx, err := m.pgpool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to begin transaction: %v", err)
+	}
+	defer tx.Rollback(ctx)
+
 	query := `UPDATE meals SET `
 	var setClauses []string
 	var args []interface{}
@@ -677,15 +753,18 @@ func (m *MealRepository) UpdateMeal(ctx context.Context, req *pbml.UpdateMealReq
 
 	updatedMeal := &pbml.XMeal{}
 
+	// Add updated_at timestamp
+	setClauses = append(setClauses, "updated_at = NOW()")
+
 	for _, update := range req.Updates {
 		switch update.Field {
 		case "meal_number":
 			newValue, err := strconv.ParseInt(update.NewValue, 10, 32)
 			if err != nil {
-				return nil, err
+				return nil, status.Errorf(codes.InvalidArgument, "invalid meal number: %v", err)
 			}
 			setClauses = append(setClauses, fmt.Sprintf("meal_number = $%d", argIndex))
-			args = append(args, update.NewValue)
+			args = append(args, int32(newValue))
 			updatedMeal.MealNumber = int32(newValue)
 			argIndex++
 		case "meal_description":
@@ -703,13 +782,39 @@ func (m *MealRepository) UpdateMeal(ctx context.Context, req *pbml.UpdateMealReq
 	}
 
 	query += strings.Join(setClauses, ", ")
-	query += fmt.Sprintf(" WHERE id = $%d AND user_id = $%d", argIndex, argIndex+1)
+	query += fmt.Sprintf(" WHERE id = $%d AND user_id = $%d RETURNING id, meal_number, meal_description, created_at, updated_at, user_id",
+		argIndex, argIndex+1)
 	args = append(args, req.MealId, req.UserId)
 
-	_, err := m.pgpool.Exec(ctx, query, args...)
+	var createdAt time.Time
+	var updatedAt sql.NullTime
+	var userID uuid.UUID
+
+	err = tx.QueryRow(ctx, query, args...).Scan(
+		&updatedMeal.MealId,
+		&updatedMeal.MealNumber,
+		&updatedMeal.MealDescription,
+		&createdAt,
+		&updatedAt,
+		&userID,
+	)
+
 	if err != nil {
-		return nil, fmt.Errorf("failed to update meal: %w", err)
+		if err == pgx.ErrNoRows {
+			return nil, status.Error(codes.NotFound, "meal not found")
+		}
+		return nil, status.Errorf(codes.Internal, "failed to update meal: %v", err)
 	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to commit transaction: %v", err)
+	}
+
+	updatedMeal.CreatedAt = timestamppb.New(createdAt)
+	if updatedAt.Valid {
+		updatedMeal.UpdatedAt = timestamppb.New(updatedAt.Time)
+	}
+	updatedMeal.UserId = userID.String()
 
 	return updatedMeal, nil
 }
