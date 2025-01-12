@@ -3,6 +3,7 @@ package meals
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -584,156 +585,347 @@ func (m *MealRepository) CreateMeal(ctx context.Context, req *pbml.CreateMealReq
 }
 
 func (m *MealRepository) GetMeal(ctx context.Context, req *pbml.GetMealReq) (*pbml.XMeal, error) {
+	// Initialize the meal response object
 	mealProto := &pbml.XMeal{}
 	id := req.MealId
-	meal := &Meal{}
-	var nutritionData map[string]float64
 
 	if id == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "meal ID cannot be empty")
 	}
 
-	//query := `SELECT * FROM meals WHERE id = $1`
 	query := `
-		SELECT 
+		SELECT
 			m.id,
 			m.user_id,
 			m.meal_number,
 			m.meal_description,
 			(m.total_macros->>'calories')::DOUBLE PRECISION as total_calories,
 			(m.total_macros->>'protein')::DOUBLE PRECISION as total_protein,
-			(m.total_macros->>'carbohydrates_total')::DOUBLE PRECISION as total_carbs,
-			(m.total_macros->>'fat_total')::DOUBLE PRECISION as total_fat,
+			(m.total_macros->>'carbohydrates_total')::DOUBLE PRECISION as total_carbohydrates_total,
+			(m.total_macros->>'fat_total')::DOUBLE PRECISION as total_fat_total,
+			(m.total_macros->>'fat_saturated')::DOUBLE PRECISION as total_fat_saturated,
 			(m.total_macros->>'fiber')::DOUBLE PRECISION as total_fiber,
 			(m.total_macros->>'sugar')::DOUBLE PRECISION as total_sugar,
 			(m.total_macros->>'sodium')::DOUBLE PRECISION as total_sodium,
 			(m.total_macros->>'potassium')::DOUBLE PRECISION as total_potassium,
 			(m.total_macros->>'cholesterol')::DOUBLE PRECISION as total_cholesterol,
-			(m.total_macros->>'fat_saturated')::DOUBLE PRECISION as total_fat_saturated,
-			
 			m.created_at,
-			m.updated_at
+			m.updated_at,
+			COALESCE(
+				jsonb_agg(jsonb_build_object(
+					'ingredient_id', mi.ingredient_id,
+					'quantity', mi.quantity,
+					'calories', mi.calories,
+					'protein', mi.protein,
+					'carbohydrates_total', mi.carbohydrates_total,
+					'fat_total', mi.fat_total,
+					'fat_saturated', mi.fat_saturated,
+					'fiber', mi.fiber,
+					'sugar', mi.sugar,
+					'sodium', mi.sodium,
+					'potassium', mi.potassium,
+					'cholesterol', mi.cholesterol,
+					'name', i.name
+				)), '[]'::jsonb
+			) AS ingredients
 		FROM meals m
 		LEFT JOIN meal_ingredients mi ON m.id = mi.meal_id
-		WHERE m.user_id = $1 AND m.id = $2
+		LEFT JOIN ingredients i ON mi.ingredient_id = i.id
+		WHERE m.id = $1
 		GROUP BY m.id, m.user_id, m.meal_number, m.meal_description, m.total_macros
 	`
-	// ARRAY_AGG(
-	// 	jsonb_build_object(
-	// 		'ingredient_id', mi.ingredient_id,
-	// 		'quantity', mi.quantity,
-	// 		'calories', mi.calories
-	// 	)
-	// ) as ingredients,
 
-	calories := nutritionData["calories"]
-	protein := nutritionData["protein"]
-	carbohydratesTotal := nutritionData["carbohydrates_total"]
-	fatTotal := nutritionData["fat_total"]
-	fatSaturated := nutritionData["fat_saturated"]
-	fiber := nutritionData["fiber"]
-	sugar := nutritionData["sugar"]
-	sodium := nutritionData["sodium"]
-	potassium := nutritionData["potassium"]
-	cholesterol := nutritionData["cholesterol"]
+	var rawIngredients []byte
+	var totalMacrosJSON []byte
 
-	if err := m.pgpool.QueryRow(ctx, query, req.UserId, id).Scan(&meal.ID,
+	meal := &Meal{
+		TotalMacros: &TotalNutrients{},
+	}
+
+	// Fetch the meal details from the database
+	if err := m.pgpool.QueryRow(ctx, query, id).Scan(
+		&meal.ID,
 		&meal.UserID,
 		&meal.MealNumber,
 		&meal.MealDescription,
-		&calories,
-		&protein,
-		&carbohydratesTotal,
-		&fatTotal,
-		&fiber,
-		&sugar,
-		&sodium,
-		&potassium,
-		&cholesterol,
-		&fatSaturated,
-		//&nutritionData,
+		&meal.TotalMacros.Calories,
+		&meal.TotalMacros.Protein,
+		&meal.TotalMacros.CarbohydratesTotal,
+		&meal.TotalMacros.FatTotal,
+		&meal.TotalMacros.FatSaturated,
+		&meal.TotalMacros.Fiber,
+		&meal.TotalMacros.Sugar,
+		&meal.TotalMacros.Sodium,
+		&meal.TotalMacros.Potassium,
+		&meal.TotalMacros.Cholesterol,
 		&meal.CreatedAt,
-		&meal.UpdatedAt); err != nil {
+		&meal.UpdatedAt,
+		&rawIngredients,
+		//&totalMacrosJSON, // Capture the total_macros JSON field
+	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, status.Errorf(codes.NotFound, "meal with id %s not found", id)
 		}
 		return nil, status.Errorf(codes.Internal, "failed to fetch meal: %v", err)
 	}
 
-	createdAt := timestamppb.New(meal.CreatedAt)
-	var updatedAt sql.NullTime
-	if meal.UpdatedAt.Valid {
-		updatedAt = meal.UpdatedAt
+	if len(totalMacrosJSON) > 0 {
+		meal.TotalMacros = &TotalNutrients{}
+		if err := json.Unmarshal(totalMacrosJSON, meal.TotalMacros); err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to unmarshal total_macros: %v", err)
+		}
 	} else {
-		updatedAt = sql.NullTime{Valid: false}
+		meal.TotalMacros = &TotalNutrients{}
+	}
+
+	var ingredients []map[string]interface{}
+	if err := json.Unmarshal(rawIngredients, &ingredients); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to parse ingredients: %v", err)
+	}
+
+	for _, ing := range ingredients {
+		ingredient := &pbml.XMealIngredient{
+			MealId: id,
+		}
+		if name, ok := ing["name"].(string); ok {
+			ingredient.Name = name
+		}
+
+		if quantity, ok := ing["quantity"].(float64); ok {
+			ingredient.Quantity = quantity
+		}
+
+		if calories, ok := ing["calories"].(float64); ok {
+			ingredient.Calories = calories
+		}
+
+		if protein, ok := ing["protein"].(float64); ok {
+			ingredient.Protein = protein
+		}
+
+		if carbohydratesTotal, ok := ing["carbohydrates_total"].(float64); ok {
+			ingredient.CarbohydratesTotal = carbohydratesTotal
+		}
+
+		if fatTotal, ok := ing["fat_total"].(float64); ok {
+			ingredient.FatTotal = fatTotal
+		}
+
+		if fatSaturated, ok := ing["fat_saturated"].(float64); ok {
+			ingredient.FatSaturated = fatSaturated
+		}
+
+		if fiber, ok := ing["fiber"].(float64); ok {
+			ingredient.Fiber = fiber
+		}
+
+		if sugar, ok := ing["sugar"].(float64); ok {
+			ingredient.Sugar = sugar
+		}
+
+		if sodium, ok := ing["sodium"].(float64); ok {
+			ingredient.Sodium = sodium
+		}
+
+		if potassium, ok := ing["potassium"].(float64); ok {
+			ingredient.Potassium = potassium
+		}
+
+		if cholesterol, ok := ing["cholesterol"].(float64); ok {
+			ingredient.Cholesterol = cholesterol
+		}
+		mealProto.MealIngredients = append(mealProto.MealIngredients, ingredient)
 	}
 
 	mealProto.MealId = id
 	mealProto.UserId = meal.UserID.String()
 	mealProto.MealNumber = int32(meal.MealNumber)
 	mealProto.MealDescription = meal.MealDescription
-	mealProto.CreatedAt = createdAt
-	mealProto.UpdatedAt = nullTimeToTimestamppb(updatedAt)
-	for m := range mealProto.MealIngredients {
-		m.MealId = id
-		m.Calories = float32(calories)
-		m.protein = float32(protein)
-		m.carbohydratesTotal = float32(carbohydratesTotal)
-		m.fatTotal = float32(fatTotal)
-		m.fatSaturated = float32(fatSaturated)
-		m.fiber = float32(fiber)
-		m.sugar = float32(sugar)
-		m.sodium = float32(sodium)
-		m.potassium = float32(potassium)
-		m.cholesterol = float32(cholesterol)
-		mealProto.MealIngredients = append(mealProto.MealIngredients, m)
+	mealProto.CreatedAt = timestamppb.New(meal.CreatedAt)
+	mealProto.UpdatedAt = nullTimeToTimestamppb(meal.UpdatedAt)
+	mealProto.TotalMealNutrients = calculateTotals(mealProto.MealIngredients) // calculate totals
 
-	}
 	return mealProto, nil
 }
 
+// Helper function to calculate nutrient totals
+func calculateTotals(ingredients []*pbml.XMealIngredient) *pbml.XTotalMealNutrients {
+	totals := &pbml.XTotalMealNutrients{}
+	for _, ing := range ingredients {
+		totals.Calories += ing.Calories
+		totals.Protein += ing.Protein
+		totals.CarbohydratesTotal += ing.CarbohydratesTotal
+		totals.FatTotal += ing.FatTotal
+		totals.FatSaturated += ing.FatSaturated
+		totals.Fiber += ing.Fiber
+		totals.Sugar += ing.Sugar
+		totals.Sodium += ing.Sodium
+		totals.Potassium += ing.Potassium
+		totals.Cholesterol += ing.Cholesterol
+	}
+	return totals
+}
+
 func (m *MealRepository) GetMeals(ctx context.Context, req *pbml.GetMealsReq) ([]*pbml.XMeal, error) {
-	mealsProto := make([]*pbml.XMeal, 0)
+	// Check if UserID is valid
+	if req.UserId == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "user ID cannot be empty")
+	}
+
 	query := `
-		SELECT * FROM meals WHERE user_id = $1`
+		SELECT
+			m.id,
+			m.user_id,
+			m.meal_number,
+			m.meal_description,
+			(m.total_macros->>'calories')::DOUBLE PRECISION as total_calories,
+			(m.total_macros->>'protein')::DOUBLE PRECISION as total_protein,
+			(m.total_macros->>'carbohydrates_total')::DOUBLE PRECISION as total_carbohydrates_total,
+			(m.total_macros->>'fat_total')::DOUBLE PRECISION as total_fat_total,
+			(m.total_macros->>'fat_saturated')::DOUBLE PRECISION as total_fat_saturated,
+			(m.total_macros->>'fiber')::DOUBLE PRECISION as total_fiber,
+			(m.total_macros->>'sugar')::DOUBLE PRECISION as total_sugar,
+			(m.total_macros->>'sodium')::DOUBLE PRECISION as total_sodium,
+			(m.total_macros->>'potassium')::DOUBLE PRECISION as total_potassium,
+			(m.total_macros->>'cholesterol')::DOUBLE PRECISION as total_cholesterol,
+			m.created_at,
+			m.updated_at,
+			COALESCE(
+				jsonb_agg(jsonb_build_object(
+					'ingredient_id', mi.ingredient_id,
+					'quantity', mi.quantity,
+					'calories', mi.calories,
+					'protein', mi.protein,
+					'carbohydrates_total', mi.carbohydrates_total,
+					'fat_total', mi.fat_total,
+					'fat_saturated', mi.fat_saturated,
+					'fiber', mi.fiber,
+					'sugar', mi.sugar,
+					'sodium', mi.sodium,
+					'potassium', mi.potassium,
+					'cholesterol', mi.cholesterol,
+					'name', i.name
+				)), '[]'::jsonb
+			) AS ingredients
+		FROM meals m
+		LEFT JOIN meal_ingredients mi ON m.id = mi.meal_id
+		LEFT JOIN ingredients i ON mi.ingredient_id = i.id
+		WHERE m.user_id = $1
+		GROUP BY m.id, m.user_id, m.meal_number, m.meal_description, m.total_macros
+	`
 
 	rows, err := m.pgpool.Query(ctx, query, req.UserId)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("no meals found: %w", err)
-		}
 		return nil, status.Errorf(codes.Internal, "failed to fetch meals: %v", err)
 	}
 	defer rows.Close()
 
+	var mealsProto []*pbml.XMeal
+
 	for rows.Next() {
-		mealProto := pbml.XMeal{}
-		meal := &Meal{}
-		var nutritionData map[string]float64
+		var rawIngredients []byte
+		meal := &Meal{
+			TotalMacros: &TotalNutrients{},
+		}
 
-		if err := rows.Scan(&meal.ID, &meal.UserID, &meal.MealNumber, &meal.MealDescription, &meal.CreatedAt, &meal.UpdatedAt, &nutritionData); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return nil, fmt.Errorf("no meals found: %w", err)
+		if err := rows.Scan(
+			&meal.ID,
+			&meal.UserID,
+			&meal.MealNumber,
+			&meal.MealDescription,
+			&meal.TotalMacros.Calories,
+			&meal.TotalMacros.Protein,
+			&meal.TotalMacros.CarbohydratesTotal,
+			&meal.TotalMacros.FatTotal,
+			&meal.TotalMacros.FatSaturated,
+			&meal.TotalMacros.Fiber,
+			&meal.TotalMacros.Sugar,
+			&meal.TotalMacros.Sodium,
+			&meal.TotalMacros.Potassium,
+			&meal.TotalMacros.Cholesterol,
+			&meal.CreatedAt,
+			&meal.UpdatedAt,
+			&rawIngredients,
+		); err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to scan meal: %v", err)
+		}
+
+		var ingredients []map[string]interface{}
+		if err := json.Unmarshal(rawIngredients, &ingredients); err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to parse ingredients: %v", err)
+		}
+
+		mealProto := &pbml.XMeal{
+			MealId:          meal.ID.String(),
+			UserId:          meal.UserID.String(),
+			MealNumber:      int32(meal.MealNumber),
+			MealDescription: meal.MealDescription,
+			CreatedAt:       timestamppb.New(meal.CreatedAt),
+			UpdatedAt:       nullTimeToTimestamppb(meal.UpdatedAt),
+		}
+
+		for _, ing := range ingredients {
+			ingredient := &pbml.XMealIngredient{
+				MealId: meal.ID.String(),
 			}
-			return nil, status.Errorf(codes.Internal, "failed to scan row: %v", err)
+			if name, ok := ing["name"].(string); ok {
+				ingredient.Name = name
+			}
+
+			if quantity, ok := ing["quantity"].(float64); ok {
+				ingredient.Quantity = quantity
+			}
+
+			if calories, ok := ing["calories"].(float64); ok {
+				ingredient.Calories = calories
+			}
+
+			if protein, ok := ing["protein"].(float64); ok {
+				ingredient.Protein = protein
+			}
+
+			if carbohydratesTotal, ok := ing["carbohydrates_total"].(float64); ok {
+				ingredient.CarbohydratesTotal = carbohydratesTotal
+			}
+
+			if fatTotal, ok := ing["fat_total"].(float64); ok {
+				ingredient.FatTotal = fatTotal
+			}
+
+			if fatSaturated, ok := ing["fat_saturated"].(float64); ok {
+				ingredient.FatSaturated = fatSaturated
+			}
+
+			if fiber, ok := ing["fiber"].(float64); ok {
+				ingredient.Fiber = fiber
+			}
+
+			if sugar, ok := ing["sugar"].(float64); ok {
+				ingredient.Sugar = sugar
+			}
+
+			if sodium, ok := ing["sodium"].(float64); ok {
+				ingredient.Sodium = sodium
+			}
+
+			if potassium, ok := ing["potassium"].(float64); ok {
+				ingredient.Potassium = potassium
+			}
+
+			if cholesterol, ok := ing["cholesterol"].(float64); ok {
+				ingredient.Cholesterol = cholesterol
+			}
+
+			mealProto.MealIngredients = append(mealProto.MealIngredients, ingredient)
 		}
 
-		createdAt := timestamppb.New(meal.CreatedAt)
-		var updatedAt sql.NullTime
-		if meal.UpdatedAt.Valid {
-			updatedAt = meal.UpdatedAt
-		} else {
-			updatedAt = sql.NullTime{Valid: false}
-		}
+		mealProto.TotalMealNutrients = calculateTotals(mealProto.MealIngredients)
 
-		mealProto.MealId = meal.ID.String()
-		mealProto.UserId = meal.UserID.String()
-		mealProto.MealNumber = int32(meal.MealNumber)
-		mealProto.MealDescription = meal.MealDescription
-		mealProto.CreatedAt = createdAt
-		mealProto.UpdatedAt = nullTimeToTimestamppb(updatedAt)
+		mealsProto = append(mealsProto, mealProto)
+	}
 
-		mealsProto = append(mealsProto, &mealProto)
+	if rows.Err() != nil {
+		return nil, status.Errorf(codes.Internal, "error iterating over meals: %v", rows.Err())
 	}
 
 	return mealsProto, nil

@@ -10,6 +10,10 @@ github.com/FACorreiaa/fitme-protos v0.0.0-20250111221732-9947e705391c h1:Bj1lLBy
 github.com/FACorreiaa/fitme-protos v0.0.0-20250111221732-9947e705391c/go.mod h1:WGKFlFWku8Uq/NOKh0wnZs0rmngs5zy4o7y6zLdaLjs=
 github.com/FACorreiaa/fitme-protos v0.0.0-20250111225852-d774fcf57563 h1:7ToYKHQJuQEMZekRIFZrcpNGStAlP1bv/JEsJlN918w=
 github.com/FACorreiaa/fitme-protos v0.0.0-20250111225852-d774fcf57563/go.mod h1:WGKFlFWku8Uq/NOKh0wnZs0rmngs5zy4o7y6zLdaLjs=
+github.com/FACorreiaa/fitme-protos v0.0.0-20250112010313-2959f57b46c9 h1:OWmUdgEY+NR3HhDU+WYQJkAlwzGqJSQ95pQltpyMWHg=
+github.com/FACorreiaa/fitme-protos v0.0.0-20250112010313-2959f57b46c9/go.mod h1:WGKFlFWku8Uq/NOKh0wnZs0rmngs5zy4o7y6zLdaLjs=
+github.com/FACorreiaa/fitme-protos v0.0.0-20250112150031-28270d6682af h1:UMJS5kiWZ+hDg2Yhje/S9OCxtRusliZorTAemf1kU54=
+github.com/FACorreiaa/fitme-protos v0.0.0-20250112150031-28270d6682af/go.mod h1:WGKFlFWku8Uq/NOKh0wnZs0rmngs5zy4o7y6zLdaLjs=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
