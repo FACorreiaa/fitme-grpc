@@ -54,8 +54,7 @@ func (m MealPlanService) DeleteMeal(ctx context.Context, req *pbml.DeleteMealReq
 	panic("implement me")
 }
 
-func (m MealPlanService) AddIngredientToMeal(ctx context.Context, req *pbml.AddIngredientReq) (*pbml.NilRes, error) {
-	//TODO implement me
+func (m MealPlanService) AddIngredientToMeal(ctx context.Context, req *pbml.AddIngredientReq) (*pbml.AddIngredientRes, error) {
 	panic("implement me")
 }
 
@@ -104,7 +103,7 @@ func (d DietPreferenceService) DeleteMeal(ctx context.Context, req *pbml.DeleteM
 	panic("implement me")
 }
 
-func (d DietPreferenceService) AddIngredientToMeal(ctx context.Context, req *pbml.AddIngredientReq) (*pbml.NilRes, error) {
+func (d DietPreferenceService) AddIngredientToMeal(ctx context.Context, req *pbml.AddIngredientReq) (*pbml.AddIngredientRes, error) {
 	//TODO implement me
 	panic("implement me")
 }
@@ -928,4 +927,86 @@ func (m *MealService) UpdateMeal(ctx context.Context, req *pbml.UpdateMealReq) (
 			RequestId: requestID,
 		},
 	}, nil
+}
+
+func (m *MealService) AddIngredientToMeal(ctx context.Context, req *pbml.AddIngredientReq) (*pbml.AddIngredientRes, error) {
+	tracer := otel.Tracer("FitSphere")
+	ctx, span := tracer.Start(ctx, "Meal/AddIngredientToMeal")
+	defer span.End()
+
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pbml.BaseRequest{}
+	}
+
+	userID := ctx.Value("userID").(string)
+	if userID == "" {
+		return nil, status.Error(codes.Unauthenticated, "userID is missing in metadata")
+	}
+
+	req.Request.RequestId = requestID
+	req.UserId = userID
+
+	ingredient, err := m.repo.AddIngredientToMeal(ctx, req)
+	if err != nil {
+		return &pbml.AddIngredientRes{
+			Success: false,
+			Message: "Failed to add ingredient to meal",
+			Response: &pbml.BaseResponse{
+				Upstream:  "meal-service",
+				RequestId: requestID,
+			},
+		}, status.Errorf(codes.Internal, "failed to add ingredient to meal: %v", err)
+	}
+
+	span.SetAttributes(
+		attribute.String("request.id", req.Request.RequestId),
+		attribute.String("request.details", req.String()),
+	)
+
+	return &pbml.AddIngredientRes{
+		Success:       true,
+		Message:       "Ingredient added to meal successfully",
+		NewIngredient: ingredient,
+		Response: &pbml.BaseResponse{
+			Upstream:  "meal-service",
+			RequestId: requestID,
+		},
+	}, nil
+}
+
+func (m *MealService) RemoveIngredientFromMeal(ctx context.Context, req *pbml.DeleteIngredientReq) (*pbml.NilRes, error) {
+	tracer := otel.Tracer("FitSphere")
+	ctx, span := tracer.Start(ctx, "Meal/RemoveIngredientFromMeal")
+	defer span.End()
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pbml.BaseRequest{}
+	}
+
+	userID := ctx.Value("userID").(string)
+	if userID == "" {
+		return nil, status.Error(codes.Unauthenticated, "userID is missing in context")
+	}
+
+	req.Request.RequestId = requestID
+	req.UserId = userID
+	_, err := m.repo.RemoveIngredientFromMeal(ctx, req)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to remove ingredient from meal: %v", err)
+	}
+
+	span.SetAttributes(
+		attribute.String("request.id", req.Request.RequestId),
+		attribute.String("request.details", req.String()))
+
+	return &pbml.NilRes{}, nil
 }

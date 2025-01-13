@@ -107,7 +107,7 @@ type MealPlanRepository interface {
 	CreateMealPlan(ctx context.Context, req *pbml.CreateMealPlanReq) (*pbml.CreateMealPlanRes, error)
 	UpdateMealPlan(ctx context.Context, req *pbml.UpdateMealPlanReq) (*pbml.UpdateMealPlanRes, error)
 	DeleteMealPlan(ctx context.Context, req *pbml.DeleteMealPlanReq) (*pbml.NilRes, error)
-	AddIngredientToMealPlan(ctx context.Context, req *pbml.AddIngredientReq) (*pbml.NilRes, error)
+	AddIngredientToMealPlan(ctx context.Context, req *pbml.AddIngredientReq) (*pbml.AddIngredientRes, error)
 	DeleteIngredientFromMealPlan(ctx context.Context, req *pbml.DeleteIngredientReq) (*pbml.NilRes, error)
 	CreateCalorieIntakeObjective(ctx context.Context, req *pbml.CreateCalorieIntakeObjectiveReq) (*pbml.CreateCalorieIntakeObjectiveRes, error)
 	UpdateCalorieIntakeObjective(ctx context.Context, req *pbml.UpdateCalorieIntakeObjectiveReq) (*pbml.UpdateCalorieIntakeObjectiveRes, error)
@@ -121,8 +121,11 @@ type MealRepository interface {
 	CreateMeal(ctx context.Context, req *pbml.CreateMealReq) (*pbml.XMeal, error)
 	UpdateMeal(ctx context.Context, req *pbml.UpdateMealReq) (*pbml.XMeal, error)
 	DeleteMeal(ctx context.Context, req *pbml.DeleteMealReq) (*pbml.NilRes, error)
-	AddIngredientToMeal(ctx context.Context, req *pbml.AddIngredientReq) (*pbml.NilRes, error)
+	AddIngredientToMeal(ctx context.Context, req *pbml.AddIngredientReq) (*pbml.NewIngredient, error)
 	RemoveIngredientFromMeal(ctx context.Context, req *pbml.DeleteIngredientReq) (*pbml.NilRes, error)
+	UpdateIngredientInMeal(ctx context.Context, req *pbml.UpdateMealIngredientReq) (*pbml.UpdateIngredientRes, error)
+	GetMealIngredients(ctx context.Context, req *pbml.GetMealIngredientsReq) (*pbml.GetMealIngredientsRes, error)
+	GetMealIngredient(ctx context.Context, req *pbml.GetMealIngredientReq) (*pbml.GetMealIngredientRes, error)
 }
 
 // IngredientsRepository interface
