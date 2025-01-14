@@ -585,7 +585,6 @@ func (m *MealRepository) CreateMeal(ctx context.Context, req *pbml.CreateMealReq
 }
 
 func (m *MealRepository) GetMeal(ctx context.Context, req *pbml.GetMealReq) (*pbml.XMeal, error) {
-	// Initialize the meal response object
 	mealProto := &pbml.XMeal{}
 	id := req.MealId
 
@@ -614,6 +613,7 @@ func (m *MealRepository) GetMeal(ctx context.Context, req *pbml.GetMealReq) (*pb
 			COALESCE(
 				jsonb_agg(jsonb_build_object(
 					'ingredient_id', mi.ingredient_id,
+					'name', i.name,
 					'quantity', mi.quantity,
 					'calories', mi.calories,
 					'protein', mi.protein,
@@ -624,8 +624,7 @@ func (m *MealRepository) GetMeal(ctx context.Context, req *pbml.GetMealReq) (*pb
 					'sugar', mi.sugar,
 					'sodium', mi.sodium,
 					'potassium', mi.potassium,
-					'cholesterol', mi.cholesterol,
-					'name', i.name
+					'cholesterol', mi.cholesterol
 				)), '[]'::jsonb
 			) AS ingredients
 		FROM meals m
@@ -636,13 +635,10 @@ func (m *MealRepository) GetMeal(ctx context.Context, req *pbml.GetMealReq) (*pb
 	`
 
 	var rawIngredients []byte
-	var totalMacrosJSON []byte
-
 	meal := &Meal{
 		TotalMacros: &TotalNutrients{},
 	}
 
-	// Fetch the meal details from the database
 	if err := m.pgpool.QueryRow(ctx, query, id).Scan(
 		&meal.ID,
 		&meal.UserID,
@@ -661,7 +657,6 @@ func (m *MealRepository) GetMeal(ctx context.Context, req *pbml.GetMealReq) (*pb
 		&meal.CreatedAt,
 		&meal.UpdatedAt,
 		&rawIngredients,
-		//&totalMacrosJSON, // Capture the total_macros JSON field
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, status.Errorf(codes.NotFound, "meal with id %s not found", id)
@@ -669,233 +664,73 @@ func (m *MealRepository) GetMeal(ctx context.Context, req *pbml.GetMealReq) (*pb
 		return nil, status.Errorf(codes.Internal, "failed to fetch meal: %v", err)
 	}
 
-	if len(totalMacrosJSON) > 0 {
-		meal.TotalMacros = &TotalNutrients{}
-		if err := json.Unmarshal(totalMacrosJSON, meal.TotalMacros); err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to unmarshal total_macros: %v", err)
-		}
-	} else {
-		meal.TotalMacros = &TotalNutrients{}
+	mealProto.TotalMealNutrients = &pbml.XTotalMealNutrients{
+		Calories:           convertFloat(meal.TotalMacros.Calories),
+		Protein:            convertFloat(meal.TotalMacros.Protein),
+		CarbohydratesTotal: convertFloat(meal.TotalMacros.CarbohydratesTotal),
+		FatTotal:           convertFloat(meal.TotalMacros.FatTotal),
+		FatSaturated:       convertFloat(meal.TotalMacros.FatSaturated),
+		Fiber:              convertFloat(meal.TotalMacros.Fiber),
+		Sugar:              convertFloat(meal.TotalMacros.Sugar),
+		Sodium:             convertFloat(meal.TotalMacros.Sodium),
+		Potassium:          convertFloat(meal.TotalMacros.Potassium),
+		Cholesterol:        convertFloat(meal.TotalMacros.Cholesterol),
 	}
 
+	// Parse rawIngredients into Ingredients slice
 	var ingredients []map[string]interface{}
 	if err := json.Unmarshal(rawIngredients, &ingredients); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to parse ingredients: %v", err)
 	}
 
 	for _, ing := range ingredients {
-		ingredient := &pbml.XMealIngredient{
-			MealId: id,
-		}
-		if name, ok := ing["name"].(string); ok {
-			ingredient.Name = name
-		}
-
-		if quantity, ok := ing["quantity"].(float64); ok {
-			ingredient.Quantity = quantity
-		}
-
-		if calories, ok := ing["calories"].(float64); ok {
-			ingredient.Calories = calories
-		}
-
-		if protein, ok := ing["protein"].(float64); ok {
-			ingredient.Protein = protein
+		ingredient := Ingredient{
+			ID:                 uuid.MustParse(ing["ingredient_id"].(string)),
+			Name:               ing["name"].(string),
+			Calories:           ing["calories"].(float64),
+			Protein:            ing["protein"].(float64),
+			CarbohydratesTotal: ing["carbohydrates_total"].(float64),
+			FatTotal:           ing["fat_total"].(float64),
+			FatSaturated:       ing["fat_saturated"].(float64),
+			Fiber:              ing["fiber"].(float64),
+			Sugar:              ing["sugar"].(float64),
+			Sodium:             ing["sodium"].(float64),
+			Potassium:          ing["potassium"].(float64),
+			Cholesterol:        ing["cholesterol"].(float64),
 		}
 
-		if carbohydratesTotal, ok := ing["carbohydrates_total"].(float64); ok {
-			ingredient.CarbohydratesTotal = carbohydratesTotal
-		}
-
-		if fatTotal, ok := ing["fat_total"].(float64); ok {
-			ingredient.FatTotal = fatTotal
-		}
-
-		if fatSaturated, ok := ing["fat_saturated"].(float64); ok {
-			ingredient.FatSaturated = fatSaturated
-		}
-
-		if fiber, ok := ing["fiber"].(float64); ok {
-			ingredient.Fiber = fiber
-		}
-
-		if sugar, ok := ing["sugar"].(float64); ok {
-			ingredient.Sugar = sugar
-		}
-
-		if sodium, ok := ing["sodium"].(float64); ok {
-			ingredient.Sodium = sodium
-		}
-
-		if potassium, ok := ing["potassium"].(float64); ok {
-			ingredient.Potassium = potassium
-		}
-
-		if cholesterol, ok := ing["cholesterol"].(float64); ok {
-			ingredient.Cholesterol = cholesterol
-		}
-		mealProto.MealIngredients = append(mealProto.MealIngredients, ingredient)
+		meal.Ingredients = append(meal.Ingredients, ingredient)
 	}
 
-	//for _, ing := range meal.Ingredients {
-	//	mealProto.MealIngredients = append(mealProto.MealIngredients, &pbml.XMealIngredient{
-	//		MealId: id,
-	//		IngredientId: ing
-	//	})
-	//}
-
-	mealProto.MealId = id
+	// Map Meal to gRPC Response
+	mealProto.MealId = meal.ID.String()
 	mealProto.UserId = meal.UserID.String()
 	mealProto.MealNumber = int32(meal.MealNumber)
 	mealProto.MealDescription = meal.MealDescription
 	mealProto.CreatedAt = timestamppb.New(meal.CreatedAt)
 	mealProto.UpdatedAt = nullTimeToTimestamppb(meal.UpdatedAt)
-	mealProto.TotalMealNutrients = calculateTotals(mealProto.MealIngredients) // calculate totals
+
+	for _, ing := range meal.Ingredients {
+		mealProto.MealIngredients = append(mealProto.MealIngredients, &pbml.XMealIngredient{
+			IngredientId:       []string{ing.ID.String()},
+			MealId:             mealProto.MealId,
+			Name:               ing.Name,
+			Quantity:           0,
+			Calories:           ing.Calories,
+			Protein:            ing.Protein,
+			CarbohydratesTotal: ing.CarbohydratesTotal,
+			FatTotal:           ing.FatTotal,
+			FatSaturated:       ing.FatSaturated,
+			Fiber:              ing.Fiber,
+			Sugar:              ing.Sugar,
+			Sodium:             ing.Sodium,
+			Potassium:          ing.Potassium,
+			Cholesterol:        ing.Cholesterol,
+		})
+	}
 
 	return mealProto, nil
 }
-
-//func (m *MealRepository) GetMeal(ctx context.Context, req *pbml.GetMealReq) (*pbml.XMeal, error) {
-//	// Initialize the meal response object
-//	mealProto := &pbml.XMeal{}
-//	id := req.MealId
-//
-//	if id == "" {
-//		return nil, status.Errorf(codes.InvalidArgument, "meal ID cannot be empty")
-//	}
-//
-//	query := `
-//		SELECT
-//			m.id,
-//			m.user_id,
-//			m.meal_number,
-//			m.meal_description,
-//			(m.total_macros->>'calories')::DOUBLE PRECISION as total_calories,
-//			(m.total_macros->>'protein')::DOUBLE PRECISION as total_protein,
-//			(m.total_macros->>'carbohydrates_total')::DOUBLE PRECISION as total_carbohydrates_total,
-//			(m.total_macros->>'fat_total')::DOUBLE PRECISION as total_fat_total,
-//			(m.total_macros->>'fat_saturated')::DOUBLE PRECISION as total_fat_saturated,
-//			(m.total_macros->>'fiber')::DOUBLE PRECISION as total_fiber,
-//			(m.total_macros->>'sugar')::DOUBLE PRECISION as total_sugar,
-//			(m.total_macros->>'sodium')::DOUBLE PRECISION as total_sodium,
-//			(m.total_macros->>'potassium')::DOUBLE PRECISION as total_potassium,
-//			(m.total_macros->>'cholesterol')::DOUBLE PRECISION as total_cholesterol,
-//			m.created_at,
-//			m.updated_at,
-//			COALESCE(
-//				jsonb_agg(jsonb_build_object(
-//					'ingredient_id', mi.ingredient_id,
-//					'quantity', mi.quantity,
-//					'calories', mi.calories,
-//					'protein', mi.protein,
-//					'carbohydrates_total', mi.carbohydrates_total,
-//					'fat_total', mi.fat_total,
-//					'fat_saturated', mi.fat_saturated,
-//					'fiber', mi.fiber,
-//					'sugar', mi.sugar,
-//					'sodium', mi.sodium,
-//					'potassium', mi.potassium,
-//					'cholesterol', mi.cholesterol,
-//					'name', i.name
-//				)), '[]'::jsonb
-//			) AS ingredients
-//		FROM meals m
-//		LEFT JOIN meal_ingredients mi ON m.id = mi.meal_id
-//		LEFT JOIN ingredients i ON mi.ingredient_id = i.id
-//		WHERE m.id = $1
-//		GROUP BY m.id
-//	`
-//
-//	var rawIngredients []byte
-//
-//	meal := &Meal{
-//		TotalMacros: &TotalNutrients{},
-//	}
-//
-//	// Execute query and scan results
-//	if err := m.pgpool.QueryRow(ctx, query, id).Scan(
-//		&meal.ID,
-//		&meal.UserID,
-//		&meal.MealNumber,
-//		&meal.MealDescription,
-//		&meal.TotalMacros.Calories,
-//		&meal.TotalMacros.Protein,
-//		&meal.TotalMacros.CarbohydratesTotal,
-//		&meal.TotalMacros.FatTotal,
-//		&meal.TotalMacros.FatSaturated,
-//		&meal.TotalMacros.Fiber,
-//		&meal.TotalMacros.Sugar,
-//		&meal.TotalMacros.Sodium,
-//		&meal.TotalMacros.Potassium,
-//		&meal.TotalMacros.Cholesterol,
-//		&meal.CreatedAt,
-//		&meal.UpdatedAt,
-//		&rawIngredients,
-//	); err != nil {
-//		if errors.Is(err, pgx.ErrNoRows) {
-//			return nil, status.Errorf(codes.NotFound, "meal with id %s not found", id)
-//		}
-//		return nil, status.Errorf(codes.Internal, "failed to fetch meal: %v", err)
-//	}
-//
-//	// Parse raw ingredients JSON into MealIngredient slice
-//	var ingredients []MealIngredient
-//	if err := json.Unmarshal(rawIngredients, &ingredients); err != nil {
-//		return nil, status.Errorf(codes.Internal, "failed to parse ingredients: %v", err)
-//	}
-//
-//	mealProto = &pbml.XMeal{
-//		MealId:          meal.ID.String(),
-//		UserId:          meal.UserID.String(),
-//		MealDescription: meal.MealDescription,
-//		CreatedAt: &timestamppb.Timestamp{
-//			Seconds: meal.CreatedAt.Unix(),
-//			Nanos:   int32(meal.CreatedAt.Nanosecond()),
-//		},
-//		TotalMealNutrients: &pbml.XTotalMealNutrients{
-//			Calories:           meal.TotalMacros.Calories,
-//			Protein:            meal.TotalMacros.Protein,
-//			CarbohydratesTotal: meal.TotalMacros.CarbohydratesTotal,
-//			FatTotal:           meal.TotalMacros.FatTotal,
-//			FatSaturated:       meal.TotalMacros.FatSaturated,
-//			Fiber:              meal.TotalMacros.Fiber,
-//			Sugar:              meal.TotalMacros.Sugar,
-//			Sodium:             meal.TotalMacros.Sodium,
-//			Potassium:          meal.TotalMacros.Potassium,
-//			Cholesterol:        meal.TotalMacros.Cholesterol,
-//		},
-//	}
-//
-//	// Map each ingredient to proto format
-//	for _, ingredient := range ingredients {
-//		mealProto.MealIngredients = append(mealProto.MealIngredients, &pbml.XMealIngredient{
-//			IngredientId:       uuidsToStrings(ingredient.IngredientID),
-//			MealId:             ingredient.MealID.String(),
-//			Quantity:           ingredient.Quantity,
-//			Calories:           ingredient.Calories,
-//			Protein:            ingredient.Protein,
-//			CarbohydratesTotal: ingredient.CarbohydratesTotal,
-//			FatTotal:           ingredient.FatTotal,
-//			FatSaturated:       ingredient.FatSaturated,
-//			Fiber:              ingredient.Fiber,
-//			Sugar:              ingredient.Sugar,
-//			Sodium:             ingredient.Sodium,
-//			Potassium:          ingredient.Potassium,
-//			Cholesterol:        ingredient.Cholesterol,
-//			//Name:               ingredient.Name,
-//		})
-//	}
-//
-//	return mealProto, nil
-//}
-//
-//func uuidsToStrings(uuids []uuid.UUID) []string {
-//	strings := make([]string, len(uuids))
-//	for i, u := range uuids {
-//		strings[i] = u.String() // Convert UUID to string
-//	}
-//	return strings
-//}
 
 // Helper function to calculate nutrient totals
 func calculateTotals(ingredients []*pbml.XMealIngredient) *pbml.XTotalMealNutrients {
@@ -913,6 +748,13 @@ func calculateTotals(ingredients []*pbml.XMealIngredient) *pbml.XTotalMealNutrie
 		totals.Cholesterol += ing.Cholesterol
 	}
 	return totals
+}
+
+func convertFloat(n sql.NullFloat64) float64 {
+	if n.Valid {
+		return n.Float64
+	}
+	return 0
 }
 
 func (m *MealRepository) GetMeals(ctx context.Context, req *pbml.GetMealsReq) ([]*pbml.XMeal, error) {
@@ -941,7 +783,8 @@ func (m *MealRepository) GetMeals(ctx context.Context, req *pbml.GetMealsReq) ([
 			m.updated_at,
 			COALESCE(
 				jsonb_agg(jsonb_build_object(
-					'ingredient_id', mi.ingredient_id,
+					'ingredient_id', mi.ingredient_id::TEXT,
+					'name', i.name,
 					'quantity', mi.quantity,
 					'calories', mi.calories,
 					'protein', mi.protein,
@@ -952,8 +795,7 @@ func (m *MealRepository) GetMeals(ctx context.Context, req *pbml.GetMealsReq) ([
 					'sugar', mi.sugar,
 					'sodium', mi.sodium,
 					'potassium', mi.potassium,
-					'cholesterol', mi.cholesterol,
-					'name', i.name
+					'cholesterol', mi.cholesterol
 				)), '[]'::jsonb
 			) AS ingredients
 		FROM meals m
@@ -996,12 +838,7 @@ func (m *MealRepository) GetMeals(ctx context.Context, req *pbml.GetMealsReq) ([
 			&meal.UpdatedAt,
 			&rawIngredients,
 		); err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to scan meal: %v", err)
-		}
-
-		var ingredients []map[string]interface{}
-		if err := json.Unmarshal(rawIngredients, &ingredients); err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to parse ingredients: %v", err)
+			return nil, status.Errorf(codes.Internal, "failed to parse row: %v", err)
 		}
 
 		mealProto := &pbml.XMeal{
@@ -1011,70 +848,45 @@ func (m *MealRepository) GetMeals(ctx context.Context, req *pbml.GetMealsReq) ([
 			MealDescription: meal.MealDescription,
 			CreatedAt:       timestamppb.New(meal.CreatedAt),
 			UpdatedAt:       nullTimeToTimestamppb(meal.UpdatedAt),
+			TotalMealNutrients: &pbml.XTotalMealNutrients{
+				Calories:           convertFloat(meal.TotalMacros.Calories),
+				Protein:            convertFloat(meal.TotalMacros.Protein),
+				CarbohydratesTotal: convertFloat(meal.TotalMacros.CarbohydratesTotal),
+				FatTotal:           convertFloat(meal.TotalMacros.FatTotal),
+				FatSaturated:       convertFloat(meal.TotalMacros.FatSaturated),
+				Fiber:              convertFloat(meal.TotalMacros.Fiber),
+				Sugar:              convertFloat(meal.TotalMacros.Sugar),
+				Sodium:             convertFloat(meal.TotalMacros.Sodium),
+				Potassium:          convertFloat(meal.TotalMacros.Potassium),
+				Cholesterol:        convertFloat(meal.TotalMacros.Cholesterol),
+			},
+		}
+
+		var ingredients []map[string]interface{}
+		if err := json.Unmarshal(rawIngredients, &ingredients); err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to parse ingredients: %v", err)
 		}
 
 		for _, ing := range ingredients {
-			ingredient := &pbml.XMealIngredient{
-				MealId: meal.ID.String(),
-			}
-			if name, ok := ing["name"].(string); ok {
-				ingredient.Name = name
-			}
-
-			if quantity, ok := ing["quantity"].(float64); ok {
-				ingredient.Quantity = quantity
-			}
-
-			if calories, ok := ing["calories"].(float64); ok {
-				ingredient.Calories = calories
-			}
-
-			if protein, ok := ing["protein"].(float64); ok {
-				ingredient.Protein = protein
-			}
-
-			if carbohydratesTotal, ok := ing["carbohydrates_total"].(float64); ok {
-				ingredient.CarbohydratesTotal = carbohydratesTotal
-			}
-
-			if fatTotal, ok := ing["fat_total"].(float64); ok {
-				ingredient.FatTotal = fatTotal
-			}
-
-			if fatSaturated, ok := ing["fat_saturated"].(float64); ok {
-				ingredient.FatSaturated = fatSaturated
-			}
-
-			if fiber, ok := ing["fiber"].(float64); ok {
-				ingredient.Fiber = fiber
-			}
-
-			if sugar, ok := ing["sugar"].(float64); ok {
-				ingredient.Sugar = sugar
-			}
-
-			if sodium, ok := ing["sodium"].(float64); ok {
-				ingredient.Sodium = sodium
-			}
-
-			if potassium, ok := ing["potassium"].(float64); ok {
-				ingredient.Potassium = potassium
-			}
-
-			if cholesterol, ok := ing["cholesterol"].(float64); ok {
-				ingredient.Cholesterol = cholesterol
-			}
-
-			mealProto.MealIngredients = append(mealProto.MealIngredients, ingredient)
+			mealProto.MealIngredients = append(mealProto.MealIngredients, &pbml.XMealIngredient{
+				IngredientId:       []string{ing["ingredient_id"].(string)},
+				MealId:             mealProto.MealId,
+				Name:               ing["name"].(string),
+				Quantity:           ing["quantity"].(float64),
+				Calories:           ing["calories"].(float64),
+				Protein:            ing["protein"].(float64),
+				CarbohydratesTotal: ing["carbohydrates_total"].(float64),
+				FatTotal:           ing["fat_total"].(float64),
+				FatSaturated:       ing["fat_saturated"].(float64),
+				Fiber:              ing["fiber"].(float64),
+				Sugar:              ing["sugar"].(float64),
+				Sodium:             ing["sodium"].(float64),
+				Potassium:          ing["potassium"].(float64),
+				Cholesterol:        ing["cholesterol"].(float64),
+			})
 		}
 
-		mealProto.TotalMealNutrients = calculateTotals(mealProto.MealIngredients)
-
 		mealsProto = append(mealsProto, mealProto)
-	}
-
-	if rows.Err() != nil {
-		return nil, status.Errorf(codes.Internal, "error iterating over meals: %v", rows.Err())
 	}
 
 	return mealsProto, nil
@@ -1403,14 +1215,314 @@ func (m *MealRepository) RemoveIngredientFromMeal(ctx context.Context, req *pbml
 
 }
 
-func (m *MealRepository) UpdateIngredientInMeal(ctx context.Context, req *pbml.UpdateMealIngredientReq) (*pbml.UpdateIngredientRes, error) {
-	return nil, nil
+func (m *MealRepository) GetMealIngredients(ctx context.Context, req *pbml.GetMealIngredientsReq) ([]*pbml.XMealIngredient, error) {
+	if req.MealId == "" {
+		return nil, status.Error(codes.InvalidArgument, "meal id is required")
+	}
+
+	tx, err := m.pgpool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to begin transaction: %v", err)
+	}
+
+	defer tx.Rollback(ctx)
+
+	query := `
+		SELECT m.id, i.name, m.quantity, m.calories, m.protein, m.carbohydrates_total, 
+			   m.fat_total, m.fat_saturated, m.fiber, m.sugar, m.sodium, 
+			   m.potassium, m.cholesterol
+		FROM meal_ingredients m
+		JOIN ingredients i ON m.ingredient_id = i.id
+		WHERE meal_id = $1
+	`
+
+	rows, err := tx.Query(ctx, query, req.MealId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get meal ingredients: %v", err)
+	}
+
+	defer rows.Close()
+
+	ingredients := make([]*pbml.XMealIngredient, 0)
+
+	for rows.Next() {
+		ingredientProto := &pbml.XMealIngredient{}
+		ingredient := &Ingredient{}
+		err := rows.Scan(
+			&ingredient.ID,
+			&ingredient.Name,
+			&ingredient.ServingSize,
+			&ingredient.Calories,
+			&ingredient.Protein,
+			&ingredient.CarbohydratesTotal,
+			&ingredient.FatTotal,
+			&ingredient.FatSaturated,
+			&ingredient.Fiber,
+			&ingredient.Sugar,
+			&ingredient.Sodium,
+			&ingredient.Potassium,
+			&ingredient.Cholesterol,
+		)
+
+		// createdAt := timestamppb.New(ingredient.CreatedAt)
+		// var updatedAt sql.NullTime
+
+		// if ingredient.UpdatedAt.Valid {
+		// 	updatedAt = ingredient.UpdatedAt
+		// } else {
+		// 	updatedAt = sql.NullTime{Valid: false}
+		// }
+
+		ingredientProto.IngredientId = []string{ingredient.ID.String()}
+		ingredientProto.Name = ingredient.Name
+		ingredientProto.Quantity = ingredient.ServingSize
+		ingredientProto.Calories = ingredient.Calories
+		ingredientProto.Protein = ingredient.Protein
+		ingredientProto.CarbohydratesTotal = ingredient.CarbohydratesTotal
+		ingredientProto.FatTotal = ingredient.FatTotal
+		ingredientProto.FatSaturated = ingredient.FatSaturated
+		ingredientProto.Fiber = ingredient.Fiber
+		ingredientProto.Sugar = ingredient.Sugar
+		ingredientProto.Sodium = ingredient.Sodium
+		ingredientProto.Potassium = ingredient.Potassium
+		ingredientProto.Cholesterol = ingredient.Cholesterol
+
+		// TODO add later
+		// ingredientProto.CreatedAt = createdAt
+		// ingredientProto.UpdatedAt = updatedAt
+
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to scan row: %v", err)
+		}
+
+		ingredients = append(ingredients, ingredientProto)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to iterate rows: %v", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to commit transaction: %v", err)
+	}
+
+	return ingredients, nil
+
 }
 
-func (m *MealRepository) GetMealIngredients(ctx context.Context, req *pbml.GetMealIngredientsReq) (*pbml.GetMealIngredientsRes, error) {
-	return nil, nil
+func (m *MealRepository) GetMealIngredient(ctx context.Context, req *pbml.GetMealIngredientReq) (*pbml.XMealIngredient, error) {
+	if req.MealId == "" {
+		return nil, status.Error(codes.InvalidArgument, "meal id is required")
+	}
+
+	if req.IngredientId == "" {
+		return nil, status.Error(codes.InvalidArgument, "ingredient id is required")
+	}
+
+	tx, err := m.pgpool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to begin transaction: %v", err)
+	}
+
+	defer tx.Rollback(ctx)
+
+	query := `
+		SELECT m.id, i.name, m.quantity, m.calories, m.protein, m.carbohydrates_total, 
+			   m.fat_total, m.fat_saturated, m.fiber, m.sugar, m.sodium, 
+			   m.potassium, m.cholesterol
+		FROM meal_ingredients m
+		JOIN ingredients i ON m.ingredient_id = i.id
+		WHERE meal_id = $1 AND m.ingredient_id = $2
+	`
+
+	row := tx.QueryRow(ctx, query, req.MealId, req.IngredientId)
+
+	ingredientProto := &pbml.XMealIngredient{}
+	ingredient := &Ingredient{}
+	err = row.Scan(
+		&ingredient.ID,
+		&ingredient.Name,
+		&ingredient.ServingSize,
+		&ingredient.Calories,
+		&ingredient.Protein,
+		&ingredient.CarbohydratesTotal,
+		&ingredient.FatTotal,
+		&ingredient.FatSaturated,
+		&ingredient.Fiber,
+		&ingredient.Sugar,
+		&ingredient.Sodium,
+		&ingredient.Potassium,
+		&ingredient.Cholesterol,
+	)
+
+	// createdAt := timestamppb.New(ingredient.CreatedAt)
+	// var updatedAt sql.NullTime
+
+	// if ingredient.UpdatedAt.Valid {
+	// 	updatedAt = ingredient.UpdatedAt
+	// } else {
+	// 	updatedAt = sql.NullTime{Valid: false}
+	// }
+
+	ingredientProto.IngredientId = []string{ingredient.ID.String()}
+	ingredientProto.Name = ingredient.Name
+	ingredientProto.Quantity = ingredient.ServingSize
+	ingredientProto.Calories = ingredient.Calories
+	ingredientProto.Protein = ingredient.Protein
+	ingredientProto.CarbohydratesTotal = ingredient.CarbohydratesTotal
+	ingredientProto.FatTotal = ingredient.FatTotal
+	ingredientProto.FatSaturated = ingredient.FatSaturated
+	ingredientProto.Fiber = ingredient.Fiber
+	ingredientProto.Sugar = ingredient.Sugar
+	ingredientProto.Sodium = ingredient.Sodium
+	ingredientProto.Potassium = ingredient.Potassium
+	ingredientProto.Cholesterol = ingredient.Cholesterol
+
+	// TODO add later
+	// ingredientProto.CreatedAt = createdAt
+	// ingredientProto.UpdatedAt = updatedAt
+
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to scan row: %v", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to commit transaction: %v", err)
+	}
+
+	return ingredientProto, nil
 }
 
-func (m *MealRepository) GetMealIngredient(ctx context.Context, req *pbml.GetMealIngredientReq) (*pbml.GetMealIngredientRes, error) {
-	return nil, nil
+func (m *MealRepository) UpdateIngredientInMeal(ctx context.Context, req *pbml.UpdateMealIngredientReq) (*pbml.XMealIngredient, error) {
+	query := `UPDATE meal_ingredients SET `
+	var setClauses []string
+	var args []interface{}
+	argIndex := 1
+	updatedIngredient := &pbml.XMealIngredient{}
+
+	if req.MealId == "" {
+		return nil, status.Error(codes.InvalidArgument, "meal id is required")
+	}
+
+	if req.IngredientId == "" {
+		return nil, status.Error(codes.InvalidArgument, "ingredient id is required")
+	}
+
+	tx, err := m.pgpool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to begin transaction: %v", err)
+	}
+
+	defer tx.Rollback(ctx)
+
+	// query := `
+	// 	UPDATE meal_ingredients
+	// 	SET quantity = $1, calories = $2, protein = $3, carbohydrates_total = $4, fat_total = $5, fat_saturated = $6, fiber = $7, sugar = $8, sodium = $9, potassium = $10, cholesterol = $11
+	// 	WHERE meal_id = $12 AND ingredient_id = $13
+	// `
+
+	for _, update := range req.Updates {
+		switch update.Field {
+		case "name":
+			setClauses = append(setClauses, fmt.Sprintf("name = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedIngredient.Name = update.NewValue
+		case "quantity":
+			quantity, _ := parseStringToFloat(update.NewValue, "invalid quantity value")
+			setClauses = append(setClauses, fmt.Sprintf("quantity = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedIngredient.Quantity = quantity
+		case "calories":
+			calories, _ := parseStringToFloat(update.NewValue, "invalid calories value")
+			setClauses = append(setClauses, fmt.Sprintf("calories = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedIngredient.Calories = calories
+		case "protein":
+			protein, _ := parseStringToFloat(update.NewValue, "invalid protein value")
+			setClauses = append(setClauses, fmt.Sprintf("protein = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedIngredient.Protein = protein
+		case "carbohydrates_total":
+			carbohydrates, _ := parseStringToFloat(update.NewValue, "invalid carbohydrates value")
+			setClauses = append(setClauses, fmt.Sprintf("carbohydrates_total = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedIngredient.CarbohydratesTotal = carbohydrates
+		case "fat_total":
+			fat, _ := parseStringToFloat(update.NewValue, "invalid fat value")
+			setClauses = append(setClauses, fmt.Sprintf("fat_total = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedIngredient.FatTotal = fat
+		case "fat_saturated":
+			fatSaturated, _ := parseStringToFloat(update.NewValue, "invalid fat saturated value")
+			setClauses = append(setClauses, fmt.Sprintf("fat_saturated = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedIngredient.FatSaturated = fatSaturated
+		case "fiber":
+			fiber, _ := parseStringToFloat(update.NewValue, "invalid fiber value")
+			setClauses = append(setClauses, fmt.Sprintf("fiber = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedIngredient.Fiber = fiber
+		case "sugar":
+			sugar, _ := parseStringToFloat(update.NewValue, "invalid sugar value")
+			setClauses = append(setClauses, fmt.Sprintf("sugar = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedIngredient.Sugar = sugar
+		case "sodium":
+			sodium, _ := parseStringToFloat(update.NewValue, "invalid sodium value")
+			setClauses = append(setClauses, fmt.Sprintf("sodium = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedIngredient.Sodium = sodium
+		case "potassium":
+			potassium, _ := parseStringToFloat(update.NewValue, "invalid potassium value")
+			setClauses = append(setClauses, fmt.Sprintf("potassium = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedIngredient.Potassium = potassium
+		case "cholesterol":
+			cholesterol, _ := parseStringToFloat(update.NewValue, "invalid cholesterol value")
+			setClauses = append(setClauses, fmt.Sprintf("cholesterol = $%d", argIndex))
+			args = append(args, update.NewValue)
+			argIndex++
+			updatedIngredient.Cholesterol = cholesterol
+		default:
+			return nil, fmt.Errorf("unsupported update field: %s", update.Field)
+		}
+	}
+
+	if len(setClauses) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "no updates provided")
+	}
+
+	query += strings.Join(setClauses, ", ")
+	query += fmt.Sprintf(" WHERE meal_id = $%d AND ingredient_id = $%d", argIndex, argIndex+1)
+	args = append(args, req.MealId, req.IngredientId)
+
+	_, err = tx.Exec(ctx, query, args...)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to update ingredient in meal: %v", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to commit transaction: %v", err)
+	}
+
+	return updatedIngredient, nil
+}
+
+func parseStringToFloat(s, errorMessage string) (float64, error) {
+	val, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, status.Errorf(codes.InvalidArgument, "%s: %v", errorMessage, err)
+	}
+	return val, nil
 }

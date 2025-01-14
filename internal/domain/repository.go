@@ -123,9 +123,9 @@ type MealRepository interface {
 	DeleteMeal(ctx context.Context, req *pbml.DeleteMealReq) (*pbml.NilRes, error)
 	AddIngredientToMeal(ctx context.Context, req *pbml.AddIngredientReq) (*pbml.NewIngredient, error)
 	RemoveIngredientFromMeal(ctx context.Context, req *pbml.DeleteIngredientReq) (*pbml.NilRes, error)
-	UpdateIngredientInMeal(ctx context.Context, req *pbml.UpdateMealIngredientReq) (*pbml.UpdateIngredientRes, error)
-	GetMealIngredients(ctx context.Context, req *pbml.GetMealIngredientsReq) (*pbml.GetMealIngredientsRes, error)
-	GetMealIngredient(ctx context.Context, req *pbml.GetMealIngredientReq) (*pbml.GetMealIngredientRes, error)
+	UpdateIngredientInMeal(ctx context.Context, req *pbml.UpdateMealIngredientReq) (*pbml.XMealIngredient, error)
+	GetMealIngredients(ctx context.Context, req *pbml.GetMealIngredientsReq) ([]*pbml.XMealIngredient, error)
+	GetMealIngredient(ctx context.Context, req *pbml.GetMealIngredientReq) (*pbml.XMealIngredient, error)
 }
 
 // IngredientsRepository interface

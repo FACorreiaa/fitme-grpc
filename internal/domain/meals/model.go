@@ -37,32 +37,32 @@ type Meal struct {
 }
 
 type MealIngredient struct {
-	MealID             uuid.UUID   `protobuf:"bytes,1,opt,name=meal_id,json=mealId" db:"meal_id"`
-	IngredientID       []uuid.UUID `protobuf:"bytes,2,opt,name=ingredient_id,json=ingredientId" db:"ingredient_id"`
-	Quantity           float64     `protobuf:"fixed64,3,opt,name=quantity" db:"quantity"`
-	Calories           float64     `protobuf:"fixed64,4,opt,name=calories" db:"calories"`
-	Protein            float64     `protobuf:"fixed64,5,opt,name=protein" db:"protein"`
-	FatTotal           float64     `protobuf:"fixed64,6,opt,name=fat_total,json=fatTotal" db:"fat_total"`
-	FatSaturated       float64     `protobuf:"fixed64,7,opt,name=fat_saturated,json=fatSaturated" db:"fat_saturated"`
-	CarbohydratesTotal float64     `protobuf:"fixed64,8,opt,name=carbohydrates_total,json=carbohydratesTotal" db:"carbohydrates_total"`
-	Fiber              float64     `protobuf:"fixed64,9,opt,name=fiber" db:"fiber"`
-	Sugar              float64     `protobuf:"fixed64,10,opt,name=sugar" db:"sugar"`
-	Sodium             float64     `protobuf:"fixed64,11,opt,name=sodium" db:"sodium"`
-	Potassium          float64     `protobuf:"fixed64,12,opt,name=potassium" db:"potassium"`
-	Cholesterol        float64     `protobuf:"fixed64,13,opt,name=cholesterol" db:"cholesterol"`
-	CreatedAt          time.Time   `protobuf:"bytes,4,opt,name=created_at,json=createdAt" db:"created_at"`
-	UpdatedAt          time.Time   `protobuf:"bytes,5,opt,name=updated_at,json=updatedAt" db:"updated_at"`
+	MealID             uuid.UUID `protobuf:"bytes,1,opt,name=meal_id,json=mealId" db:"meal_id"`
+	IngredientID       uuid.UUID `protobuf:"bytes,2,opt,name=ingredient_id,json=ingredientId" db:"ingredient_id"`
+	Quantity           float64   `protobuf:"fixed64,3,opt,name=quantity" db:"quantity"`
+	Calories           float64   `protobuf:"fixed64,4,opt,name=calories" db:"calories"`
+	Protein            float64   `protobuf:"fixed64,5,opt,name=protein" db:"protein"`
+	FatTotal           float64   `protobuf:"fixed64,6,opt,name=fat_total,json=fatTotal" db:"fat_total"`
+	FatSaturated       float64   `protobuf:"fixed64,7,opt,name=fat_saturated,json=fatSaturated" db:"fat_saturated"`
+	CarbohydratesTotal float64   `protobuf:"fixed64,8,opt,name=carbohydrates_total,json=carbohydratesTotal" db:"carbohydrates_total"`
+	Fiber              float64   `protobuf:"fixed64,9,opt,name=fiber" db:"fiber"`
+	Sugar              float64   `protobuf:"fixed64,10,opt,name=sugar" db:"sugar"`
+	Sodium             float64   `protobuf:"fixed64,11,opt,name=sodium" db:"sodium"`
+	Potassium          float64   `protobuf:"fixed64,12,opt,name=potassium" db:"potassium"`
+	Cholesterol        float64   `protobuf:"fixed64,13,opt,name=cholesterol" db:"cholesterol"`
+	CreatedAt          time.Time `protobuf:"bytes,4,opt,name=created_at,json=createdAt" db:"created_at"`
+	UpdatedAt          time.Time `protobuf:"bytes,5,opt,name=updated_at,json=updatedAt" db:"updated_at"`
 }
 
 type TotalNutrients struct {
-	Calories           float64 `protobuf:"fixed64,1,opt,name=calories" db:"calories"`
-	Protein            float64 `protobuf:"fixed64,2,opt,name=protein" db:"protein"`
-	FatTotal           float64 `protobuf:"fixed64,3,opt,name=fat_total,json=fatTotal" db:"fat_total"`
-	FatSaturated       float64 `protobuf:"fixed64,4,opt,name=fat_saturated,json=fatSaturated" db:"fat_saturated"`
-	CarbohydratesTotal float64 `protobuf:"fixed64,5,opt,name=carbohydrates_total,json=carbohydratesTotal" db:"carbohydrates_total"`
-	Fiber              float64 `protobuf:"fixed64,6,opt,name=fiber" db:"fiber"`
-	Sugar              float64 `protobuf:"fixed64,7,opt,name=sugar" db:"sugar"`
-	Sodium             float64 `protobuf:"fixed64,8,opt,name=sodium" db:"sodium"`
-	Potassium          float64 `protobuf:"fixed64,9,opt,name=potassium" db:"potassium"`
-	Cholesterol        float64 `protobuf:"fixed64,10,opt,name=cholesterol" db:"cholesterol"`
+	Calories           sql.NullFloat64 `protobuf:"fixed64,1,opt,name=calories" db:"calories"`
+	Protein            sql.NullFloat64 `protobuf:"fixed64,2,opt,name=protein" db:"protein"`
+	FatTotal           sql.NullFloat64 `protobuf:"fixed64,3,opt,name=fat_total,json=fatTotal" db:"fat_total"`
+	FatSaturated       sql.NullFloat64 `protobuf:"fixed64,4,opt,name=fat_saturated,json=fatSaturated" db:"fat_saturated"`
+	CarbohydratesTotal sql.NullFloat64 `protobuf:"fixed64,5,opt,name=carbohydrates_total,json=carbohydratesTotal" db:"carbohydrates_total"`
+	Fiber              sql.NullFloat64 `protobuf:"fixed64,6,opt,name=fiber" db:"fiber"`
+	Sugar              sql.NullFloat64 `protobuf:"fixed64,7,opt,name=sugar" db:"sugar"`
+	Sodium             sql.NullFloat64 `protobuf:"fixed64,8,opt,name=sodium" db:"sodium"`
+	Potassium          sql.NullFloat64 `protobuf:"fixed64,9,opt,name=potassium" db:"potassium"`
+	Cholesterol        sql.NullFloat64 `protobuf:"fixed64,10,opt,name=cholesterol" db:"cholesterol"`
 }
