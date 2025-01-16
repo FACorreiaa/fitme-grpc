@@ -61,7 +61,6 @@ func ServeGRPC(ctx context.Context, port string, container *ServiceContainer, re
 	wpb.RegisterWorkoutServer(server, container.WorkoutService)
 	mpb.RegisterUserMeasurementsServer(server, container.MeasurementService)
 
-	mlpb.RegisterMealServer(server, container.MealServices.MealService)
 	mlpb.RegisterMealPlanServer(server, container.MealServices.MealPlanService)
 	mlpb.RegisterDietPreferenceServiceServer(server, container.MealServices.DietPreferenceService)
 	mlpb.RegisterFoodLogServiceServer(server, container.MealServices.FoodLogService)

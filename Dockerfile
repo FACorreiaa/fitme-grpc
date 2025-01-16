@@ -1,4 +1,4 @@
-FROM golang:1.23.1 AS builder
+FROM golang:1.23.4 AS builder
 
 LABEL maintainer="a11199"
 LABEL description="Base image fitme dev"
@@ -28,6 +28,26 @@ RUN go mod download
 COPY . .
 EXPOSE 8080
 CMD ["air"]
+
+#FROM golang:1.23-alpine AS debug
+#WORKDIR /app
+#
+## Install Delve
+#RUN go install github.com/go-delve/delve/cmd/dlv@latest
+#
+#COPY go.mod go.sum ./
+#RUN go mod download
+#
+## Copy the application source code
+#COPY . .
+#
+## Expose the debugging port for Delve
+#EXPOSE 40000
+#EXPOSE 8000
+#
+## Set the Delve command for debugging
+#CMD ["dlv", "debug", "--headless", "--listen=:40000", "--api-version=2", "--accept-multiclient", "--log", "--", "--port=8000"]
+
 
 FROM alpine:latest AS prod
 WORKDIR /app

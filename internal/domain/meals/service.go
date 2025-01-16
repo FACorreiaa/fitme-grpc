@@ -2,8 +2,11 @@ package meals
 
 import (
 	"context"
+	"strconv"
 
 	pbml "github.com/FACorreiaa/fitme-protos/modules/meal/generated"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"google.golang.org/grpc/codes"
@@ -15,7 +18,6 @@ import (
 
 type MealServices interface {
 	GetMealPlanService() MealPlanService
-	GetMealService() MealService
 	GetDietPreferenceService() DietPreferenceService
 	GetFoodLogService() FoodLogService
 	GetIngredientService() IngredientService
@@ -27,50 +29,12 @@ type MealServices interface {
 type MealPlanService struct {
 	pbml.UnimplementedMealPlanServer
 	repo domain.MealPlanRepository
-}
-
-func (m MealPlanService) GetMeal(ctx context.Context, req *pbml.GetMealReq) (*pbml.GetMealRes, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (m MealPlanService) GetMeals(ctx context.Context, req *pbml.GetMealsReq) (*pbml.GetMealsRes, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (m MealPlanService) CreateMeal(ctx context.Context, req *pbml.CreateMealReq) (*pbml.CreateMealRes, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (m MealPlanService) UpdateMeal(ctx context.Context, req *pbml.UpdateMealReq) (*pbml.UpdateMealRes, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (m MealPlanService) DeleteMeal(ctx context.Context, req *pbml.DeleteMealReq) (*pbml.NilRes, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (m MealPlanService) AddIngredientToMeal(ctx context.Context, req *pbml.AddIngredientReq) (*pbml.AddIngredientRes, error) {
-	panic("implement me")
-}
-
-func (m MealPlanService) RemoveIngredientFromMeal(ctx context.Context, req *pbml.DeleteIngredientReq) (*pbml.NilRes, error) {
-	//TODO implement me
-	panic("implement me")
+	db   *pgxpool.Pool
 }
 
 func (m MealPlanService) mustEmbedUnimplementedMealServer() {
 	//TODO implement me
 	panic("implement me")
-}
-
-type MealService struct {
-	pbml.UnimplementedMealServer
-	repo domain.MealRepository
 }
 
 type DietPreferenceService struct {
@@ -347,10 +311,6 @@ func NewMealPlanService(ctx context.Context, repo domain.MealPlanRepository) *Me
 	return &MealPlanService{repo: repo}
 }
 
-func NewMealService(ctx context.Context, repo domain.MealRepository) *MealService {
-	return &MealService{repo: repo}
-}
-
 func NewDietPreferenceService(ctx context.Context, repo domain.DietPreferenceRepository) *DietPreferenceService {
 	return &DietPreferenceService{repo: repo}
 }
@@ -377,7 +337,6 @@ func NewMealReminderService(ctx context.Context, repo domain.MealReminderReposit
 
 type mealServices struct {
 	mealPlanService           MealPlanService
-	mealService               MealService
 	dietPreferenceService     DietPreferenceService
 	foodLogService            FoodLogService
 	ingredientService         IngredientService
@@ -386,9 +345,43 @@ type mealServices struct {
 	mealReminderService       MealReminderService
 }
 
+func (m mealServices) GetMealPlanService() MealPlanService {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m mealServices) GetDietPreferenceService() DietPreferenceService {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m mealServices) GetFoodLogService() FoodLogService {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m mealServices) GetIngredientService() IngredientService {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m mealServices) GetTrackMealProgressService() TrackMealProgressService {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m mealServices) GetGoalRecommendationService() GoalRecommendationService {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m mealServices) GetMealReminderService() MealReminderService {
+	//TODO implement me
+	panic("implement me")
+}
+
 func NewMealServices(
 	mealPlanService MealPlanService,
-	mealService MealService,
 	dietPreferenceService DietPreferenceService,
 	foodLogService FoodLogService,
 	ingredientService IngredientService,
@@ -398,7 +391,6 @@ func NewMealServices(
 ) MealServices {
 	return &mealServices{
 		mealPlanService:           mealPlanService,
-		mealService:               mealService,
 		dietPreferenceService:     dietPreferenceService,
 		foodLogService:            foodLogService,
 		ingredientService:         ingredientService,
@@ -408,64 +400,56 @@ func NewMealServices(
 	}
 }
 
-func (m *mealServices) GetMealPlanService() MealPlanService {
-	return m.mealPlanService
+func (m *MealPlanService) GetMealPlanService() MealPlanService {
+	return m.GetMealPlanService()
 }
 
-func (m *mealServices) GetMealService() MealService {
-	return m.mealService
+func (m *MealPlanService) GetDietPreferenceService() DietPreferenceService {
+	return m.GetDietPreferenceService()
 }
 
-func (m *mealServices) GetDietPreferenceService() DietPreferenceService {
-	return m.dietPreferenceService
+func (m *MealPlanService) GetFoodLogService() FoodLogService {
+	return m.GetFoodLogService()
 }
 
-func (m *mealServices) GetFoodLogService() FoodLogService {
-	return m.foodLogService
+func (m *MealPlanService) GetIngredientService() IngredientService {
+	return m.GetIngredientService()
 }
 
-func (m *mealServices) GetIngredientService() IngredientService {
-	return m.ingredientService
+func (m *MealPlanService) GetTrackMealProgressService() TrackMealProgressService {
+	return m.GetTrackMealProgressService()
 }
 
-func (m *mealServices) GetTrackMealProgressService() TrackMealProgressService {
-	return m.trackMealProgressService
+func (m *MealPlanService) GetGoalRecommendationService() GoalRecommendationService {
+	return m.GetGoalRecommendationService()
 }
 
-func (m *mealServices) GetGoalRecommendationService() GoalRecommendationService {
-	return m.goalRecommendationService
+func (m *MealPlanService) GetMealReminderService() MealReminderService {
+	return m.GetMealReminderService()
 }
 
-func (m *mealServices) GetMealReminderService() MealReminderService {
-	return m.mealReminderService
+func (m *MealPlanService) GetMealReminder() MealReminderService {
+	return m.GetMealReminder()
 }
 
-func (m *mealServices) GetMeal() MealService {
-	return m.mealService
+func (m *MealPlanService) GetDietPreference() DietPreferenceService {
+	return m.GetDietPreference()
 }
 
-func (m *mealServices) GetMealReminder() MealReminderService {
-	return m.mealReminderService
+func (m *MealPlanService) GetFoodLog() FoodLogService {
+	return m.GetFoodLog()
 }
 
-func (m *mealServices) GetDietPreference() DietPreferenceService {
-	return m.dietPreferenceService
+func (m *MealPlanService) GetIngredient() IngredientService {
+	return m.GetIngredient()
 }
 
-func (m *mealServices) GetFoodLog() FoodLogService {
-	return m.foodLogService
+func (m *MealPlanService) GetTrackMealProgress() TrackMealProgressService {
+	return m.GetTrackMealProgress()
 }
 
-func (m *mealServices) GetIngredient() IngredientService {
-	return m.ingredientService
-}
-
-func (m *mealServices) GetTrackMealProgress() TrackMealProgressService {
-	return m.trackMealProgressService
-}
-
-func (m *mealServices) GetGoalRecommendation() GoalRecommendationService {
-	return m.goalRecommendationService
+func (m *MealPlanService) GetGoalRecommendation() GoalRecommendationService {
+	return m.GetGoalRecommendation()
 }
 
 func (i *IngredientService) GetIngredient(ctx context.Context, req *pbml.GetIngredientReq) (*pbml.GetIngredientRes, error) {
@@ -693,7 +677,7 @@ func (i *IngredientService) UpdateIngredient(ctx context.Context, req *pbml.Upda
 // TODO GetIngredientsByName
 // TODO GetMealsByDate
 
-func (m *MealService) CreateMeal(ctx context.Context, req *pbml.CreateMealReq) (*pbml.CreateMealRes, error) {
+func (m *MealPlanService) CreateMeal(ctx context.Context, req *pbml.CreateMealReq) (*pbml.CreateMealRes, error) {
 
 	tracer := otel.Tracer("FitSphere")
 	ctx, span := tracer.Start(ctx, "Meal/CreateMeal")
@@ -716,7 +700,17 @@ func (m *MealService) CreateMeal(ctx context.Context, req *pbml.CreateMealReq) (
 	req.Request.RequestId = requestID
 	req.UserId = userID
 
-	meal, err := m.repo.CreateMeal(ctx, req)
+	tx, err := m.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to start transaction")
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback(ctx)
+		}
+	}()
+
+	meal, err := m.repo.CreateMeal(ctx, tx, req)
 	if err != nil {
 		return &pbml.CreateMealRes{
 			Success: false,
@@ -744,7 +738,7 @@ func (m *MealService) CreateMeal(ctx context.Context, req *pbml.CreateMealReq) (
 	}, nil
 }
 
-func (m *MealService) GetMeal(ctx context.Context, req *pbml.GetMealReq) (*pbml.GetMealRes, error) {
+func (m *MealPlanService) GetMeal(ctx context.Context, req *pbml.GetMealReq) (*pbml.GetMealRes, error) {
 	tracer := otel.Tracer("FitSphere")
 	ctx, span := tracer.Start(ctx, "Meal/GetMeal")
 	defer span.End()
@@ -794,7 +788,7 @@ func (m *MealService) GetMeal(ctx context.Context, req *pbml.GetMealReq) (*pbml.
 	}, nil
 }
 
-func (m *MealService) GetMeals(ctx context.Context, req *pbml.GetMealsReq) (*pbml.GetMealsRes, error) {
+func (m *MealPlanService) GetMeals(ctx context.Context, req *pbml.GetMealsReq) (*pbml.GetMealsRes, error) {
 	tracer := otel.Tracer("FitSphere")
 	ctx, span := tracer.Start(ctx, "Meal/GetMeals")
 	defer span.End()
@@ -844,7 +838,7 @@ func (m *MealService) GetMeals(ctx context.Context, req *pbml.GetMealsReq) (*pbm
 	}, nil
 }
 
-func (m *MealService) DeleteMeal(ctx context.Context, req *pbml.DeleteMealReq) (*pbml.NilRes, error) {
+func (m *MealPlanService) DeleteMeal(ctx context.Context, req *pbml.DeleteMealReq) (*pbml.NilRes, error) {
 	tracer := otel.Tracer("FitSphere")
 	ctx, span := tracer.Start(ctx, "Meal/DeleteMeal")
 	defer span.End()
@@ -879,7 +873,7 @@ func (m *MealService) DeleteMeal(ctx context.Context, req *pbml.DeleteMealReq) (
 	return &pbml.NilRes{}, nil
 }
 
-func (m *MealService) UpdateMeal(ctx context.Context, req *pbml.UpdateMealReq) (*pbml.UpdateMealRes, error) {
+func (m *MealPlanService) UpdateMeal(ctx context.Context, req *pbml.UpdateMealReq) (*pbml.UpdateMealRes, error) {
 	tracer := otel.Tracer("FitSphere")
 	ctx, span := tracer.Start(ctx, "Meal/UpdateMeal")
 	defer span.End()
@@ -929,7 +923,7 @@ func (m *MealService) UpdateMeal(ctx context.Context, req *pbml.UpdateMealReq) (
 	}, nil
 }
 
-func (m *MealService) AddIngredientToMeal(ctx context.Context, req *pbml.AddIngredientReq) (*pbml.AddIngredientRes, error) {
+func (m *MealPlanService) AddIngredientToMeal(ctx context.Context, req *pbml.AddIngredientReq) (*pbml.AddIngredientRes, error) {
 	tracer := otel.Tracer("FitSphere")
 	ctx, span := tracer.Start(ctx, "Meal/AddIngredientToMeal")
 	defer span.End()
@@ -979,7 +973,7 @@ func (m *MealService) AddIngredientToMeal(ctx context.Context, req *pbml.AddIngr
 	}, nil
 }
 
-func (m *MealService) RemoveIngredientFromMeal(ctx context.Context, req *pbml.DeleteIngredientReq) (*pbml.NilRes, error) {
+func (m *MealPlanService) RemoveIngredientFromMeal(ctx context.Context, req *pbml.DeleteIngredientReq) (*pbml.NilRes, error) {
 	tracer := otel.Tracer("FitSphere")
 	ctx, span := tracer.Start(ctx, "Meal/RemoveIngredientFromMeal")
 	defer span.End()
@@ -1011,7 +1005,7 @@ func (m *MealService) RemoveIngredientFromMeal(ctx context.Context, req *pbml.De
 	return &pbml.NilRes{}, nil
 }
 
-func (m *MealService) GetMealIngredients(ctx context.Context, req *pbml.GetMealIngredientsReq) (*pbml.GetMealIngredientsRes, error) {
+func (m *MealPlanService) GetMealIngredients(ctx context.Context, req *pbml.GetMealIngredientsReq) (*pbml.GetMealIngredientsRes, error) {
 	tracer := otel.Tracer("FitSphere")
 	ctx, span := tracer.Start(ctx, "Meal/GetMealIngredients")
 	defer span.End()
@@ -1051,7 +1045,7 @@ func (m *MealService) GetMealIngredients(ctx context.Context, req *pbml.GetMealI
 	}, nil
 }
 
-func (m *MealService) GetMealIngredient(ctx context.Context, req *pbml.GetMealIngredientReq) (*pbml.GetMealIngredientRes, error) {
+func (m *MealPlanService) GetMealIngredient(ctx context.Context, req *pbml.GetMealIngredientReq) (*pbml.GetMealIngredientRes, error) {
 	tracer := otel.Tracer("FitSphere")
 	ctx, span := tracer.Start(ctx, "Meal/GetMealPlan")
 	defer span.End()
@@ -1091,7 +1085,7 @@ func (m *MealService) GetMealIngredient(ctx context.Context, req *pbml.GetMealIn
 	}, nil
 }
 
-func (m *MealService) UpdateIngredientInMeal(ctx context.Context, req *pbml.UpdateMealIngredientReq) (*pbml.UpdateMealIngredientRes, error) {
+func (m *MealPlanService) UpdateIngredientInMeal(ctx context.Context, req *pbml.UpdateMealIngredientReq) (*pbml.UpdateMealIngredientRes, error) {
 	tracer := otel.Tracer("FitSphere")
 	ctx, span := tracer.Start(ctx, "Meal/UpdateIngredientInMeal")
 	defer span.End()
@@ -1124,6 +1118,53 @@ func (m *MealService) UpdateIngredientInMeal(ctx context.Context, req *pbml.Upda
 		Success:        true,
 		Message:        "Meal plan updated successfully",
 		MealIngredient: ing,
+		Response: &pbml.BaseResponse{
+			Upstream:  "meal-service",
+			RequestId: requestID,
+		},
+	}, nil
+}
+
+func (m *MealPlanService) CreateMealPlan(ctx context.Context, req *pbml.CreateMealPlanReq) (*pbml.CreateMealPlanRes, error) {
+	tracer := otel.Tracer("FitSphere")
+	ctx, span := tracer.Start(ctx, "Meal/CreateMealPlan")
+	defer span.End()
+
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	userID := ctx.Value("userID").(string)
+	if userID == "" {
+		return nil, status.Error(codes.Unauthenticated, "userID is missing in context")
+	}
+
+	req.Request.RequestId = requestID
+	req.UserId = userID
+
+	mp, err := m.repo.CreateMealPlan(ctx, req)
+	if err != nil {
+		return &pbml.CreateMealPlanRes{
+			Success: false,
+			Message: "Failed to add ingredient to meal",
+			Status:  strconv.Itoa(int(codes.NotFound)),
+			Response: &pbml.BaseResponse{
+				Upstream:  "meal-service",
+				RequestId: requestID,
+			},
+		}, status.Errorf(codes.Internal, "failed to create new meal plan: %v", err)
+	}
+
+	span.SetAttributes(
+		attribute.String("request.id", req.Request.RequestId),
+		attribute.String("request.details", req.String()))
+
+	return &pbml.CreateMealPlanRes{
+		Success:    true,
+		Message:    "Meal plan updated successfully",
+		MealPlanId: mp.MealPlanId,
+		Status:     strconv.Itoa(int(codes.OK)),
 		Response: &pbml.BaseResponse{
 			Upstream:  "meal-service",
 			RequestId: requestID,

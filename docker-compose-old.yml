@@ -1,29 +1,42 @@
 services:
+  init:
+    image: &tempoImage grafana/tempo:latest
+    user: root
+    entrypoint:
+      - "chown"
+      - "10001:10001"
+      - "/var/tempo"
+    volumes:
+      - ./tempo-data:/var/tempo
+
   app:
     platform: linux/amd64
     container_name: fitme-dev
     build:
       dockerfile: Dockerfile
       context: .
-      target: dev
+      target: debug
     volumes:
       - .:/app
     ports:
       - "8000:8000"
       - "8001:8001"
+      - "40000:40000"
     environment:
-      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4318/v1/traces
+      #- OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=otel-collector:4317
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=tempo:4317
+
     depends_on:
       - postgres
       - redis
       - otel-collector
-      - prometheus
     logging:
       driver: loki
       options:
         loki-url: http://localhost:3100/loki/api/v1/push
     networks:
       fit-me:
+
   postgres:
     env_file:
       - .env
@@ -58,19 +71,146 @@ services:
       - ./.data/docker-redis:/var/lib/redis/data
     networks:
       - fit-me
+  tempo:
+    container_name: tempo
+    image: *tempoImage
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ./config/docker/tempo.yaml:/etc/tempo.yaml
+      - ./tempo-data:/var/tempo
+    ports:
+      - "3200:3200"  # Tempo API
+      #- "9411:9411"  # Zipkin
+      # - "4317:4317"  # OTLP
+    restart: unless-stopped
+    depends_on:
+      - init
+    networks:
+      fit-me:
+
+#  tempo-query:
+#    container_name: tempo-query
+#    image: grafana/tempo-query:0.7.0
+#    environment:
+#      - BACKEND=tempo:3200
+#    volumes:
+#      - ./etc/tempo-query.yaml:/etc/tempo-query.yaml
+#    ports:
+#      - "16686:16686"  # jaeger-ui
+#    depends_on:
+#      - tempo
+#    logging:
+#      driver: loki
+#      options:
+#        loki-url: 'http://localhost:3100/api/prom/push'
+#    networks:
+#      fit-me:
+
+  # Generate fake traces...
+#  k6-tracing:
+#    image: ghcr.io/grafana/xk6-client-tracing:v0.0.5
+#    environment:
+#      - ENDPOINT=otel-collector:4317
+#    restart: always
+#    depends_on:
+#      - otel-collector
+#    networks:
+#      fit-me:
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.46
+    container_name: jaeger
+    environment:
+      COLLECTOR_ZIPKIN_HTTP_PORT: 9411  # Enable Zipkin endpoint
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "14268:14268"  # Jaeger HTTP ingestion
+      - "14250:14250"  # OTLP gRPC ingestion
+      # - "9411:9411"    # Zipkin HTTP ingestion
+    networks:
+      - fit-me
+
+  # And put them in an OTEL collector pipeline...
+  otel-collector:
+    image: otel/opentelemetry-collector:0.86.0
+    container_name: otel-collector
+    command: [ "--config=/etc/otel-collector.yaml" ]
+    volumes:
+      - ./config/docker/otel-collector.yaml:/etc/otel-collector.yaml
+    ports:
+      - "4317:4317"  # OTLP gRPC
+      - "4318:4318"  # OTLP HTTP
+      - "9464:9464"  # Prometheus metrics
+    networks:
+      fit-me:
   prometheus:
     container_name: prometheus
-    image: prom/prometheus:v3.0.1
-    platform: linux/amd64
-    volumes:
-      - ./config/prometheus.yml:/etc/prometheus.yml
-    entrypoint:
-      - /bin/prometheus
+    image: prom/prometheus:latest
+    command:
       - --config.file=/etc/prometheus.yml
+      - --web.enable-remote-write-receiver
+      - --enable-feature=exemplar-storage
+      - --enable-feature=native-histograms
+    volumes:
+      - ./config/docker/prometheus.yml:/etc/prometheus.yml
     ports:
       - "9090:9090"
     networks:
+      fit-me:
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:11.0.0
+    volumes:
+      - ./config/docker/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+    ports:
+      - "3000:3000"
+    networks:
+      fit-me:
+  loki:
+    container_name: loki
+    image: grafana/loki:main
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./config/docker/loki-config.yaml:/etc/loki/local-config.yaml
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
       - fit-me
+
+
+
+
+
+# DONT NEED THIS
+#  minio:
+#    container_name: minio
+#    image: minio/minio
+#    entrypoint: [ "" ]
+#    command: [ "sh", "-c", "mkdir -p /data/mimir && minio server --quiet /data" ]
+#    environment:
+#      - MINIO_ROOT_USER=mimir
+#      - MINIO_ROOT_PASSWORD=supersecret
+#    ports:
+#      - "9000:9000"
+#    networks:
+#      - fit-me
+#  mimir:
+#    container_name: mimir
+#    image: grafana/mimir:latest
+#    command: [ "-config.file=/etc/mimir.yaml" ]
+#    hostname: mimir
+#    volumes:
+#      - ./config/docker/mimir/mimir.yaml:/etc/mimir.yaml
+#      - ./config/docker/mimir/alertmanager-fallback-config.yaml:/etc/alertmanager-fallback-config.yaml
 #  jaeger:
 #    networks:
 #      fit-me:
@@ -78,105 +218,10 @@ services:
 #    container_name: jaeger
 #    image: jaegertracing/jaeger:2.0.0
 #    volumes:
-#      - ./config/jaeger-ui.json:/etc/jaeger/jaeger-ui.json
-#      - ./config/jaeger-config-spm.yaml:/etc/jaeger/jaeger-config-spm.yml
+#      - ./config/docker/jaeger/jaeger-ui.json:/etc/jaeger/jaeger-ui.json
+#      - ./config/docker/jaeger/jaeger-config-spm.yaml:/etc/jaeger/jaeger-config-spm.yml
 #    command: [ "--config", "/etc/jaeger/jaeger-config-spm.yml" ]
 #    ports:
 #      - "16686:16686"
-
-  tempo:
-    container_name: tempo
-    image: grafana/tempo:0.7.0
-    command: [ "--target=all", "--storage.trace.backend=local", "--storage.trace.local.path=/var/tempo", "--auth.enabled=false" ]
-    ports:
-      - "8081:80"
-    logging:
-      driver: loki
-      options:
-        loki-url: 'http://localhost:3100/api/prom/push'
-
-  tempo-query:
-    container_name: tempo-query
-    image: grafana/tempo-query:0.7.0
-    environment:
-      - BACKEND=tempo:80
-    volumes:
-      - ./etc/tempo-query.yaml:/etc/tempo-query.yaml
-    ports:
-      - "16687:16686"  # jaeger-ui
-    depends_on:
-      - tempo
-    logging:
-      driver: loki
-      options:
-        loki-url: 'http://localhost:3100/api/prom/push'
-
-  grafana:
-    container_name: grafana
-    image: grafana/grafana:7.3.x-exemplars
-    platform: linux/amd64
-    volumes:
-      - ./config/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
-#      - ./config/grafana-provisioning-dashboards.yaml:/etc/grafana/provisioning/dashboards/provisioning-dashboards.yaml:ro
-#      - ./config/mimir-mixin-compiled/dashboards/mimir-alertmanager.json:/var/lib/grafana/dashboards/mimir-alertmanager.json:ro
-#      - ./config/mimir-mixin-compiled/dashboards/mimir-compactor.json:/var/lib/grafana/dashboards/mimir-compactor.json:ro
-#      - ./config/mimir-mixin-compiled/dashboards/mimir-object-store.json:/var/lib/grafana/dashboards/mimir-object-store.json:ro
-#      - ./config/mimir-mixin-compiled/dashboards/mimir-overrides.json:/var/lib/grafana/dashboards/mimir-overrides.json:ro
-#      - ./config/mimir-mixin-compiled/dashboards/mimir-queries.json:/var/lib/grafana/dashboards/mimir-queries.json:ro
-#      - ./config/mimir-mixin-compiled/dashboards/mimir-reads.json:/var/lib/grafana/dashboards/mimir-reads.json:ro
-#      - ./config/mimir-mixin-compiled/dashboards/mimir-ruler.json:/var/lib/grafana/dashboards/mimir-ruler.json:ro
-#      - ./config/mimir-mixin-compiled/dashboards/mimir-tenants.json:/var/lib/grafana/dashboards/mimir-tenants.json:ro
-#      - ./config/mimir-mixin-compiled/dashboards/mimir-top-tenants.json:/var/lib/grafana/dashboards/mimir-top-tenants.json:ro
-#      - ./config/mimir-mixin-compiled/dashboards/mimir-writes.json:/var/lib/grafana/dashboards/mimir-writes.json:ro
-    environment:
-      - GF_AUTH_ANONYMOUS_ENABLED=true
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
-      - GF_AUTH_DISABLE_LOGIN_FORM=true
-    ports:
-      - "3000:3000"
-
-  loki:
-    image: grafana/loki:2.2.1
-    command: -config.file=/etc/loki/local-config.yaml
-    ports:
-      - "3100:3100"
-    logging:
-      driver: loki
-      options:
-        loki-url: 'http://localhost:3100/api/prom/push'
-  otel-collector:
-    container_name: otel-collector
-    image: otel/opentelemetry-collector:latest
-    ports:
-      - "8888:8888"
-      - "8889:8889"
-      - "4317:4317"
-      - "4318:4318"
-    volumes:
-      - ./config/otel-collector-helm.yaml:/etc/otel-collector-helm.yaml
-    command: [ "--config", "/etc/otel-collector-helm.yaml" ]
-    networks:
-      - fit-me
-  minio:
-    container_name: minio
-    image: minio/minio
-    entrypoint: [ "" ]
-    command: [ "sh", "-c", "mkdir -p /data/mimir && minio server --quiet /data" ]
-    environment:
-      - MINIO_ROOT_USER=mimir
-      - MINIO_ROOT_PASSWORD=supersecret
-    networks:
-      - fit-me
-  mimir:
-    container_name: mimir
-    image: grafana/mimir:latest
-    command: [ "-config.file=/etc/mimir.yaml" ]
-    hostname: mimir-1
-    depends_on:
-      - minio
-    volumes:
-      - ./config/mimir/mimir.yaml:/etc/mimir.yaml
-      - ./config/mimir/alertmanager-fallback-config.yaml:/etc/alertmanager-fallback-config.yaml
-
 networks:
   fit-me:

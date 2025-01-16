@@ -7,6 +7,7 @@ import (
 	pbc "github.com/FACorreiaa/fitme-protos/modules/calculator/generated"
 	pbml "github.com/FACorreiaa/fitme-protos/modules/meal/generated"
 	pbm "github.com/FACorreiaa/fitme-protos/modules/measurement/generated"
+	"github.com/jackc/pgx/v5"
 
 	pb "github.com/FACorreiaa/fitme-protos/modules/user/generated"
 	pbw "github.com/FACorreiaa/fitme-protos/modules/workout/generated"
@@ -102,23 +103,18 @@ type TrackMealProgressRepository interface {
 
 // MealPlanRepository interface
 type MealPlanRepository interface {
-	GetMealPlan(ctx context.Context, req *pbml.GetMealPlanReq) (*pbml.GetMealPlanRes, error)
-	GetMealPlans(ctx context.Context, req *pbml.GetMealPlansReq) (*pbml.GetMealPlansRes, error)
-	CreateMealPlan(ctx context.Context, req *pbml.CreateMealPlanReq) (*pbml.CreateMealPlanRes, error)
+
+	// MealPlans
+	GetMealPlan(ctx context.Context, req *pbml.GetMealPlanReq) (*pbml.XMealPlan, error)
+	GetMealPlans(ctx context.Context, req *pbml.GetMealPlansReq) ([]*pbml.XMealPlan, error)
+	CreateMealPlan(ctx context.Context, req *pbml.CreateMealPlanReq) (*pbml.XMealPlan, error)
 	UpdateMealPlan(ctx context.Context, req *pbml.UpdateMealPlanReq) (*pbml.UpdateMealPlanRes, error)
 	DeleteMealPlan(ctx context.Context, req *pbml.DeleteMealPlanReq) (*pbml.NilRes, error)
-	AddIngredientToMealPlan(ctx context.Context, req *pbml.AddIngredientReq) (*pbml.AddIngredientRes, error)
-	DeleteIngredientFromMealPlan(ctx context.Context, req *pbml.DeleteIngredientReq) (*pbml.NilRes, error)
-	CreateCalorieIntakeObjective(ctx context.Context, req *pbml.CreateCalorieIntakeObjectiveReq) (*pbml.CreateCalorieIntakeObjectiveRes, error)
-	UpdateCalorieIntakeObjective(ctx context.Context, req *pbml.UpdateCalorieIntakeObjectiveReq) (*pbml.UpdateCalorieIntakeObjectiveRes, error)
-	DeleteCalorieIntakeObjective(ctx context.Context, req *pbml.DeleteCalorieIntakeObjectiveReq) (*pbml.NilRes, error)
-}
 
-// MealRepository interface
-type MealRepository interface {
+	// Meals
 	GetMeal(ctx context.Context, req *pbml.GetMealReq) (*pbml.XMeal, error)
 	GetMeals(ctx context.Context, req *pbml.GetMealsReq) ([]*pbml.XMeal, error)
-	CreateMeal(ctx context.Context, req *pbml.CreateMealReq) (*pbml.XMeal, error)
+	CreateMeal(ctx context.Context, tx pgx.Tx, req *pbml.CreateMealReq) (*pbml.XMeal, error)
 	UpdateMeal(ctx context.Context, req *pbml.UpdateMealReq) (*pbml.XMeal, error)
 	DeleteMeal(ctx context.Context, req *pbml.DeleteMealReq) (*pbml.NilRes, error)
 	AddIngredientToMeal(ctx context.Context, req *pbml.AddIngredientReq) (*pbml.NewIngredient, error)

@@ -1,7 +1,9 @@
 package meals
 
 import (
+	"context"
 	"database/sql"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -65,4 +67,69 @@ type TotalNutrients struct {
 	Sodium             sql.NullFloat64 `protobuf:"fixed64,8,opt,name=sodium" db:"sodium"`
 	Potassium          sql.NullFloat64 `protobuf:"fixed64,9,opt,name=potassium" db:"potassium"`
 	Cholesterol        sql.NullFloat64 `protobuf:"fixed64,10,opt,name=cholesterol" db:"cholesterol"`
+}
+
+// to use later
+
+type Broadcaster struct {
+	mu        sync.Mutex
+	consumers map[chan<- any]struct{}
+}
+
+func NewBroadcaster() *Broadcaster {
+	return &Broadcaster{
+		consumers: make(map[chan<- any]struct{}),
+	}
+}
+
+func (mb *Broadcaster) Send(msg any) {
+	mb.mu.Lock()
+	defer mb.mu.Unlock()
+	for listener := range mb.consumers {
+		listener <- msg
+	}
+}
+
+func (mb *Broadcaster) Close() {
+	mb.mu.Lock()
+	defer mb.mu.Unlock()
+	for listener := range mb.consumers {
+		close(listener)
+		delete(mb.consumers, listener)
+	}
+}
+
+func Listen[T any](ctx context.Context, mb *Broadcaster) <-chan T {
+	all := make(chan any)
+	mb.mu.Lock()
+	mb.consumers[all] = struct{}{}
+	mb.mu.Unlock()
+	go func() {
+		<-ctx.Done()
+		mb.mu.Lock()
+		delete(mb.consumers, all)
+		mb.mu.Unlock()
+	}()
+	ch := make(chan T)
+	go func() {
+		defer close(ch)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg, ok := <-all:
+				if !ok {
+					return
+				}
+				if m, ok := msg.(T); ok {
+					select {
+					case ch <- m:
+					case <-ctx.Done():
+						return
+					}
+				}
+			}
+		}
+	}()
+	return ch
 }

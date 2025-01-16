@@ -1058,5 +1058,4 @@ func (r *RepositoryWorkout) UpdateWorkoutPlan(ctx context.Context, req *pbw.Upda
 		Message: "Workout updated successfully",
 		Workout: updatedWorkouts,
 	}, nil
-
 }

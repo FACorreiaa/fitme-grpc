@@ -40,13 +40,6 @@ type MealPlanRepository struct {
 	sessionManager *auth.SessionManager
 }
 
-type MealRepository struct {
-	pbml.UnimplementedMealServer
-	pgpool         *pgxpool.Pool
-	redis          *redis.Client
-	sessionManager *auth.SessionManager
-}
-
 type DietPreferenceRepository struct {
 	pbml.UnimplementedDietPreferenceServiceServer
 	pgpool         *pgxpool.Pool
@@ -89,14 +82,6 @@ type MealReminderRepository struct {
 	sessionManager *auth.SessionManager
 }
 
-func NewMealPlanRepository(db *pgxpool.Pool, redis *redis.Client, sessionManager *auth.SessionManager) *MealPlanRepository {
-	return &MealPlanRepository{pgpool: db, redis: redis, sessionManager: sessionManager}
-}
-
-func NewMealRepository(db *pgxpool.Pool, redis *redis.Client, sessionManager *auth.SessionManager) *MealRepository {
-	return &MealRepository{pgpool: db, redis: redis, sessionManager: sessionManager}
-}
-
 func NewDietPreferenceRepository(db *pgxpool.Pool, redis *redis.Client, sessionManager *auth.SessionManager) *DietPreferenceRepository {
 	return &DietPreferenceRepository{pgpool: db, redis: redis, sessionManager: sessionManager}
 }
@@ -119,6 +104,13 @@ func NewGoalRecommendationRepository(db *pgxpool.Pool, redis *redis.Client, sess
 
 func NewMealReminderRepository(db *pgxpool.Pool, redis *redis.Client, sessionManager *auth.SessionManager) *MealReminderRepository {
 	return &MealReminderRepository{pgpool: db, redis: redis, sessionManager: sessionManager}
+}
+
+func NewMealPlanRepository(db *pgxpool.Pool, redis *redis.Client, sessionManager *auth.SessionManager) *MealPlanRepository {
+	if db == nil {
+		panic(errors.New("db is nil"))
+	}
+	return &MealPlanRepository{pgpool: db, redis: redis, sessionManager: sessionManager}
 }
 
 func (i *IngredientRepository) GetIngredient(ctx context.Context, req *pbml.GetIngredientReq) (*pbml.GetIngredientRes, error) {
@@ -453,15 +445,9 @@ func (i *IngredientRepository) DeleteIngredient(ctx context.Context, req *pbml.D
 	return &pbml.NilRes{}, nil
 }
 
-func (m *MealRepository) CreateMeal(ctx context.Context, req *pbml.CreateMealReq) (*pbml.XMeal, error) {
-	tx, err := m.pgpool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to start transaction")
-	}
-	defer tx.Rollback(ctx)
-
+func (m *MealPlanRepository) CreateMeal(ctx context.Context, tx pgx.Tx, req *pbml.CreateMealReq) (*pbml.XMeal, error) {
 	var exists bool
-	err = m.pgpool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)`, req.UserId).Scan(&exists)
+	err := m.pgpool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)`, req.UserId).Scan(&exists)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to check user existence: %v", err)
 	}
@@ -584,7 +570,7 @@ func (m *MealRepository) CreateMeal(ctx context.Context, req *pbml.CreateMealReq
 	}, nil
 }
 
-func (m *MealRepository) GetMeal(ctx context.Context, req *pbml.GetMealReq) (*pbml.XMeal, error) {
+func (m *MealPlanRepository) GetMeal(ctx context.Context, req *pbml.GetMealReq) (*pbml.XMeal, error) {
 	mealProto := &pbml.XMeal{}
 	id := req.MealId
 
@@ -757,7 +743,7 @@ func convertFloat(n sql.NullFloat64) float64 {
 	return 0
 }
 
-func (m *MealRepository) GetMeals(ctx context.Context, req *pbml.GetMealsReq) ([]*pbml.XMeal, error) {
+func (m *MealPlanRepository) GetMeals(ctx context.Context, req *pbml.GetMealsReq) ([]*pbml.XMeal, error) {
 	// Check if UserID is valid
 	if req.UserId == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "user ID cannot be empty")
@@ -892,7 +878,7 @@ func (m *MealRepository) GetMeals(ctx context.Context, req *pbml.GetMealsReq) ([
 	return mealsProto, nil
 }
 
-func (m *MealRepository) UpdateMeal(ctx context.Context, req *pbml.UpdateMealReq) (*pbml.XMeal, error) {
+func (m *MealPlanRepository) UpdateMeal(ctx context.Context, req *pbml.UpdateMealReq) (*pbml.XMeal, error) {
 	tx, err := m.pgpool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to begin transaction: %v", err)
@@ -972,7 +958,7 @@ func (m *MealRepository) UpdateMeal(ctx context.Context, req *pbml.UpdateMealReq
 	return updatedMeal, nil
 }
 
-func (m *MealRepository) DeleteMeal(ctx context.Context, req *pbml.DeleteMealReq) (*pbml.NilRes, error) {
+func (m *MealPlanRepository) DeleteMeal(ctx context.Context, req *pbml.DeleteMealReq) (*pbml.NilRes, error) {
 	if req.MealId == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "meal ID cannot be empty")
 	}
@@ -988,7 +974,7 @@ func (m *MealRepository) DeleteMeal(ctx context.Context, req *pbml.DeleteMealReq
 	return &pbml.NilRes{}, nil
 }
 
-func (m *MealRepository) AddIngredientToMeal(ctx context.Context, req *pbml.AddIngredientReq) (*pbml.NewIngredient, error) {
+func (m *MealPlanRepository) AddIngredientToMeal(ctx context.Context, req *pbml.AddIngredientReq) (*pbml.NewIngredient, error) {
 	if req.MealId == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "meal plan ID cannot be empty")
 	}
@@ -1153,7 +1139,7 @@ func (m *MealRepository) AddIngredientToMeal(ctx context.Context, req *pbml.AddI
 	}, nil
 }
 
-func (m *MealRepository) RemoveIngredientFromMeal(ctx context.Context, req *pbml.DeleteIngredientReq) (*pbml.NilRes, error) {
+func (m *MealPlanRepository) RemoveIngredientFromMeal(ctx context.Context, req *pbml.DeleteIngredientReq) (*pbml.NilRes, error) {
 	if req.MealPlanId == "" {
 		return nil, status.Error(codes.InvalidArgument, "meal plan id is required")
 	}
@@ -1215,7 +1201,7 @@ func (m *MealRepository) RemoveIngredientFromMeal(ctx context.Context, req *pbml
 
 }
 
-func (m *MealRepository) GetMealIngredients(ctx context.Context, req *pbml.GetMealIngredientsReq) ([]*pbml.XMealIngredient, error) {
+func (m *MealPlanRepository) GetMealIngredients(ctx context.Context, req *pbml.GetMealIngredientsReq) ([]*pbml.XMealIngredient, error) {
 	if req.MealId == "" {
 		return nil, status.Error(codes.InvalidArgument, "meal id is required")
 	}
@@ -1228,8 +1214,8 @@ func (m *MealRepository) GetMealIngredients(ctx context.Context, req *pbml.GetMe
 	defer tx.Rollback(ctx)
 
 	query := `
-		SELECT m.id, i.name, m.quantity, m.calories, m.protein, m.carbohydrates_total, 
-			   m.fat_total, m.fat_saturated, m.fiber, m.sugar, m.sodium, 
+		SELECT m.id, i.name, m.quantity, m.calories, m.protein, m.carbohydrates_total,
+			   m.fat_total, m.fat_saturated, m.fiber, m.sugar, m.sodium,
 			   m.potassium, m.cholesterol
 		FROM meal_ingredients m
 		JOIN ingredients i ON m.ingredient_id = i.id
@@ -1310,7 +1296,7 @@ func (m *MealRepository) GetMealIngredients(ctx context.Context, req *pbml.GetMe
 
 }
 
-func (m *MealRepository) GetMealIngredient(ctx context.Context, req *pbml.GetMealIngredientReq) (*pbml.XMealIngredient, error) {
+func (m *MealPlanRepository) GetMealIngredient(ctx context.Context, req *pbml.GetMealIngredientReq) (*pbml.XMealIngredient, error) {
 	if req.MealId == "" {
 		return nil, status.Error(codes.InvalidArgument, "meal id is required")
 	}
@@ -1327,8 +1313,8 @@ func (m *MealRepository) GetMealIngredient(ctx context.Context, req *pbml.GetMea
 	defer tx.Rollback(ctx)
 
 	query := `
-		SELECT m.id, i.name, m.quantity, m.calories, m.protein, m.carbohydrates_total, 
-			   m.fat_total, m.fat_saturated, m.fiber, m.sugar, m.sodium, 
+		SELECT m.id, i.name, m.quantity, m.calories, m.protein, m.carbohydrates_total,
+			   m.fat_total, m.fat_saturated, m.fiber, m.sugar, m.sodium,
 			   m.potassium, m.cholesterol
 		FROM meal_ingredients m
 		JOIN ingredients i ON m.ingredient_id = i.id
@@ -1393,7 +1379,7 @@ func (m *MealRepository) GetMealIngredient(ctx context.Context, req *pbml.GetMea
 	return ingredientProto, nil
 }
 
-func (m *MealRepository) UpdateIngredientInMeal(ctx context.Context, req *pbml.UpdateMealIngredientReq) (*pbml.XMealIngredient, error) {
+func (m *MealPlanRepository) UpdateIngredientInMeal(ctx context.Context, req *pbml.UpdateMealIngredientReq) (*pbml.XMealIngredient, error) {
 	query := `UPDATE meal_ingredients SET `
 	var setClauses []string
 	var args []interface{}
@@ -1526,3 +1512,338 @@ func parseStringToFloat(s, errorMessage string) (float64, error) {
 	}
 	return val, nil
 }
+
+func (m *MealPlanRepository) GetMealPlan(ctx context.Context, req *pbml.GetMealPlanReq) (*pbml.XMealPlan, error) {
+	return nil, nil
+}
+
+func (m *MealPlanRepository) GetMealPlans(ctx context.Context, req *pbml.GetMealPlansReq) ([]*pbml.XMealPlan, error) {
+	return nil, nil
+}
+
+// TODO Improve
+//func (m *MealPlanRepository) CreateMealPlan(ctx context.Context, req *pbml.CreateMealPlanReq) (*pbml.CreateMealPlanRes, error) {
+//	tx, err := r.pgpool.BeginTx(ctx, pgx.TxOptions{})
+//	if err != nil {
+//		return nil, status.Errorf(codes.Internal, "failed to begin transaction: %v", err)
+//	}
+//	defer tx.Rollback(ctx)
+//
+//	// Validate meal plan length
+//	if len(req.Meal) == 0 {
+//		return nil, status.Errorf(codes.InvalidArgument, "meal plan must contain at least one meal")
+//	}
+//
+//	// Create meal plan
+//	var mealPlanID uuid.UUID
+//	err = tx.QueryRow(ctx, `
+//        INSERT INTO meal_plans (name, description, user_id, created_at)
+//        VALUES ($1, $2, $3, NOW())
+//        RETURNING id
+//    `, req.Name, req.Description, req.UserId).Scan(&mealPlanID)
+//	if err != nil {
+//		return nil, status.Errorf(codes.Internal, "failed to create meal plan: %v", err)
+//	}
+//
+//	// Prepare bulk inserts
+//	var mealPlanMeals []interface{}
+//	var ingredients []interface{}
+//
+//	for i, meal := range req.Meal {
+//		// Check if the meal is properly initialized
+//		if meal == nil {
+//			return nil, status.Errorf(codes.InvalidArgument, "meal at index %d is nil", i)
+//		}
+//
+//		// Insert or ignore meal
+//		_, err = tx.Exec(ctx, `
+//            INSERT INTO meals (id, user_id, meal_number, meal_description, created_at, total_macros)
+//            VALUES ($1, $2, $3, $4, NOW(), $5)
+//            ON CONFLICT (id) DO NOTHING
+//        `, meal.MealId, meal.UserId, meal.MealNumber, meal.MealDescription, meal.TotalMealNutrients)
+//		if err != nil {
+//			return nil, status.Errorf(codes.Internal, "failed to insert meal %s: %v", meal.MealId, err)
+//		}
+//
+//		// Add meal-plan association
+//		mealPlanMeals = append(mealPlanMeals, mealPlanID, meal.MealId, i+1)
+//
+//		// Insert ingredients
+//		if meal.MealIngredients != nil {
+//			for _, ingredient := range meal.MealIngredients {
+//				// Check for nil ingredient
+//				if meal.MealId == "" {
+//					return nil, status.Errorf(codes.InvalidArgument, "meal_id is required for meal %d", i)
+//				}
+//				if meal.UserId == "" {
+//					return nil, status.Errorf(codes.InvalidArgument, "user_id is required for meal %d", i)
+//				}
+//				if meal.MealNumber == 0 {
+//					return nil, status.Errorf(codes.InvalidArgument, "meal_number is required for meal %d", i)
+//				}
+//				if meal.MealDescription == "" {
+//					return nil, status.Errorf(codes.InvalidArgument, "meal_description is required for meal %d", i)
+//				}
+//				if meal.TotalMealNutrients != nil {
+//					return nil, status.Errorf(codes.InvalidArgument, "total_meal_nutrients is required for meal %d", i)
+//				}
+//
+//				if ingredient == nil {
+//					return nil, status.Errorf(codes.InvalidArgument, "ingredient is nil for meal %s", meal.MealId)
+//				}
+//				ingredients = append(ingredients, ingredient.IngredientId, ingredient.Name, ingredient.Calories)
+//			}
+//		}
+//	}
+//
+//	// Bulk insert meal-plan associations
+//	_, err = tx.Exec(ctx, `
+//        INSERT INTO meal_plan_meals (meal_plan_id, meal_id, meal_order)
+//        VALUES ($1, $2, $3)
+//    `, mealPlanMeals...)
+//	if err != nil {
+//		return nil, status.Errorf(codes.Internal, "failed to insert meal-plan associations: %v", err)
+//	}
+//
+//	// Bulk insert ingredients
+//	_, err = tx.Exec(ctx, `
+//        INSERT INTO ingredients (id, name, calories, created_at)
+//        VALUES ($1, $2, $3, NOW())
+//        ON CONFLICT (id) DO NOTHING
+//    `, ingredients...)
+//	if err != nil {
+//		return nil, status.Errorf(codes.Internal, "failed to insert ingredients: %v", err)
+//	}
+//
+//	// Commit transaction
+//	if err = tx.Commit(ctx); err != nil {
+//		return nil, status.Errorf(codes.Internal, "failed to commit transaction: %v", err)
+//	}
+//
+//	return &pbml.CreateMealPlanRes{
+//		Success:    true,
+//		Message:    "Meal plan created successfully",
+//		MealPlanId: mealPlanID.String(),
+//	}, nil
+//}
+
+func (m *MealPlanRepository) CreateMealPlan(ctx context.Context, req *pbml.CreateMealPlanReq) (*pbml.XMealPlan, error) {
+	mealPlanProto := &pbml.XMealPlan{}
+	if m.pgpool == nil {
+		return nil, status.Errorf(codes.Internal, "pgpool is nil")
+	}
+
+	if req == nil || req.UserId == "" || req.Name == "" || req.Description == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid request: required fields are missing")
+	}
+	if req.Meal == nil {
+		return nil, status.Errorf(codes.InvalidArgument, "meal list cannot be nil")
+	}
+
+	tx, err := m.pgpool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to start transaction")
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback(ctx)
+		}
+	}()
+
+	var exists bool
+	err = m.pgpool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)`, req.UserId).Scan(&exists)
+	if err != nil || !exists {
+		return nil, status.Errorf(codes.InvalidArgument, "user_id does not exist")
+	}
+
+	var mealPlanID string
+	err = tx.QueryRow(ctx, `
+       INSERT INTO meal_plans (user_id, name, description, created_at)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id
+   `, req.UserId, req.Name, req.Description, time.Now()).Scan(&mealPlanID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to insert meal plan: %v", err)
+	}
+
+	for i, meal := range req.Meal {
+		if meal == nil || meal.MealId == "" {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid meal at index %d", i)
+		}
+
+		// Query or create meal
+		var mealID string
+		err := m.pgpool.QueryRow(ctx, `
+           SELECT id FROM meals WHERE user_id = $1 AND id = $2
+       `, req.UserId, meal.MealId).Scan(&mealID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				if m.CreateMeal == nil {
+					return nil, status.Errorf(codes.Internal, "CreateMeal function is nil")
+				}
+
+				mealReq := &pbml.CreateMealReq{
+					UserId: req.UserId,
+					Meal:   meal,
+				}
+				createdMeal, err := m.CreateMeal(ctx, tx, mealReq)
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "failed to create meal: %v", err)
+				}
+				mealID = createdMeal.MealId
+			} else {
+				return nil, status.Errorf(codes.Internal, "failed to query meal: %v", err)
+			}
+		}
+
+		_, err = tx.Exec(ctx, `
+           INSERT INTO meal_plan_meals (meal_plan_id, meal_id)
+           VALUES ($1, $2)
+       `, mealPlanID, mealID)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to associate meal with meal plan: %v", err)
+		}
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to commit transaction: %v", err)
+	}
+
+	mealPlanProto.Meal = req.Meal
+	mealPlanProto.MealPlanId = mealPlanID
+	mealPlanProto.Description = req.Description
+	mealPlanProto.Name = req.Name
+
+	return mealPlanProto, nil
+}
+
+func (m *MealPlanRepository) UpdateMealPlan(ctx context.Context, req *pbml.UpdateMealPlanReq) (*pbml.UpdateMealPlanRes, error) {
+	return nil, nil
+}
+
+func (m *MealPlanRepository) DeleteMealPlan(ctx context.Context, req *pbml.DeleteMealPlanReq) (*pbml.NilRes, error) {
+	return nil, nil
+}
+
+//func (m *MealPlanRepository) CreateMealPlan(ctx context.Context, req *pbml.CreateMealPlanReq) (*pbml.XMealPlan, error) {
+//	if m.pgpool == nil {
+//		return nil, status.Errorf(codes.Internal, "pgpool is nil")
+//	}
+//
+//	if err := validateCreateMealPlanRequest(req); err != nil {
+//		return nil, err
+//	}
+//
+//	tx, err := m.pgpool.BeginTx(ctx, pgx.TxOptions{})
+//	if err != nil {
+//		return nil, status.Error(codes.Internal, "failed to start transaction")
+//	}
+//	defer func() {
+//		if err != nil {
+//			_ = tx.Rollback(ctx)
+//		}
+//	}()
+//
+//	// Validate user
+//	if err = validateUserExists(ctx, m.pgpool, req.UserId); err != nil {
+//		return nil, err
+//	}
+//
+//	// Insert meal plan
+//	mealPlanID, err := insertMealPlan(ctx, tx, req)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	// Process meals
+//	for i, meal := range req.Meal {
+//		if err = processMeal(ctx, tx, m.CreateMeal, req.UserId, mealPlanID, meal, i); err != nil {
+//			return nil, err
+//		}
+//	}
+//
+//	if err = tx.Commit(ctx); err != nil {
+//		return nil, status.Errorf(codes.Internal, "failed to commit transaction: %v", err)
+//	}
+//
+//	return &pbml.XMealPlan{
+//		MealPlanId:  mealPlanID,
+//		Meal:        req.Meal,
+//		Description: req.Description,
+//		Name:        req.Name,
+//	}, nil
+//}
+//
+//func validateCreateMealPlanRequest(req *pbml.CreateMealPlanReq) error {
+//	if req == nil || req.UserId == "" || req.Name == "" || req.Description == "" {
+//		return status.Errorf(codes.InvalidArgument, "invalid request: required fields are missing")
+//	}
+//	if req.Meal == nil {
+//		return status.Errorf(codes.InvalidArgument, "meal list cannot be nil")
+//	}
+//	return nil
+//}
+//
+//func validateUserExists(ctx context.Context, db *pgxpool.Pool, userId string) error {
+//	var exists bool
+//	err := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)`, userId).Scan(&exists)
+//	if err != nil {
+//		return status.Errorf(codes.Internal, "failed to check user existence: %v", err)
+//	}
+//	if !exists {
+//		return status.Errorf(codes.InvalidArgument, "user_id does not exist")
+//	}
+//	return nil
+//}
+//
+//func insertMealPlan(ctx context.Context, tx pgx.Tx, req *pbml.CreateMealPlanReq) (string, error) {
+//	var mealPlanID string
+//	err := tx.QueryRow(ctx, `
+//        INSERT INTO meal_plans (user_id, name, description, created_at)
+//        VALUES ($1, $2, $3, $4)
+//        RETURNING id
+//    `, req.UserId, req.Name, req.Description, time.Now()).Scan(&mealPlanID)
+//	if err != nil {
+//		return "", status.Errorf(codes.Internal, "failed to insert meal plan: %v", err)
+//	}
+//	return mealPlanID, nil
+//}
+//
+//func processMeal(ctx context.Context, tx pgx.Tx, createMealFunc func(context.Context, pgx.Tx, *pbml.CreateMealReq) (*pbml.XMeal, error), userId, mealPlanID string, meal *pbml.XMeal, index int) error {
+//	if meal == nil || meal.MealId == "" {
+//		return status.Errorf(codes.InvalidArgument, "invalid meal at index %d", index)
+//	}
+//
+//	var mealID string
+//	err := tx.QueryRow(ctx, `
+//        SELECT id FROM meals WHERE user_id = $1 AND id = $2
+//    `, userId, meal.MealId).Scan(&mealID)
+//	if err != nil {
+//		if errors.Is(err, pgx.ErrNoRows) {
+//			if createMealFunc == nil {
+//				return status.Errorf(codes.Internal, "CreateMeal function is nil")
+//			}
+//
+//			mealReq := &pbml.CreateMealReq{
+//				UserId: userId,
+//				Meal:   meal,
+//			}
+//			createdMeal, err := createMealFunc(ctx, tx, mealReq)
+//			if err != nil {
+//				return status.Errorf(codes.Internal, "failed to create meal: %v", err)
+//			}
+//			mealID = createdMeal.MealId
+//		} else {
+//			return status.Errorf(codes.Internal, "failed to query meal: %v", err)
+//		}
+//	}
+//
+//	_, err = tx.Exec(ctx, `
+//        INSERT INTO meal_plan_meals (meal_plan_id, meal_id)
+//        VALUES ($1, $2)
+//    `, mealPlanID, mealID)
+//	if err != nil {
+//		return status.Errorf(codes.Internal, "failed to associate meal with meal plan: %v", err)
+//	}
+//	return nil
+//}

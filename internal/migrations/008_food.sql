@@ -49,18 +49,17 @@ CREATE TABLE "meal_ingredients" (
     "updated_at" TIMESTAMP DEFAULT NULL
 );
 
-ALTER TABLE "meals" ADD COLUMN "total_macros" JSONB DEFAULT NULL;
-
-
 CREATE TABLE "meal_plans" (
                             "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
                             "user_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
-                            "description" VARCHAR(255),
-                            "notes" VARCHAR(255),
-                            "total_calories" FLOAT(8),
+                            "name" VARCHAR(255) NOT NULL,
+                            "description" TEXT,
+                            "notes" TEXT,
+                            "rating" INTEGER DEFAULT 0,
+                            "objective" VARCHAR(255),
+                            "total_macros" JSONB DEFAULT '{}'::jsonb,
                             "created_at" TIMESTAMP DEFAULT NOW(),
-                            "updated_at" TIMESTAMP DEFAULT NULL,
-                            "rating" INTEGER DEFAULT 10
+                            "updated_at" TIMESTAMP DEFAULT NULL
 );
 
 -- Meal Plan Meals Table: A many-to-many relationship table linking meal plans and meals.
@@ -68,9 +67,24 @@ CREATE TABLE "meal_plan_meals" (
                                  "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
                                  "meal_plan_id" UUID NOT NULL REFERENCES "meal_plans" ("id") ON DELETE CASCADE,
                                  "meal_id" UUID NOT NULL REFERENCES "meals" ("id") ON DELETE CASCADE,
+                                 "meal_order" INTEGER NOT NULL,
                                  "created_at" TIMESTAMP DEFAULT NOW(),
-                                 "updated_at" TIMESTAMP DEFAULT NULL
+                                 "updated_at" TIMESTAMP DEFAULT NULL,
+                                 UNIQUE(meal_plan_id, meal_id)
 );
+
+ALTER TABLE "meals" ADD COLUMN "total_macros" JSONB DEFAULT NULL;
+CREATE UNIQUE INDEX unique_meal ON meals (id, meal_number);
+CREATE UNIQUE INDEX unique_meal_plan ON meal_plans (id, name);
+CREATE UNIQUE INDEX unique_ingredient ON ingredients (id, name);
+
+-- CREATE TABLE "meal_plan_meals" (
+--                                  "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+--                                  "meal_plan_id" UUID NOT NULL REFERENCES "meal_plans" ("id") ON DELETE CASCADE,
+--                                  "meal_id" UUID NOT NULL REFERENCES "meals" ("id") ON DELETE CASCADE,
+--                                  "created_at" TIMESTAMP DEFAULT NOW(),
+--                                  "updated_at" TIMESTAMP DEFAULT NULL
+-- );
 
 
 -- CREATE TABLE "meal_type" (

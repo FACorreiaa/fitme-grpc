@@ -17,7 +17,6 @@ import (
 
 type MealServiceContainer struct {
 	MealPlanService           *meals.MealPlanService
-	MealService               *meals.MealService
 	DietPreferenceService     *meals.DietPreferenceService
 	FoodLogService            *meals.FoodLogService
 	IngredientService         *meals.IngredientService
@@ -53,7 +52,6 @@ func NewServiceContainer(ctx context.Context, pgPool *pgxpool.Pool, redisClient 
 
 	// meals
 	mealPlanRepo := meals.NewMealPlanRepository(pgPool, redisClient, sessionManager)
-	mealRepo := meals.NewMealRepository(pgPool, redisClient, sessionManager)
 	dietPreferenceRepo := meals.NewDietPreferenceRepository(pgPool, redisClient, sessionManager)
 	foodLogRepo := meals.NewFoodLogRepository(pgPool, redisClient, sessionManager)
 	ingredientRepo := meals.NewIngredientRepository(pgPool, redisClient, sessionManager)
@@ -63,7 +61,6 @@ func NewServiceContainer(ctx context.Context, pgPool *pgxpool.Pool, redisClient 
 
 	mealServices := &MealServiceContainer{
 		MealPlanService:           meals.NewMealPlanService(ctx, mealPlanRepo),
-		MealService:               meals.NewMealService(ctx, mealRepo),
 		DietPreferenceService:     meals.NewDietPreferenceService(ctx, dietPreferenceRepo),
 		FoodLogService:            meals.NewFoodLogService(ctx, foodLogRepo),
 		IngredientService:         meals.NewIngredientService(ctx, ingredientRepo),
