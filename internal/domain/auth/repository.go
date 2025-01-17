@@ -20,25 +20,25 @@ import (
 	"github.com/FACorreiaa/fitme-grpc/internal/domain"
 )
 
-type AuthRepository struct {
+type Repository struct {
 	pb.UnimplementedAuthServer
 	pgpool         *pgxpool.Pool
 	redis          *redis.Client
 	sessionManager *SessionManager
 }
 
-// NewAuthService creates a new AuthService
-func NewAuthRepository(db *pgxpool.Pool, redis *redis.Client, sessionManager *SessionManager) *AuthRepository {
-	return &AuthRepository{pgpool: db, redis: redis, sessionManager: sessionManager}
+// NewRepository creates a new AuthService
+func NewRepository(db *pgxpool.Pool, redis *redis.Client, sessionManager *SessionManager) *Repository {
+	return &Repository{pgpool: db, redis: redis, sessionManager: sessionManager}
 }
 
-func (a *AuthRepository) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
+func (r *Repository) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to hash password: %v", err)
 	}
 
-	_, err = a.pgpool.Exec(ctx, `INSERT INTO "users" (username, email, password) VALUES ($1, $2, $3)`, req.Username, req.Email, hashedPassword)
+	_, err = r.pgpool.Exec(ctx, `INSERT INTO "users" (username, email, password) VALUES ($1, $2, $3)`, req.Username, req.Email, hashedPassword)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to insert user: %v", err)
 	}
@@ -46,7 +46,7 @@ func (a *AuthRepository) Register(ctx context.Context, req *pb.RegisterRequest) 
 	return &pb.RegisterResponse{Message: "Registration successful"}, nil
 }
 
-func (s *AuthRepository) RefreshToken(ctx context.Context, req *pb.RefreshTokenRequest) (*pb.TokenResponse, error) {
+func (r *Repository) RefreshToken(ctx context.Context, req *pb.RefreshTokenRequest) (*pb.TokenResponse, error) {
 	claims := &domain.Claims{}
 	token, err := jwt.ParseWithClaims(req.RefreshToken, claims, func(token *jwt.Token) (interface{}, error) {
 		return domain.JwtRefreshSecretKey, nil
@@ -66,9 +66,9 @@ func (s *AuthRepository) RefreshToken(ctx context.Context, req *pb.RefreshTokenR
 		RefreshToken: refreshToken,
 	}, nil
 }
-func (a *AuthRepository) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResponse, error) {
+func (r *Repository) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResponse, error) {
 	var user User
-	err := a.pgpool.QueryRow(ctx, `SELECT id, password, email FROM "users" WHERE username=$1`, req.Username).Scan(
+	err := r.pgpool.QueryRow(ctx, `SELECT id, password, email FROM "users" WHERE username=$1`, req.Username).Scan(
 		&user.ID, &user.Password, &user.Email)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to query user: %v", err)
@@ -109,7 +109,7 @@ func (a *AuthRepository) Login(ctx context.Context, req *pb.LoginRequest) (*pb.L
 	return &pb.LoginResponse{Token: tokenString, Message: "Login successful!"}, nil
 }
 
-func (a *AuthRepository) Logout(ctx context.Context, req *pb.NilReq) (*pb.NilRes, error) {
+func (r *Repository) Logout(ctx context.Context, req *pb.NilReq) (*pb.NilRes, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return nil, errors.New("unable to retrieve metadata")
@@ -121,7 +121,7 @@ func (a *AuthRepository) Logout(ctx context.Context, req *pb.NilReq) (*pb.NilRes
 	}
 
 	token := authHeader[0]
-	sessionData, err := a.redis.Get(ctx, token).Result()
+	sessionData, err := r.redis.Get(ctx, token).Result()
 	if err != nil {
 		return nil, errors.New("invalid or expired token")
 	}
@@ -139,7 +139,7 @@ func (a *AuthRepository) Logout(ctx context.Context, req *pb.NilReq) (*pb.NilRes
 	//	return nil, err
 	//}
 
-	err = a.redis.Del(ctx, token).Err()
+	err = r.redis.Del(ctx, token).Err()
 	if err != nil {
 		return nil, errors.New("delete item")
 	}
@@ -147,9 +147,9 @@ func (a *AuthRepository) Logout(ctx context.Context, req *pb.NilReq) (*pb.NilRes
 	return &pb.NilRes{}, nil
 }
 
-func (a *AuthRepository) ChangePassword(ctx context.Context, req *pb.ChangePasswordRequest) (*pb.ChangePasswordResponse, error) {
+func (r *Repository) ChangePassword(ctx context.Context, req *pb.ChangePasswordRequest) (*pb.ChangePasswordResponse, error) {
 	var passwordHash string
-	err := a.pgpool.QueryRow(ctx, `SELECT password FROM "users" WHERE username=$1`, req.Username).Scan(&passwordHash)
+	err := r.pgpool.QueryRow(ctx, `SELECT password FROM "users" WHERE username=$1`, req.Username).Scan(&passwordHash)
 	if err != nil {
 		return nil, errors.New("user not found")
 	}
@@ -164,7 +164,7 @@ func (a *AuthRepository) ChangePassword(ctx context.Context, req *pb.ChangePassw
 		return nil, err
 	}
 
-	_, err = a.pgpool.Exec(ctx, `UPDATE "users" SET password=$1, updated_at=now() WHERE username=$2`, newHashedPassword, req.Username)
+	_, err = r.pgpool.Exec(ctx, `UPDATE "users" SET password=$1, updated_at=now() WHERE username=$2`, newHashedPassword, req.Username)
 	if err != nil {
 		return nil, err
 	}
@@ -172,9 +172,9 @@ func (a *AuthRepository) ChangePassword(ctx context.Context, req *pb.ChangePassw
 	return &pb.ChangePasswordResponse{Message: "Password changed successfully"}, nil
 }
 
-func (a *AuthRepository) ChangeEmail(ctx context.Context, req *pb.ChangeEmailRequest) (*pb.ChangeEmailResponse, error) {
+func (r *Repository) ChangeEmail(ctx context.Context, req *pb.ChangeEmailRequest) (*pb.ChangeEmailResponse, error) {
 	var passwordHash string
-	err := a.pgpool.QueryRow(ctx, `SELECT password FROM "users" WHERE username=$1`, req.Username).Scan(&passwordHash)
+	err := r.pgpool.QueryRow(ctx, `SELECT password FROM "users" WHERE username=$1`, req.Username).Scan(&passwordHash)
 	if err != nil {
 		return nil, errors.New("user not found")
 	}
@@ -184,7 +184,7 @@ func (a *AuthRepository) ChangeEmail(ctx context.Context, req *pb.ChangeEmailReq
 		return nil, errors.New("invalid credentials")
 	}
 
-	_, err = a.pgpool.Exec(ctx, `UPDATE "users" SET email=$1, updated_at=now() WHERE username=$2`, req.NewEmail, req.Username)
+	_, err = r.pgpool.Exec(ctx, `UPDATE "users" SET email=$1, updated_at=now() WHERE username=$2`, req.NewEmail, req.Username)
 	if err != nil {
 		return nil, err
 	}
@@ -192,8 +192,8 @@ func (a *AuthRepository) ChangeEmail(ctx context.Context, req *pb.ChangeEmailReq
 	return &pb.ChangeEmailResponse{Message: "Email changed successfully"}, nil
 }
 
-func (a *AuthRepository) GetAllUsers(ctx context.Context) (*pb.GetAllUsersResponse, error) {
-	rows, err := a.pgpool.Query(ctx, `SELECT id, username, email, role, created_at, updated_at FROM "users"`)
+func (r *Repository) GetAllUsers(ctx context.Context) (*pb.GetAllUsersResponse, error) {
+	rows, err := r.pgpool.Query(ctx, `SELECT id, username, email, role, created_at, updated_at FROM "users"`)
 	if err != nil {
 		return nil, err
 	}
@@ -243,12 +243,12 @@ func (a *AuthRepository) GetAllUsers(ctx context.Context) (*pb.GetAllUsersRespon
 	return &pb.GetAllUsersResponse{Users: users}, nil
 }
 
-func (a *AuthRepository) GetUserByID(ctx context.Context, req *pb.GetUserByIDRequest) (*pb.GetUserByIDResponse, error) {
+func (r *Repository) GetUserByID(ctx context.Context, req *pb.GetUserByIDRequest) (*pb.GetUserByIDResponse, error) {
 	var u pb.User
 	var createdAt time.Time
 	var updatedAt *time.Time
 
-	err := a.pgpool.QueryRow(ctx, `
+	err := r.pgpool.QueryRow(ctx, `
 			SELECT u.id, u.username, u.email, u.created_at, u.updated_at
 			FROM "users" u
 			WHERE id = $1`, req.Id).Scan(
@@ -269,9 +269,9 @@ func (a *AuthRepository) GetUserByID(ctx context.Context, req *pb.GetUserByIDReq
 	return &pb.GetUserByIDResponse{User: &u}, nil
 }
 
-func (a *AuthRepository) DeleteUser(ctx context.Context, req *pb.DeleteUserRequest) (*pb.DeleteUserResponse, error) {
+func (r *Repository) DeleteUser(ctx context.Context, req *pb.DeleteUserRequest) (*pb.DeleteUserResponse, error) {
 	// Execute the delete query
-	commandTag, err := a.pgpool.Exec(ctx, `DELETE FROM "users" WHERE user = $1`, req.Id)
+	commandTag, err := r.pgpool.Exec(ctx, `DELETE FROM "users" WHERE user = $1`, req.Id)
 	if err != nil {
 		return nil, fmt.Errorf("error deleting user: %v", err)
 	}
@@ -284,9 +284,9 @@ func (a *AuthRepository) DeleteUser(ctx context.Context, req *pb.DeleteUserReque
 	return &pb.DeleteUserResponse{Message: "user deleted successfully"}, nil
 }
 
-func (a *AuthRepository) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest) (*pb.UpdateUserResponse, error) {
+func (r *Repository) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest) (*pb.UpdateUserResponse, error) {
 	// Execute the update query
-	commandTag, err := a.pgpool.Exec(ctx, `
+	commandTag, err := r.pgpool.Exec(ctx, `
 		UPDATE "users"
 		SET username = $1, email = $2, updated_at = NOW()
 		WHERE id = $3`,
@@ -305,9 +305,9 @@ func (a *AuthRepository) UpdateUser(ctx context.Context, req *pb.UpdateUserReque
 
 // InsertUser change this later
 
-func (a *AuthRepository) InsertUser(ctx context.Context, req *pb.InsertUserRequest) (*pb.InsertUserResponse, error) {
+func (r *Repository) InsertUser(ctx context.Context, req *pb.InsertUserRequest) (*pb.InsertUserResponse, error) {
 	// Insert the new user
-	_, err := a.pgpool.Exec(ctx, `
+	_, err := r.pgpool.Exec(ctx, `
 		INSERT INTO "users" (id, username, email, password, role, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, NOW(), NOW())`,
 		req.User.Id, req.User.Username, req.User.Email, req.User.PasswordHash, req.User.IsAdmin)

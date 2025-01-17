@@ -10,7 +10,7 @@ import (
 	"github.com/FACorreiaa/fitme-grpc/internal/domain"
 )
 
-type AuthService struct {
+type Service struct {
 	pb.UnimplementedAuthServer
 	ctx            context.Context
 	repo           domain.AuthRepository
@@ -19,34 +19,34 @@ type AuthService struct {
 	SessionManager *SessionManager
 }
 
-func NewAuthService(ctx context.Context, repo domain.AuthRepository,
+func NewService(ctx context.Context, repo domain.AuthRepository,
 	db *pgxpool.Pool,
 	redis *redis.Client,
-	sessionManager *SessionManager) *AuthService {
-	return &AuthService{ctx: ctx, repo: repo, pgpool: db, redis: redis, SessionManager: sessionManager}
+	sessionManager *SessionManager) *Service {
+	return &Service{ctx: ctx, repo: repo, pgpool: db, redis: redis, SessionManager: sessionManager}
 }
 
-func (s *AuthService) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
+func (s *Service) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
 	return s.repo.Register(ctx, req)
 }
 
-func (s *AuthService) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResponse, error) {
+func (s *Service) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResponse, error) {
 	return s.repo.Login(ctx, req)
 }
 
-func (s *AuthService) Logout(ctx context.Context, req *pb.NilReq) (*pb.NilRes, error) {
+func (s *Service) Logout(ctx context.Context, req *pb.NilReq) (*pb.NilRes, error) {
 	return s.repo.Logout(ctx, req)
 }
 
-func (s *AuthService) ChangePassword(ctx context.Context, req *pb.ChangePasswordRequest) (*pb.ChangePasswordResponse, error) {
+func (s *Service) ChangePassword(ctx context.Context, req *pb.ChangePasswordRequest) (*pb.ChangePasswordResponse, error) {
 	return s.repo.ChangePassword(ctx, req)
 }
 
-func (s *AuthService) ChangeEmail(ctx context.Context, req *pb.ChangeEmailRequest) (*pb.ChangeEmailResponse, error) {
+func (s *Service) ChangeEmail(ctx context.Context, req *pb.ChangeEmailRequest) (*pb.ChangeEmailResponse, error) {
 	return s.repo.ChangeEmail(ctx, req)
 }
 
-func (s *AuthService) GetAllUsers(ctx context.Context, _ *pb.GetAllUsersRequest) (*pb.GetAllUsersResponse, error) {
+func (s *Service) GetAllUsers(ctx context.Context, _ *pb.GetAllUsersRequest) (*pb.GetAllUsersResponse, error) {
 	users, err := s.repo.GetAllUsers(ctx)
 	if err != nil {
 		return nil, err
@@ -54,7 +54,7 @@ func (s *AuthService) GetAllUsers(ctx context.Context, _ *pb.GetAllUsersRequest)
 	return users, nil
 }
 
-func (s *AuthService) GetUserByID(ctx context.Context, req *pb.GetUserByIDRequest) (*pb.GetUserByIDResponse, error) {
+func (s *Service) GetUserByID(ctx context.Context, req *pb.GetUserByIDRequest) (*pb.GetUserByIDResponse, error) {
 	user, err := s.repo.GetUserByID(ctx, req)
 	if err != nil {
 		return nil, err
@@ -62,14 +62,14 @@ func (s *AuthService) GetUserByID(ctx context.Context, req *pb.GetUserByIDReques
 	return user, nil
 }
 
-func (s *AuthService) DeleteUser(ctx context.Context, req *pb.DeleteUserRequest) (*pb.DeleteUserResponse, error) {
+func (s *Service) DeleteUser(ctx context.Context, req *pb.DeleteUserRequest) (*pb.DeleteUserResponse, error) {
 	return s.repo.DeleteUser(ctx, req)
 }
 
-func (s *AuthService) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest) (*pb.UpdateUserResponse, error) {
+func (s *Service) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest) (*pb.UpdateUserResponse, error) {
 	return s.repo.UpdateUser(ctx, req)
 }
 
-func (s *AuthService) InsertUser(ctx context.Context, req *pb.InsertUserRequest) (*pb.InsertUserResponse, error) {
+func (s *Service) InsertUser(ctx context.Context, req *pb.InsertUserRequest) (*pb.InsertUserResponse, error) {
 	return s.repo.InsertUser(ctx, req)
 }

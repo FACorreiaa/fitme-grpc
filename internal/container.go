@@ -27,7 +27,7 @@ type MealServiceContainer struct {
 
 type ServiceContainer struct {
 	Brokers     *container.Brokers
-	AuthService *auth.AuthService
+	AuthService *auth.Service
 	//CustomerService    *domain.CustomerService
 	CalculatorService  *calculator.CalculatorService
 	ServiceActivity    *activity.ServiceActivity
@@ -38,12 +38,12 @@ type ServiceContainer struct {
 
 func NewServiceContainer(ctx context.Context, pgPool *pgxpool.Pool, redisClient *redis.Client, brokers *container.Brokers) *ServiceContainer {
 	sessionManager := auth.NewSessionManager(pgPool, redisClient)
-	authRepo := auth.NewAuthRepository(pgPool, redisClient, sessionManager)
+	authRepo := auth.NewRepository(pgPool, redisClient, sessionManager)
 	calculatorRepo := calculator.NewCalculatorRepository(pgPool, redisClient, sessionManager)
 	activityRepo := activity.NewRepositoryActivity(pgPool, redisClient, sessionManager)
 	workoutRepo := workout.NewRepositoryWorkout(pgPool, redisClient, sessionManager)
 	measurementRepo := measurements.NewRepositoryMeasurement(pgPool, redisClient, sessionManager)
-	authService := auth.NewAuthService(ctx, authRepo, pgPool, redisClient, sessionManager)
+	authService := auth.NewService(ctx, authRepo, pgPool, redisClient, sessionManager)
 	//customerService := domain.NewCustomerService(ctx, pgPool, redisClient)
 	calculatorService := calculator.NewCalculatorService(ctx, calculatorRepo)
 	activityService := activity.NewCalculatorService(ctx, activityRepo)

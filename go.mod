@@ -1,6 +1,6 @@
 module github.com/FACorreiaa/fitme-grpc
 
-go 1.23.1
+go 1.23.4
 
 require (
 	github.com/FACorreiaa/fitme-protos v0.0.0-20250116193959-881bbe25d408
