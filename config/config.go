@@ -84,15 +84,21 @@ func InitConfig() (Config, error) {
 	v.SetConfigName("config")
 	v.SetConfigType("yaml")
 
-	if err := v.ReadInConfig(); err != nil {
+	err := v.ReadInConfig()
+	if err != nil {
+		// Log warning, but don't fail, as we fall back to embedded config
+		fmt.Printf("Warning: Failed to find file-based config: %s. Falling back to embedded config.\n", err)
+	}
+
+	if err = v.ReadInConfig(); err != nil {
 		return Config{}, fmt.Errorf("failed to read embedded config: %s", err)
 	}
 
-	if err := v.ReadConfig(bytes.NewReader(embeddedConfig)); err != nil {
+	if err = v.ReadConfig(bytes.NewReader(embeddedConfig)); err != nil {
 		return Config{}, fmt.Errorf("failed to read embedded config: %s", err)
 	}
 
-	if err := v.Unmarshal(&config); err != nil {
+	if err = v.Unmarshal(&config); err != nil {
 		return Config{}, fmt.Errorf("failed to unmarshal config: %s", err)
 	}
 	println("Successfully loaded app configs..")

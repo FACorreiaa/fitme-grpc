@@ -1,40 +1,40 @@
 services:
-  init:
-    image: &tempoImage grafana/tempo:latest
-    user: root
-    entrypoint:
-      - "chown"
-      - "10001:10001"
-      - "/var/tempo"
-    volumes:
-      - ./tempo-data:/var/tempo
-
-  app:
-    platform: linux/amd64
-    container_name: fitme-dev
-    build:
-      dockerfile: Dockerfile
-      context: .
-      target: dev
-    volumes:
-      - .:/app
-    ports:
-      - "8000:8000"
-      - "8001:8001"
-      - "40000:40000"
-    environment:
-      #- OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=otel-collector:4317
-      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=tempo:4317
-
-    depends_on:
-      - postgres
-      - redis
-    logging:
-      driver: loki
-      options:
-        loki-url: http://localhost:3100/loki/api/v1/push
-    networks:
-      fit-me:
+#  init:
+#    image: &tempoImage grafana/tempo:latest
+#    user: root
+#    entrypoint:
+#      - "chown"
+#      - "10001:10001"
+#      - "/var/tempo"
+#    volumes:
+#      - ./tempo-data:/var/tempo
+#
+#  app:
+#    platform: linux/amd64
+#    container_name: fitme-dev
+#    build:
+#      dockerfile: Dockerfile
+#      context: .
+#      target: dev
+#    volumes:
+#      - .:/app
+#    ports:
+#      - "8000:8000"
+#      - "8001:8001"
+#      - "40000:40000"
+#    environment:
+#      #- OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=otel-collector:4317
+#      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=tempo:4317
+#
+#    depends_on:
+#      - postgres
+#      - redis
+#    logging:
+#      driver: loki
+#      options:
+#        loki-url: http://localhost:3100/loki/api/v1/push
+#    networks:
+#      fit-me:
 
   postgres:
     env_file:

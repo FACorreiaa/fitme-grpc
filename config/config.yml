@@ -32,7 +32,7 @@ services:
 
 repositories:
   postgres:
-    port: "5432"
+    port: "5440"
     username: "postgres"
     db: "fit-me-dev"
     SSLMODE: "verify-full"
