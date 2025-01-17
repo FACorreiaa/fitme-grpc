@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	pbml "github.com/FACorreiaa/fitme-protos/modules/meal/generated"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -700,17 +699,17 @@ func (m *MealPlanService) CreateMeal(ctx context.Context, req *pbml.CreateMealRe
 	req.Request.RequestId = requestID
 	req.UserId = userID
 
-	tx, err := m.db.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to start transaction")
-	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback(ctx)
-		}
-	}()
+	//tx, err := m.db.BeginTx(ctx, pgx.TxOptions{})
+	//if err != nil {
+	//	return nil, status.Error(codes.Internal, "failed to start transaction")
+	//}
+	//defer func() {
+	//	if err != nil {
+	//		_ = tx.Rollback(ctx)
+	//	}
+	//}()
 
-	meal, err := m.repo.CreateMeal(ctx, tx, req)
+	meal, err := m.repo.CreateMeal(ctx, req)
 	if err != nil {
 		return &pbml.CreateMealRes{
 			Success: false,
@@ -1129,10 +1128,13 @@ func (m *MealPlanService) CreateMealPlan(ctx context.Context, req *pbml.CreateMe
 	tracer := otel.Tracer("FitSphere")
 	ctx, span := tracer.Start(ctx, "Meal/CreateMealPlan")
 	defer span.End()
-
 	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
 	if !ok {
 		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pbml.BaseRequest{}
 	}
 
 	userID := ctx.Value("userID").(string)
@@ -1162,7 +1164,7 @@ func (m *MealPlanService) CreateMealPlan(ctx context.Context, req *pbml.CreateMe
 
 	return &pbml.CreateMealPlanRes{
 		Success:    true,
-		Message:    "Meal plan updated successfully",
+		Message:    "Meal plan inserted successfully",
 		MealPlanId: mp.MealPlanId,
 		Status:     strconv.Itoa(int(codes.OK)),
 		Response: &pbml.BaseResponse{

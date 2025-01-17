@@ -32,6 +32,9 @@ services:
 
 repositories:
   postgres:
+    #port: "5432"
+    host: "localhost"
+    password: "postgres"
     port: "5440"
     username: "postgres"
     db: "fit-me-dev"

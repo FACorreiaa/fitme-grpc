@@ -40,6 +40,8 @@ type Config struct {
 	} `mapstructure:"handlers"`
 	Repositories struct {
 		Postgres struct {
+			Host              string `mapstructure:"host"`
+			Password          string `mapstructure:"password"`
 			Port              string `mapstructure:"port"`
 			Username          string `mapstructure:"username"`
 			DB                string `mapstructure:"db"`
@@ -75,6 +77,8 @@ type Config struct {
 func InitConfig() (Config, error) {
 	var config Config
 	v := viper.New()
+
+	// Add file-based config paths
 	v.AddConfigPath(".")
 	v.AddConfigPath("config")
 	v.AddConfigPath("/app/config")
@@ -84,23 +88,21 @@ func InitConfig() (Config, error) {
 	v.SetConfigName("config")
 	v.SetConfigType("yaml")
 
+	// Try to load file-based config
 	err := v.ReadInConfig()
 	if err != nil {
-		// Log warning, but don't fail, as we fall back to embedded config
 		fmt.Printf("Warning: Failed to find file-based config: %s. Falling back to embedded config.\n", err)
+
+		// Fallback to embedded config
+		if err = v.ReadConfig(bytes.NewReader(embeddedConfig)); err != nil {
+			return Config{}, fmt.Errorf("failed to read embedded config: %s", err)
+		}
 	}
 
-	if err = v.ReadInConfig(); err != nil {
-		return Config{}, fmt.Errorf("failed to read embedded config: %s", err)
-	}
-
-	if err = v.ReadConfig(bytes.NewReader(embeddedConfig)); err != nil {
-		return Config{}, fmt.Errorf("failed to read embedded config: %s", err)
-	}
-
+	// Unmarshal the config into the Config struct
 	if err = v.Unmarshal(&config); err != nil {
 		return Config{}, fmt.Errorf("failed to unmarshal config: %s", err)
 	}
-	println("Successfully loaded app configs..")
+	fmt.Println("Successfully loaded app configs...")
 	return config, nil
 }

@@ -96,13 +96,14 @@ func NewDatabaseConfig() (*DatabaseConfig, error) {
 	}
 	connURL := url.URL{
 		Scheme:   "postgres",
-		User:     url.UserPassword(cfg.Repositories.Postgres.Username, password),
-		Host:     host + ":" + cfg.Repositories.Postgres.Port,
+		User:     url.UserPassword(cfg.Repositories.Postgres.Username, cfg.Repositories.Postgres.Password),
+		Host:     cfg.Repositories.Postgres.Host + ":" + cfg.Repositories.Postgres.Port,
 		Path:     cfg.Repositories.Postgres.DB,
 		RawQuery: query.Encode(),
 	}
 	log.Info("Database connection URL generated", zap.String("connectionURL", connURL.String()))
 
+	fmt.Printf("Connection URL: %s\n", connURL.String())
 	return &DatabaseConfig{
 		ConnectionURL: connURL.String(),
 	}, nil

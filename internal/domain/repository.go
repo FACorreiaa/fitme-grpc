@@ -7,8 +7,6 @@ import (
 	pbc "github.com/FACorreiaa/fitme-protos/modules/calculator/generated"
 	pbml "github.com/FACorreiaa/fitme-protos/modules/meal/generated"
 	pbm "github.com/FACorreiaa/fitme-protos/modules/measurement/generated"
-	"github.com/jackc/pgx/v5"
-
 	pb "github.com/FACorreiaa/fitme-protos/modules/user/generated"
 	pbw "github.com/FACorreiaa/fitme-protos/modules/workout/generated"
 )
@@ -114,7 +112,7 @@ type MealPlanRepository interface {
 	// Meals
 	GetMeal(ctx context.Context, req *pbml.GetMealReq) (*pbml.XMeal, error)
 	GetMeals(ctx context.Context, req *pbml.GetMealsReq) ([]*pbml.XMeal, error)
-	CreateMeal(ctx context.Context, tx pgx.Tx, req *pbml.CreateMealReq) (*pbml.XMeal, error)
+	CreateMeal(ctx context.Context, req *pbml.CreateMealReq) (*pbml.XMeal, error)
 	UpdateMeal(ctx context.Context, req *pbml.UpdateMealReq) (*pbml.XMeal, error)
 	DeleteMeal(ctx context.Context, req *pbml.DeleteMealReq) (*pbml.NilRes, error)
 	AddIngredientToMeal(ctx context.Context, req *pbml.AddIngredientReq) (*pbml.NewIngredient, error)
