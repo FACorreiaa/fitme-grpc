@@ -18,10 +18,24 @@ CREATE TABLE "ingredients" (
                         CONSTRAINT fk_user FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE
 );
 
+CREATE TABLE "meal_plans" (
+                            "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                            "user_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
+                            "name" VARCHAR(255) NOT NULL,
+                            "description" TEXT,
+                            "notes" TEXT,
+                            "rating" INTEGER DEFAULT 0,
+                            "objective" VARCHAR(255),
+                            "total_macros" JSONB DEFAULT '{}'::jsonb,
+                            "created_at" TIMESTAMP DEFAULT NOW(),
+                            "updated_at" TIMESTAMP DEFAULT NULL
+);
+
 --
 CREATE TABLE "meals" (
     "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     "user_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
+    "meal_plan_id" UUID REFERENCES "meal_plans" (id) ON DELETE CASCADE,
     "meal_number" INTEGER NOT NULL, -- E.g., breakfast, lunch, dinner
     "meal_description" VARCHAR(255),
      -- "meal_ingredients" uuid[], -- Array of ingredient IDs
@@ -47,19 +61,6 @@ CREATE TABLE "meal_ingredients" (
     "cholesterol" FLOAT(8) NOT NULL, -- Computed cholesterol
     "created_at" TIMESTAMP DEFAULT NOW(),
     "updated_at" TIMESTAMP DEFAULT NULL
-);
-
-CREATE TABLE "meal_plans" (
-                            "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                            "user_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
-                            "name" VARCHAR(255) NOT NULL,
-                            "description" TEXT,
-                            "notes" TEXT,
-                            "rating" INTEGER DEFAULT 0,
-                            "objective" VARCHAR(255),
-                            "total_macros" JSONB DEFAULT '{}'::jsonb,
-                            "created_at" TIMESTAMP DEFAULT NOW(),
-                            "updated_at" TIMESTAMP DEFAULT NULL
 );
 
 -- Meal Plan Meals Table: A many-to-many relationship table linking meal plans and meals.

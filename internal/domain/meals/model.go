@@ -69,6 +69,34 @@ type TotalNutrients struct {
 	Cholesterol        sql.NullFloat64 `protobuf:"fixed64,10,opt,name=cholesterol" db:"cholesterol"`
 }
 
+//type MealPlan struct {
+//	ID              uuid.UUID `db:"id"`
+//	UserID          uuid.UUID `db:"user_id"`
+//	MealPlanID      uuid.UUID `db:"meal_plan_id"`
+//	MealPlanNumber  int       `db:"meal_plan_number"`
+//	MealDescription string    `db:"description"`
+//	Meals           []Meal    `db:"meals"`
+//	TotalNutrients  TotalNutrients
+//	Notes           string       `db:"notes"`
+//	Objective       string       `db:"objective"`
+//	CreatedAt       time.Time    `db:"created_at"`
+//	UpdatedAt       sql.NullTime `db:"updated_at"`
+//	Name            string       `db:"name"`
+//}
+
+type MealPlan struct {
+	ID          uuid.UUID       `protobuf:"bytes,1,opt,name=meal_plan_id,json=meal_plan_id" db:"id"`
+	UserID      uuid.UUID       `db:"user_id"`
+	Name        string          `db:"name"`
+	CreatedAt   time.Time       `db:"created_at"`
+	UpdatedAt   sql.NullTime    `db:"updated_at"`
+	Meals       []Meal          `db:"-"` // Exclude from DB scan, populate later
+	TotalMacros *TotalNutrients `protobuf:"bytes,8,rep,name=total_macros,json=totalMacros" db:"total_macros"`
+	Description string          `db:"description"`
+	Notes       string          `db:"notes"`
+	Rating      float32         `db:"rating"`
+}
+
 // to use later
 
 type Broadcaster struct {

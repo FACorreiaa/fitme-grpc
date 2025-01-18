@@ -1173,3 +1173,56 @@ func (m *MealPlanService) CreateMealPlan(ctx context.Context, req *pbml.CreateMe
 		},
 	}, nil
 }
+
+func (m *MealPlanService) GetMealPlans(ctx context.Context, req *pbml.GetMealPlansReq) (*pbml.GetMealPlansRes, error) {
+	tracer := otel.Tracer("FitSphere")
+	ctx, span := tracer.Start(ctx, "Meal/GetMealPlans")
+	defer span.End()
+
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	userID := ctx.Value("userID").(string)
+	if userID == "" {
+		return nil, status.Error(codes.Unauthenticated, "userID is missing in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pbml.BaseRequest{}
+	}
+
+	req.Request.RequestId = requestID
+	req.UserId = userID
+
+	mps, err := m.repo.GetMealPlans(ctx, req)
+	if err != nil {
+		return &pbml.GetMealPlansRes{
+			Success: false,
+			Message: "Failed to fetch meal plans",
+			//Status:  strconv.Itoa(int(codes.NotFound)),
+			Response: &pbml.BaseResponse{
+				Upstream:  "meal-service",
+				RequestId: requestID,
+			},
+		}, status.Errorf(codes.Internal, "failed to get meal plans: %v", err)
+	}
+
+	span.SetAttributes(
+		attribute.String("request.id", req.Request.RequestId),
+		attribute.String("request.details", req.String()))
+
+	return &pbml.GetMealPlansRes{
+		Success:            true,
+		Message:            "Meal plan fetched successfully",
+		MealPlan:           mps.MealPlan,
+		CreatedAt:          mps.CreatedAt,
+		UpdatedAt:          mps.UpdatedAt,
+		TotalMealNutrients: mps.TotalMealNutrients,
+		Response: &pbml.BaseResponse{
+			Upstream:  "meal-service",
+			RequestId: requestID,
+		},
+	}, nil
+}

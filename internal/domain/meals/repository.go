@@ -1527,115 +1527,160 @@ func (m *MealPlanRepository) GetMealPlan(ctx context.Context, req *pbml.GetMealP
 	return nil, nil
 }
 
-func (m *MealPlanRepository) GetMealPlans(ctx context.Context, req *pbml.GetMealPlansReq) ([]*pbml.XMealPlan, error) {
-	return nil, nil
-}
+func (m *MealPlanRepository) GetMealPlans(ctx context.Context, req *pbml.GetMealPlansReq) (*pbml.GetMealPlansRes, error) {
+	// Check if UserID is valid
+	if req.UserId == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "user ID cannot be empty")
+	}
 
-// TODO Improve
-//func (m *MealPlanRepository) CreateMealPlan(ctx context.Context, req *pbml.CreateMealPlanReq) (*pbml.CreateMealPlanRes, error) {
-//	tx, err := r.pgpool.BeginTx(ctx, pgx.TxOptions{})
-//	if err != nil {
-//		return nil, status.Errorf(codes.Internal, "failed to begin transaction: %v", err)
-//	}
-//	defer tx.Rollback(ctx)
-//
-//	// Validate meal plan length
-//	if len(req.Meal) == 0 {
-//		return nil, status.Errorf(codes.InvalidArgument, "meal plan must contain at least one meal")
-//	}
-//
-//	// Create meal plan
-//	var mealPlanID uuid.UUID
-//	err = tx.QueryRow(ctx, `
-//        INSERT INTO meal_plans (name, description, user_id, created_at)
-//        VALUES ($1, $2, $3, NOW())
-//        RETURNING id
-//    `, req.Name, req.Description, req.UserId).Scan(&mealPlanID)
-//	if err != nil {
-//		return nil, status.Errorf(codes.Internal, "failed to create meal plan: %v", err)
-//	}
-//
-//	// Prepare bulk inserts
-//	var mealPlanMeals []interface{}
-//	var ingredients []interface{}
-//
-//	for i, meal := range req.Meal {
-//		// Check if the meal is properly initialized
-//		if meal == nil {
-//			return nil, status.Errorf(codes.InvalidArgument, "meal at index %d is nil", i)
-//		}
-//
-//		// Insert or ignore meal
-//		_, err = tx.Exec(ctx, `
-//            INSERT INTO meals (id, user_id, meal_number, meal_description, created_at, total_macros)
-//            VALUES ($1, $2, $3, $4, NOW(), $5)
-//            ON CONFLICT (id) DO NOTHING
-//        `, meal.MealId, meal.UserId, meal.MealNumber, meal.MealDescription, meal.TotalMealNutrients)
-//		if err != nil {
-//			return nil, status.Errorf(codes.Internal, "failed to insert meal %s: %v", meal.MealId, err)
-//		}
-//
-//		// Add meal-plan association
-//		mealPlanMeals = append(mealPlanMeals, mealPlanID, meal.MealId, i+1)
-//
-//		// Insert ingredients
-//		if meal.MealIngredients != nil {
-//			for _, ingredient := range meal.MealIngredients {
-//				// Check for nil ingredient
-//				if meal.MealId == "" {
-//					return nil, status.Errorf(codes.InvalidArgument, "meal_id is required for meal %d", i)
-//				}
-//				if meal.UserId == "" {
-//					return nil, status.Errorf(codes.InvalidArgument, "user_id is required for meal %d", i)
-//				}
-//				if meal.MealNumber == 0 {
-//					return nil, status.Errorf(codes.InvalidArgument, "meal_number is required for meal %d", i)
-//				}
-//				if meal.MealDescription == "" {
-//					return nil, status.Errorf(codes.InvalidArgument, "meal_description is required for meal %d", i)
-//				}
-//				if meal.TotalMealNutrients != nil {
-//					return nil, status.Errorf(codes.InvalidArgument, "total_meal_nutrients is required for meal %d", i)
-//				}
-//
-//				if ingredient == nil {
-//					return nil, status.Errorf(codes.InvalidArgument, "ingredient is nil for meal %s", meal.MealId)
-//				}
-//				ingredients = append(ingredients, ingredient.IngredientId, ingredient.Name, ingredient.Calories)
-//			}
-//		}
-//	}
-//
-//	// Bulk insert meal-plan associations
-//	_, err = tx.Exec(ctx, `
-//        INSERT INTO meal_plan_meals (meal_plan_id, meal_id, meal_order)
-//        VALUES ($1, $2, $3)
-//    `, mealPlanMeals...)
-//	if err != nil {
-//		return nil, status.Errorf(codes.Internal, "failed to insert meal-plan associations: %v", err)
-//	}
-//
-//	// Bulk insert ingredients
-//	_, err = tx.Exec(ctx, `
-//        INSERT INTO ingredients (id, name, calories, created_at)
-//        VALUES ($1, $2, $3, NOW())
-//        ON CONFLICT (id) DO NOTHING
-//    `, ingredients...)
-//	if err != nil {
-//		return nil, status.Errorf(codes.Internal, "failed to insert ingredients: %v", err)
-//	}
-//
-//	// Commit transaction
-//	if err = tx.Commit(ctx); err != nil {
-//		return nil, status.Errorf(codes.Internal, "failed to commit transaction: %v", err)
-//	}
-//
-//	return &pbml.CreateMealPlanRes{
-//		Success:    true,
-//		Message:    "Meal plan created successfully",
-//		MealPlanId: mealPlanID.String(),
-//	}, nil
-//}
+	query := `
+				SELECT
+					mp.id AS id,
+					mp.user_id AS user_id,
+					mp.name AS name,
+					mp.description AS description,
+					mp.notes AS notes,
+					mp.rating AS rating,
+					mp.created_at AS created_at,
+					mp.updated_at AS updated_at,
+					COALESCE(
+						jsonb_agg(jsonb_build_object(
+							'meal_id', m.id::TEXT,
+							'meal_number', m.meal_number,
+							'meal_description', m.meal_description,
+							'total_macros', m.total_macros
+						)), '[]'::jsonb
+					) AS meals
+				FROM meal_plans mp
+				LEFT JOIN meals m ON mp.id = m.meal_plan_id
+				WHERE mp.user_id = $1
+				GROUP BY mp.id, mp.user_id, mp.name, mp.description, mp.notes, mp.rating, mp.created_at, mp.updated_at
+	`
+
+	rows, err := m.pgpool.Query(ctx, query, req.UserId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to fetch meal plans: %v", err)
+	}
+	defer rows.Close()
+
+	mealPlansProto := make([]*pbml.XMealPlan, 0)
+
+	for rows.Next() {
+		var rawMeals []byte
+		mealPlan := &MealPlan{} // Your struct representing a meal plan
+
+		createdAt := timestamppb.New(mealPlan.CreatedAt)
+		var updatedAt *timestamppb.Timestamp
+
+		if mealPlan.UpdatedAt.Valid {
+			updatedAt = timestamppb.New(mealPlan.UpdatedAt.Time)
+		} else {
+			updatedAt = nil
+		}
+
+		// Scan the database row into the struct
+		if err := rows.Scan(
+			&mealPlan.ID,
+			&mealPlan.UserID,
+			&mealPlan.Name,
+			&mealPlan.CreatedAt,
+			&mealPlan.UpdatedAt,
+			&rawMeals,
+		); err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to parse row: %v", err)
+		}
+
+		// Parse meals for the meal plan
+		var meals []map[string]interface{}
+		if err := json.Unmarshal(rawMeals, &meals); err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to parse meals: %v", err)
+		}
+
+		mealProtos := make([]*pbml.XMeal, 0)
+		totalNutrients := &pbml.XTotalMealNutrients{}
+
+		for _, meal := range meals {
+
+			// Convert meal data to `XMeal` format
+			mealProto := &pbml.XMeal{
+				MealId:          meal["meal_id"].(string),
+				MealNumber:      int32(meal["meal_number"].(float64)),
+				MealDescription: meal["meal_description"].(string),
+			}
+
+			if mealId, ok := meal["meal_id"].(string); ok {
+				mealProto.MealId = mealId
+			} else {
+				mealProto.MealId = "" // Provide a default value
+			}
+
+			if mealNumber, ok := meal["meal_number"].(float64); ok {
+				mealProto.MealNumber = int32(mealNumber)
+			} else {
+				mealProto.MealNumber = 0 // Provide a default value
+			}
+
+			if mealDescription, ok := meal["meal_description"].(string); ok {
+				mealProto.MealDescription = mealDescription
+			} else {
+				mealProto.MealDescription = "" // Provide a default value
+			}
+
+			// Parse and sum up nutrients
+			if totalMacros, ok := meal["total_macros"].(map[string]interface{}); ok {
+				mealProto.TotalMealNutrients = &pbml.XTotalMealNutrients{
+					Calories:           totalMacros["calories"].(float64),
+					Protein:            totalMacros["protein"].(float64),
+					CarbohydratesTotal: totalMacros["carbohydrates_total"].(float64),
+					FatTotal:           totalMacros["fat_total"].(float64),
+					FatSaturated:       totalMacros["fat_saturated"].(float64),
+					Fiber:              totalMacros["fiber"].(float64),
+					Sugar:              totalMacros["sugar"].(float64),
+					Sodium:             totalMacros["sodium"].(float64),
+					Potassium:          totalMacros["potassium"].(float64),
+					Cholesterol:        totalMacros["cholesterol"].(float64),
+				}
+
+				totalNutrients.Calories += mealProto.TotalMealNutrients.Calories
+				totalNutrients.Protein += mealProto.TotalMealNutrients.Protein
+				totalNutrients.CarbohydratesTotal += mealProto.TotalMealNutrients.CarbohydratesTotal
+				totalNutrients.FatTotal += mealProto.TotalMealNutrients.FatTotal
+				totalNutrients.FatSaturated += mealProto.TotalMealNutrients.FatSaturated
+				totalNutrients.Fiber += mealProto.TotalMealNutrients.Fiber
+				totalNutrients.Sugar += mealProto.TotalMealNutrients.Sugar
+				totalNutrients.Sodium += mealProto.TotalMealNutrients.Sodium
+				totalNutrients.Potassium += mealProto.TotalMealNutrients.Potassium
+				totalNutrients.Cholesterol += mealProto.TotalMealNutrients.Cholesterol
+			} else {
+				mealProto.TotalMealNutrients = &pbml.XTotalMealNutrients{}
+			}
+
+			mealProtos = append(mealProtos, mealProto)
+		}
+
+		// Build `XMealPlan`
+		mealPlanProto := &pbml.XMealPlan{
+			MealPlanId:         mealPlan.ID.String(),
+			UserId:             mealPlan.UserID.String(),
+			Name:               mealPlan.Name,
+			CreatedAt:          createdAt,
+			UpdatedAt:          updatedAt,
+			Meal:               mealProtos,
+			TotalMealNutrients: totalNutrients,
+		}
+
+		mealPlansProto = append(mealPlansProto, mealPlanProto)
+	}
+
+	// Construct final response
+	return &pbml.GetMealPlansRes{
+		Success:   true,
+		Message:   "Meal plans fetched successfully",
+		MealPlan:  mealPlansProto,
+		CreatedAt: timestamppb.Now(),
+		UpdatedAt: timestamppb.Now(),
+	}, nil
+}
 
 func (m *MealPlanRepository) CreateMealPlan(ctx context.Context, req *pbml.CreateMealPlanReq) (*pbml.XMealPlan, error) {
 	mealPlanProto := &pbml.XMealPlan{}
@@ -1752,126 +1797,3 @@ func (m *MealPlanRepository) UpdateMealPlan(ctx context.Context, req *pbml.Updat
 func (m *MealPlanRepository) DeleteMealPlan(ctx context.Context, req *pbml.DeleteMealPlanReq) (*pbml.NilRes, error) {
 	return nil, nil
 }
-
-//func (m *MealPlanRepository) CreateMealPlan(ctx context.Context, req *pbml.CreateMealPlanReq) (*pbml.XMealPlan, error) {
-//	if m.pgpool == nil {
-//		return nil, status.Errorf(codes.Internal, "pgpool is nil")
-//	}
-//
-//	if err := validateCreateMealPlanRequest(req); err != nil {
-//		return nil, err
-//	}
-//
-//	tx, err := m.pgpool.BeginTx(ctx, pgx.TxOptions{})
-//	if err != nil {
-//		return nil, status.Error(codes.Internal, "failed to start transaction")
-//	}
-//	defer func() {
-//		if err != nil {
-//			_ = tx.Rollback(ctx)
-//		}
-//	}()
-//
-//	// Validate user
-//	if err = validateUserExists(ctx, m.pgpool, req.UserId); err != nil {
-//		return nil, err
-//	}
-//
-//	// Insert meal plan
-//	mealPlanID, err := insertMealPlan(ctx, tx, req)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	// Process meals
-//	for i, meal := range req.Meal {
-//		if err = processMeal(ctx, tx, m.CreateMeal, req.UserId, mealPlanID, meal, i); err != nil {
-//			return nil, err
-//		}
-//	}
-//
-//	if err = tx.Commit(ctx); err != nil {
-//		return nil, status.Errorf(codes.Internal, "failed to commit transaction: %v", err)
-//	}
-//
-//	return &pbml.XMealPlan{
-//		MealPlanId:  mealPlanID,
-//		Meal:        req.Meal,
-//		Description: req.Description,
-//		Name:        req.Name,
-//	}, nil
-//}
-//
-//func validateCreateMealPlanRequest(req *pbml.CreateMealPlanReq) error {
-//	if req == nil || req.UserId == "" || req.Name == "" || req.Description == "" {
-//		return status.Errorf(codes.InvalidArgument, "invalid request: required fields are missing")
-//	}
-//	if req.Meal == nil {
-//		return status.Errorf(codes.InvalidArgument, "meal list cannot be nil")
-//	}
-//	return nil
-//}
-//
-//func validateUserExists(ctx context.Context, db *pgxpool.Pool, userId string) error {
-//	var exists bool
-//	err := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)`, userId).Scan(&exists)
-//	if err != nil {
-//		return status.Errorf(codes.Internal, "failed to check user existence: %v", err)
-//	}
-//	if !exists {
-//		return status.Errorf(codes.InvalidArgument, "user_id does not exist")
-//	}
-//	return nil
-//}
-//
-//func insertMealPlan(ctx context.Context, tx pgx.Tx, req *pbml.CreateMealPlanReq) (string, error) {
-//	var mealPlanID string
-//	err := tx.QueryRow(ctx, `
-//        INSERT INTO meal_plans (user_id, name, description, created_at)
-//        VALUES ($1, $2, $3, $4)
-//        RETURNING id
-//    `, req.UserId, req.Name, req.Description, time.Now()).Scan(&mealPlanID)
-//	if err != nil {
-//		return "", status.Errorf(codes.Internal, "failed to insert meal plan: %v", err)
-//	}
-//	return mealPlanID, nil
-//}
-//
-//func processMeal(ctx context.Context, tx pgx.Tx, createMealFunc func(context.Context, pgx.Tx, *pbml.CreateMealReq) (*pbml.XMeal, error), userId, mealPlanID string, meal *pbml.XMeal, index int) error {
-//	if meal == nil || meal.MealId == "" {
-//		return status.Errorf(codes.InvalidArgument, "invalid meal at index %d", index)
-//	}
-//
-//	var mealID string
-//	err := tx.QueryRow(ctx, `
-//        SELECT id FROM meals WHERE user_id = $1 AND id = $2
-//    `, userId, meal.MealId).Scan(&mealID)
-//	if err != nil {
-//		if errors.Is(err, pgx.ErrNoRows) {
-//			if createMealFunc == nil {
-//				return status.Errorf(codes.Internal, "CreateMeal function is nil")
-//			}
-//
-//			mealReq := &pbml.CreateMealReq{
-//				UserId: userId,
-//				Meal:   meal,
-//			}
-//			createdMeal, err := createMealFunc(ctx, tx, mealReq)
-//			if err != nil {
-//				return status.Errorf(codes.Internal, "failed to create meal: %v", err)
-//			}
-//			mealID = createdMeal.MealId
-//		} else {
-//			return status.Errorf(codes.Internal, "failed to query meal: %v", err)
-//		}
-//	}
-//
-//	_, err = tx.Exec(ctx, `
-//        INSERT INTO meal_plan_meals (meal_plan_id, meal_id)
-//        VALUES ($1, $2)
-//    `, mealPlanID, mealID)
-//	if err != nil {
-//		return status.Errorf(codes.Internal, "failed to associate meal with meal plan: %v", err)
-//	}
-//	return nil
-//}

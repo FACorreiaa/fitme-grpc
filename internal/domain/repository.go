@@ -104,7 +104,7 @@ type MealPlanRepository interface {
 
 	// MealPlans
 	GetMealPlan(ctx context.Context, req *pbml.GetMealPlanReq) (*pbml.XMealPlan, error)
-	GetMealPlans(ctx context.Context, req *pbml.GetMealPlansReq) ([]*pbml.XMealPlan, error)
+	GetMealPlans(ctx context.Context, req *pbml.GetMealPlansReq) (*pbml.GetMealPlansRes, error)
 	CreateMealPlan(ctx context.Context, req *pbml.CreateMealPlanReq) (*pbml.XMealPlan, error)
 	UpdateMealPlan(ctx context.Context, req *pbml.UpdateMealPlanReq) (*pbml.UpdateMealPlanRes, error)
 	DeleteMealPlan(ctx context.Context, req *pbml.DeleteMealPlanReq) (*pbml.NilRes, error)
