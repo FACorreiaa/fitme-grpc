@@ -87,14 +87,14 @@ type TotalNutrients struct {
 type MealPlan struct {
 	ID          uuid.UUID       `protobuf:"bytes,1,opt,name=meal_plan_id,json=meal_plan_id" db:"id"`
 	UserID      uuid.UUID       `db:"user_id"`
-	Name        string          `db:"name"`
+	Name        sql.NullString  `db:"name"`
 	CreatedAt   time.Time       `db:"created_at"`
 	UpdatedAt   sql.NullTime    `db:"updated_at"`
 	Meals       []Meal          `db:"-"` // Exclude from DB scan, populate later
 	TotalMacros *TotalNutrients `protobuf:"bytes,8,rep,name=total_macros,json=totalMacros" db:"total_macros"`
-	Description string          `db:"description"`
-	Notes       string          `db:"notes"`
-	Rating      float32         `db:"rating"`
+	Description sql.NullString  `db:"description"`
+	Notes       sql.NullString  `db:"notes"`
+	Rating      sql.NullFloat64 `db:"rating"`
 }
 
 // to use later
