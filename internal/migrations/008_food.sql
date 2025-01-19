@@ -1,3 +1,31 @@
+-- DO $$
+--   BEGIN
+--     -- Create Objective ENUM
+--     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'objective_enum') THEN
+--       CREATE TYPE objective_enum AS ENUM ('MAINTENANCE', 'BULKING', 'CUTTING');
+--     END IF;
+--
+--     -- Create Activity ENUM
+--     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'activity_enum') THEN
+--       CREATE TYPE activity_enum AS ENUM ('SEDENTARY', 'LIGHT', 'MODERATE', 'HEAVY', 'EXTRA_HEAVY');
+--     END IF;
+--
+--     -- Create Gender ENUM
+--     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'gender_enum') THEN
+--       CREATE TYPE gender_enum AS ENUM ('MALE', 'FEMALE');
+--     END IF;
+--
+--     -- Create QuantityUnit ENUM
+--     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'quantity_unit_enum') THEN
+--       CREATE TYPE quantity_unit_enum AS ENUM ('GRAM', 'KILOGRAM', 'MILLILITER', 'LITER', 'OUNCE', 'POUND', 'CUP', 'TEASPOON', 'TABLESPOON');
+--     END IF;
+--   END $$;
+
+CREATE TYPE objective_enum AS ENUM ('MAINTENANCE', 'BULKING', 'CUTTING');
+CREATE TYPE activity_enum AS ENUM ('SEDENTARY', 'LIGHT', 'MODERATE', 'HEAVY', 'EXTRA_HEAVY');
+CREATE TYPE gender_enum AS ENUM ('MALE', 'FEMALE');
+CREATE TYPE quantity_unit_enum AS ENUM ('GRAM', 'KILOGRAM', 'MILLILITER', 'LITER', 'OUNCE', 'POUND', 'CUP', 'TEASPOON', 'TABLESPOON');
+
 CREATE TABLE "ingredients" (
                         "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
                         "name" varchar(255),
@@ -25,11 +53,15 @@ CREATE TABLE "meal_plans" (
                             "description" TEXT,
                             "notes" TEXT,
                             "rating" INTEGER DEFAULT 0,
-                            "objective" VARCHAR(255),
-                            "total_macros" JSONB DEFAULT '{}'::jsonb,
+                            "objective" objective_enum,    -- Enum for the objective field
+                            "activity" activity_enum,      -- Enum for the activity field
+                            "gender" gender_enum,          -- Enum for the gender field
+                            "quantity_unit" quantity_unit_enum, -- Enum for the quantity unit field
+                            "total_macros" JSONB DEFAULT '{}'::jsonb, -- Stores nutrients in JSON format
                             "created_at" TIMESTAMP DEFAULT NOW(),
                             "updated_at" TIMESTAMP DEFAULT NULL
 );
+
 CREATE INDEX idx_total_macros ON "meal_plans" USING GIN ("total_macros");
 
 --

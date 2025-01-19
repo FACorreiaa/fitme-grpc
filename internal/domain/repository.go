@@ -69,22 +69,18 @@ type RepositoryWorkout interface {
 }
 
 type RepositoryMeasurement interface {
-
-	// Weight
 	CreateWeight(ctx context.Context, req *pbm.CreateWeightReq) (*pbm.XWeight, error)
 	GetWeights(ctx context.Context) ([]*pbm.XWeight, error)
 	GetWeight(ctx context.Context, req *pbm.GetWeightReq) (*pbm.XWeight, error)
 	DeleteWeight(ctx context.Context, req *pbm.DeleteWeightReq) (*pbm.NilRes, error)
 	UpdateWeight(ctx context.Context, req *pbm.UpdateWeightReq) (*pbm.XWeight, error)
 
-	// waterIntake
 	CreateWaterMeasurement(ctx context.Context, req *pbm.CreateWaterIntakeReq) (*pbm.XWaterIntake, error)
 	GetWaterMeasurements(ctx context.Context) ([]*pbm.XWaterIntake, error)
 	GetWaterMeasurement(ctx context.Context, req *pbm.GetWaterIntakeReq) (*pbm.XWaterIntake, error)
 	DeleteWaterMeasurement(ctx context.Context, req *pbm.DeleteWaterIntakeReq) (*pbm.NilRes, error)
 	UpdateWaterMeasurement(ctx context.Context, req *pbm.UpdateWaterIntakeReq) (*pbm.XWaterIntake, error)
 
-	// wasteline
 	CreateWasteLineMeasurement(ctx context.Context, req *pbm.CreateWasteLineReq) (*pbm.XWasteLine, error)
 	GetWasteLineMeasurements(ctx context.Context) ([]*pbm.XWasteLine, error)
 	GetWasteLineMeasurement(ctx context.Context, req *pbm.GetWasteLineReq) (*pbm.XWasteLine, error)
@@ -101,15 +97,12 @@ type TrackMealProgressRepository interface {
 
 // MealPlanRepository interface
 type MealPlanRepository interface {
-
-	// MealPlans
 	GetMealPlan(ctx context.Context, req *pbml.GetMealPlanReq) (*pbml.GetMealPlanRes, error)
 	GetMealPlans(ctx context.Context, req *pbml.GetMealPlansReq) (*pbml.GetMealPlansRes, error)
 	CreateMealPlan(ctx context.Context, req *pbml.CreateMealPlanReq) (*pbml.XMealPlan, error)
-	UpdateMealPlan(ctx context.Context, req *pbml.UpdateMealPlanReq) (*pbml.UpdateMealPlanRes, error)
+	UpdateMealPlan(ctx context.Context, req *pbml.UpdateMealPlanReq) (*pbml.XMealPlan, error)
 	DeleteMealPlan(ctx context.Context, req *pbml.DeleteMealPlanReq) (*pbml.NilRes, error)
 
-	// Meals
 	GetMeal(ctx context.Context, req *pbml.GetMealReq) (*pbml.XMeal, error)
 	GetMeals(ctx context.Context, req *pbml.GetMealsReq) ([]*pbml.XMeal, error)
 	CreateMeal(ctx context.Context, req *pbml.CreateMealReq) (*pbml.XMeal, error)

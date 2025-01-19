@@ -32,7 +32,7 @@ func NewCalculatorService(ctx context.Context, repo domain.CalculatorRepository)
 	}
 }
 
-func mapActivity(ctx context.Context, activity Activity) (*ActivityList, error) {
+func mapActivity(ctx context.Context, activity pb.Activity) (*ActivityList, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -45,12 +45,12 @@ func mapActivity(ctx context.Context, activity Activity) (*ActivityList, error) 
 		return nil, errors.New("invalid activity")
 	}
 	return &ActivityList{
-		Activity:    activity,
+		Activity:    activity.String(),
 		Description: description,
 	}, nil
 }
 
-func mapActivityValues(ctx context.Context, activity Activity) (ActivityValues, error) {
+func mapActivityValues(ctx context.Context, activity pb.Activity) (ActivityValues, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -64,7 +64,7 @@ func mapActivityValues(ctx context.Context, activity Activity) (ActivityValues, 
 	return value, nil
 }
 
-func mapObjective(ctx context.Context, objective Objective) (*ObjectiveList, error) {
+func mapObjective(ctx context.Context, objective pb.Objective) (*ObjectiveList, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -76,8 +76,9 @@ func mapObjective(ctx context.Context, objective Objective) (*ObjectiveList, err
 	if !valid {
 		return nil, errors.New("invalid objective")
 	}
+
 	return &ObjectiveList{
-		Objective:   objective,
+		Objective:   objective.String(),
 		Description: description,
 	}, nil
 }
@@ -214,21 +215,31 @@ func calculateUserPersonalMacros(ctx context.Context, params UserParams) (UserIn
 		return UserInfo{}, err
 	}
 
+	aEnum, err := StringToActivityEnum(params.Activity) // Convert to pb.Activity
+	if err != nil {
+		return UserInfo{}, fmt.Errorf("invalid activity: %s", params.Activity)
+	}
+
+	oEnum, err := StringToObjectiveEnum(params.Objective)
+	if err != nil {
+		return UserInfo{}, fmt.Errorf("invalid objective: %s", params.Objective)
+	}
+
 	bmr, err := CalculateBMR(userData, System(params.System))
 	if err != nil {
 		return UserInfo{}, err
 	}
-	a, err := mapActivity(ctx, Activity(params.Activity))
+	a, err := mapActivity(ctx, aEnum)
 	if err != nil {
 		return UserInfo{}, err
 	}
 
-	o, err := mapObjective(ctx, Objective(params.Objective))
+	o, err := mapObjective(ctx, oEnum)
 	if err != nil {
 		return UserInfo{}, err
 	}
 
-	v, err := mapActivityValues(ctx, Activity(params.Activity))
+	v, err := mapActivityValues(ctx, aEnum)
 	if err != nil {
 		return UserInfo{}, err
 	}
@@ -314,11 +325,11 @@ func (s *CalculatorService) CreateUserMacro(ctx context.Context, req *pb.CreateU
 		Age:      uint16(req.UserMacro.Age),
 		Height:   uint16(req.UserMacro.Height),
 		Weight:   uint16(req.UserMacro.Weight),
-		Gender:   req.UserMacro.Gender,
-		System:   req.UserMacro.System,
-		Activity: req.UserMacro.Activity,
+		Gender:   req.UserMacro.Gender.String(),
+		System:   req.UserMacro.System.String(),
+		Activity: req.UserMacro.Activity.String(),
 		//ActivityDesc:     req.UserMacro.ActivityDescription,
-		Objective: req.UserMacro.Objective,
+		Objective: req.UserMacro.Objective.String(),
 		//ObjectiveDesc:    req.UserMacro.ObjectiveDescription,
 		CaloriesDist: req.UserMacro.CaloriesDistribution,
 		//CaloriesDistDesc: req.UserMacro.CaloriesDistributionDescription,
@@ -330,7 +341,20 @@ func (s *CalculatorService) CreateUserMacro(ctx context.Context, req *pb.CreateU
 		return nil, fmt.Errorf("calculate user macro info: %w", err)
 	}
 	createdAt := timestamppb.New(time.Now())
+	system, err := StringToSystemEnum(userInfo.System)
+	if err != nil {
+		return nil, fmt.Errorf("parse system enum: %w", err)
+	}
 
+	objective, err := StringToObjectiveEnum(userInfo.ObjectiveInfo.Objective)
+	if err != nil {
+		return nil, fmt.Errorf("parse objective enum: %w", err)
+	}
+
+	activity, err := StringToActivityEnum(userInfo.ActivityInfo.Activity)
+	if err != nil {
+		return nil, fmt.Errorf("parse activity enum: %w", err)
+	}
 	macroDistribution := &pb.UserMacroDistribution{
 		Id:                              req.UserMacro.Id,
 		UserId:                          req.UserMacro.UserId,
@@ -338,10 +362,10 @@ func (s *CalculatorService) CreateUserMacro(ctx context.Context, req *pb.CreateU
 		Height:                          uint32(userInfo.UserData.Height),
 		Weight:                          userInfo.UserData.Weight,
 		Gender:                          req.UserMacro.Gender,
-		System:                          userInfo.System,
-		Activity:                        string(userInfo.ActivityInfo.Activity),
+		System:                          system,
+		Activity:                        activity,
 		ActivityDescription:             string(userInfo.ActivityInfo.Description),
-		Objective:                       string(userInfo.ObjectiveInfo.Objective),
+		Objective:                       objective,
 		ObjectiveDescription:            string(userInfo.ObjectiveInfo.Description),
 		CaloriesDistribution:            string(userInfo.MacrosInfo.CaloriesInfo.CaloriesDistribution),
 		CaloriesDistributionDescription: string(userInfo.MacrosInfo.CaloriesInfo.CaloriesDistributionDescription),
@@ -389,8 +413,8 @@ func (s *CalculatorService) GetUsersMacros(ctx context.Context, req *pb.GetAllUs
 		response.UserMacros = append(response.UserMacros, &pb.UserMacroDistribution{
 			Id:                              macro.Id,
 			UserId:                          macro.UserId,
-			Age:                             uint32(macro.Age),
-			Height:                          uint32(macro.Height),
+			Age:                             macro.Age,
+			Height:                          macro.Height,
 			Weight:                          macro.Weight,
 			Gender:                          macro.Gender,
 			System:                          macro.System,
@@ -400,12 +424,12 @@ func (s *CalculatorService) GetUsersMacros(ctx context.Context, req *pb.GetAllUs
 			ObjectiveDescription:            macro.ObjectiveDescription,
 			CaloriesDistribution:            macro.CaloriesDistribution,
 			CaloriesDistributionDescription: macro.CaloriesDistributionDescription,
-			Protein:                         uint32(macro.Protein),
-			Fats:                            uint32(macro.Fats),
-			Carbs:                           uint32(macro.Carbs),
-			Bmr:                             uint32(macro.Bmr),
-			Tdee:                            uint32(macro.Tdee),
-			Goal:                            uint32(macro.Goal),
+			Protein:                         macro.Protein,
+			Fats:                            macro.Fats,
+			Carbs:                           macro.Carbs,
+			Bmr:                             macro.Bmr,
+			Tdee:                            macro.Tdee,
+			Goal:                            macro.Goal,
 			CreatedAt:                       createdAt,
 		})
 	}
@@ -415,7 +439,7 @@ func (s *CalculatorService) GetUsersMacros(ctx context.Context, req *pb.GetAllUs
 	}, nil
 }
 
-// TODO FIX createdAT
+// GetUserMacros TODO FIX createdAT
 // GetUserMacros implements the GetUserMacro gRPC method
 func (s *CalculatorService) GetUserMacros(ctx context.Context, req *pb.GetUserMacroRequest) (*pb.GetUserMacroResponse, error) {
 	macro, err := s.repo.GetUserMacros(ctx, req)
@@ -452,7 +476,7 @@ func (s *CalculatorService) CreateOfflineUserMacro(ctx context.Context, req *pb.
 	// Perform the offline calculations
 	userInfo, err := calculateUserPersonalMacros(ctx, params)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to calculate user info: %v", err)
 	}
 
 	// Creating response
@@ -463,9 +487,9 @@ func (s *CalculatorService) CreateOfflineUserMacro(ctx context.Context, req *pb.
 			Weight:                          uint32(userInfo.UserData.Weight),
 			Gender:                          req.UserMacro.Gender,
 			System:                          userInfo.System,
-			Activity:                        string(userInfo.ActivityInfo.Activity),
+			Activity:                        userInfo.ActivityInfo.Activity,
 			ActivityDescription:             string(userInfo.ActivityInfo.Description),
-			Objective:                       string(userInfo.ObjectiveInfo.Objective),
+			Objective:                       userInfo.ObjectiveInfo.Objective,
 			ObjectiveDescription:            string(userInfo.ObjectiveInfo.Description),
 			CaloriesDistribution:            string(userInfo.MacrosInfo.CaloriesInfo.CaloriesDistribution),
 			CaloriesDistributionDescription: string(userInfo.MacrosInfo.CaloriesInfo.CaloriesDistributionDescription),
@@ -489,4 +513,50 @@ func (s *CalculatorService) DeleteUserMacro(ctx context.Context, req *pb.DeleteU
 	}
 
 	return &pb.DeleteUserMacroResponse{}, nil // Return an empty response on successful deletion
+}
+
+func StringToSystemEnum(s string) (pb.System, error) {
+	switch s {
+	case "METRIC":
+		return pb.System_METRIC, nil
+	case "IMPERIAL":
+		return pb.System_IMPERIAL, nil
+	default:
+		return pb.System_SYSTEM_UNSPECIFIED, fmt.Errorf("invalid System: %s", s)
+	}
+}
+
+func StringToObjectiveEnum(s string) (pb.Objective, error) {
+	switch s {
+	case "MAINTENANCE":
+		return pb.Objective_MAINTENANCE, nil
+
+	case "BULKING":
+		return pb.Objective_BULKING, nil
+
+	case "CUTTING":
+		return pb.Objective_CUTTING, nil
+	default:
+		return pb.Objective_OBJECTIVE_UNSPECIFIED, fmt.Errorf("invalid Objective: %s", s)
+	}
+}
+
+func StringToActivityEnum(s string) (pb.Activity, error) {
+	switch s {
+	case "ACTIVITY_UNSPECIFIED":
+		return pb.Activity_ACTIVITY_UNSPECIFIED, nil
+
+	case "SEDENTARY":
+		return pb.Activity_SEDENTARY, nil
+	case "LIGHT":
+		return pb.Activity_LIGHT, nil
+	case "MODERATE":
+		return pb.Activity_MODERATE, nil
+	case "HEAVY":
+		return pb.Activity_HEAVY, nil
+	case "EXTRA_HEAVY":
+		return pb.Activity_EXTRA_HEAVY, nil
+	default:
+		return pb.Activity_ACTIVITY_UNSPECIFIED, fmt.Errorf("invalid Activity: %s", s)
+	}
 }

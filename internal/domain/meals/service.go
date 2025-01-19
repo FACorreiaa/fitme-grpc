@@ -31,10 +31,10 @@ type MealPlanService struct {
 	db   *pgxpool.Pool
 }
 
-func (m MealPlanService) mustEmbedUnimplementedMealServer() {
-	//TODO implement me
-	panic("implement me")
-}
+//func (m MealPlanService) mustEmbedUnimplementedMealServer() {
+//	//TODO implement me
+//	panic("implement me")
+//}
 
 type DietPreferenceService struct {
 	pbml.UnimplementedDietPreferenceServiceServer
@@ -131,45 +131,46 @@ type IngredientService struct {
 	repo domain.IngredientsRepository
 }
 
-func (i IngredientService) GetMeal(ctx context.Context, req *pbml.GetMealReq) (*pbml.GetMealRes, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (i IngredientService) GetMeals(ctx context.Context, req *pbml.GetMealsReq) (*pbml.GetMealsRes, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (i IngredientService) CreateMeal(ctx context.Context, req *pbml.CreateMealReq) (*pbml.CreateMealRes, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (i IngredientService) UpdateMeal(ctx context.Context, req *pbml.UpdateMealReq) (*pbml.UpdateMealRes, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (i IngredientService) DeleteMeal(ctx context.Context, req *pbml.DeleteMealReq) (*pbml.NilRes, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (i IngredientService) AddIngredientToMeal(ctx context.Context, req *pbml.AddIngredientReq) (*pbml.NilRes, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (i IngredientService) RemoveIngredientFromMeal(ctx context.Context, req *pbml.DeleteIngredientReq) (*pbml.NilRes, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (i IngredientService) mustEmbedUnimplementedMealServer() {
-	//TODO implement me
-	panic("implement me")
-}
+//
+//func (i IngredientService) GetMeal(ctx context.Context, req *pbml.GetMealReq) (*pbml.GetMealRes, error) {
+//	//TODO implement me
+//	panic("implement me")
+//}
+//
+//func (i IngredientService) GetMeals(ctx context.Context, req *pbml.GetMealsReq) (*pbml.GetMealsRes, error) {
+//	//TODO implement me
+//	panic("implement me")
+//}
+//
+//func (i IngredientService) CreateMeal(ctx context.Context, req *pbml.CreateMealReq) (*pbml.CreateMealRes, error) {
+//	//TODO implement me
+//	panic("implement me")
+//}
+//
+//func (i IngredientService) UpdateMeal(ctx context.Context, req *pbml.UpdateMealReq) (*pbml.UpdateMealRes, error) {
+//	//TODO implement me
+//	panic("implement me")
+//}
+//
+//func (i IngredientService) DeleteMeal(ctx context.Context, req *pbml.DeleteMealReq) (*pbml.NilRes, error) {
+//	//TODO implement me
+//	panic("implement me")
+//}
+//
+//func (i IngredientService) AddIngredientToMeal(ctx context.Context, req *pbml.AddIngredientReq) (*pbml.NilRes, error) {
+//	//TODO implement me
+//	panic("implement me")
+//}
+//
+//func (i IngredientService) RemoveIngredientFromMeal(ctx context.Context, req *pbml.DeleteIngredientReq) (*pbml.NilRes, error) {
+//	//TODO implement me
+//	panic("implement me")
+//}
+//
+//func (i IngredientService) mustEmbedUnimplementedMealServer() {
+//	//TODO implement me
+//	panic("implement me")
+//}
 
 type TrackMealProgressService struct {
 	pbml.UnimplementedTrackMealProgressServer
@@ -1143,7 +1144,7 @@ func (m *MealPlanService) CreateMealPlan(ctx context.Context, req *pbml.CreateMe
 	}
 
 	req.Request.RequestId = requestID
-	req.UserId = userID
+	req.MealPlan.UserId = userID
 
 	mp, err := m.repo.CreateMealPlan(ctx, req)
 	if err != nil {
@@ -1163,10 +1164,10 @@ func (m *MealPlanService) CreateMealPlan(ctx context.Context, req *pbml.CreateMe
 		attribute.String("request.details", req.String()))
 
 	return &pbml.CreateMealPlanRes{
-		Success:    true,
-		Message:    "Meal plan inserted successfully",
-		MealPlanId: mp.MealPlanId,
-		Status:     strconv.Itoa(int(codes.OK)),
+		Success:  true,
+		Message:  "Meal plan inserted successfully",
+		MealPlan: mp,
+		Status:   strconv.Itoa(int(codes.OK)),
 		Response: &pbml.BaseResponse{
 			Upstream:  "meal-service",
 			RequestId: requestID,
@@ -1312,4 +1313,45 @@ func (m *MealPlanService) DeleteMealPlan(ctx context.Context, req *pbml.DeleteMe
 		attribute.String("request.details", req.String()))
 
 	return d, nil
+}
+
+func (m *MealPlanService) UpdateMealPlan(ctx context.Context, req *pbml.UpdateMealPlanReq) (*pbml.UpdateMealPlanRes, error) {
+	tracer := otel.Tracer("FitSphere")
+	ctx, span := tracer.Start(ctx, "Meal/UpdateMealPlan")
+	defer span.End()
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	userID := ctx.Value("userID").(string)
+	if userID == "" {
+		return nil, status.Error(codes.Unauthenticated, "userID is missing in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pbml.BaseRequest{}
+	}
+
+	req.Request.RequestId = requestID
+	req.UserId = userID
+
+	mp, err := m.repo.UpdateMealPlan(ctx, req)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to delete meal plan: %v", err)
+	}
+
+	span.SetAttributes(
+		attribute.String("request.id", req.Request.RequestId),
+		attribute.String("request.details", req.String()))
+
+	return &pbml.UpdateMealPlanRes{
+		Success:  true,
+		Message:  "meal plan updated successfully",
+		MealPlan: mp,
+		Response: &pbml.BaseResponse{
+			Upstream:  "meal-service",
+			RequestId: requestID,
+		},
+	}, nil
 }

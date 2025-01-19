@@ -122,7 +122,11 @@ func (i *IngredientRepository) GetIngredient(ctx context.Context, req *pbml.GetI
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to start transaction")
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback(ctx)
+		}
+	}()
 
 	err = tx.QueryRow(ctx, `
 		SELECT id, name, calories, protein, carbohydrates_total, fat_total
@@ -240,7 +244,11 @@ func (i *IngredientRepository) CreateIngredient(ctx context.Context, req *pbml.C
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to start transaction")
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback(ctx)
+		}
+	}()
 
 	query := `
 		INSERT INTO ingredients (name, calories, serving_size,
@@ -1529,6 +1537,10 @@ func (m *MealPlanRepository) GetMealPlan(ctx context.Context, req *pbml.GetMealP
 					mp.description AS description,
 					mp.notes AS notes,
 					mp.rating AS rating,
+					mp.objective AS objective,
+					mp.activity AS activity,
+					mp.gender AS gender,
+					mp.quantity_unit AS quantity_unit,
 					mp.created_at AS created_at,
 					mp.updated_at AS updated_at,
 					COALESCE(
@@ -1573,7 +1585,13 @@ func (m *MealPlanRepository) GetMealPlan(ctx context.Context, req *pbml.GetMealP
 					GROUP BY mi.meal_id, m.total_macros
 				) t ON t.meal_id = m.id
 				WHERE mp.user_id = $1 and mp.id = $2
-				GROUP BY mp.id, mp.user_id, mp.name, mp.description, mp.notes, mp.rating, mp.created_at, mp.updated_at
+				GROUP BY mp.id, mp.user_id, mp.name,
+				         mp.description, mp.notes,
+				         mp.rating, mp.created_at, mp.updated_at,
+				         mp.objective,
+						 mp.activity,
+						 mp.gender,
+						 mp.quantity_unit
 `
 
 	var rawMeals []byte
@@ -1594,8 +1612,11 @@ func (m *MealPlanRepository) GetMealPlan(ctx context.Context, req *pbml.GetMealP
 	}
 	if err := m.pgpool.QueryRow(ctx, query, req.UserId, req.MealPlanId).Scan(&mealPlan.ID,
 		&mealPlan.UserID, &mealPlan.Name, &mealPlan.Description,
-		&mealPlan.Notes, &mealPlan.Rating, &mealPlan.CreatedAt,
-		&mealPlan.UpdatedAt, &rawMeals); err != nil {
+		&mealPlan.Notes, &mealPlan.Rating,
+		&mealPlan.Objective, &mealPlan.Activity,
+		&mealPlan.Gender, &mealPlan.QuantityUnit,
+		&mealPlan.CreatedAt, &mealPlan.UpdatedAt,
+		&rawMeals); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to fetch meal plans: %v", err)
 	}
 
@@ -1657,7 +1678,7 @@ func (m *MealPlanRepository) GetMealPlan(ctx context.Context, req *pbml.GetMealP
 			mealProto.TotalMealNutrients = &pbml.XTotalMealNutrients{}
 		}
 
-		// Append the meal to the meal list
+		// append a meal to the meal list
 		mealProtos = append(mealProtos, mealProto)
 	}
 
@@ -1708,12 +1729,12 @@ func (m *MealPlanRepository) GetMealPlan(ctx context.Context, req *pbml.GetMealP
 
 	// Construct final response
 	return &pbml.GetMealPlanRes{
-		Success:                true,
-		Message:                "Meal plans fetched successfully",
-		MealPlan:               mealPlanProto,
-		TotalMealPlanNutrients: totalMealPlanNutrients,
-		CreatedAt:              timestamppb.Now(),
-		UpdatedAt:              timestamppb.Now(),
+		Success:  true,
+		Message:  "Meal plans fetched successfully",
+		MealPlan: mealPlanProto,
+		//TotalMealPlanNutrients: totalMealPlanNutrients,
+		CreatedAt: timestamppb.Now(),
+		UpdatedAt: timestamppb.Now(),
 	}, nil
 }
 
@@ -1755,6 +1776,10 @@ func (m *MealPlanRepository) GetMealPlans(ctx context.Context, req *pbml.GetMeal
         mp.description AS description,
         mp.notes AS notes,
         mp.rating AS rating,
+        mp.objective AS objective,
+		mp.activity AS activity,
+		mp.gender AS gender,
+		mp.quantity_unit AS quantity_unit,
         mp.created_at AS created_at,
         mp.updated_at AS updated_at,
         COALESCE(
@@ -1799,7 +1824,9 @@ func (m *MealPlanRepository) GetMealPlans(ctx context.Context, req *pbml.GetMeal
         GROUP BY mi.meal_id
     ) t ON t.meal_id = m.id
     WHERE mp.user_id = $1
-    GROUP BY mp.id, mp.user_id, mp.name, mp.description, mp.notes, mp.rating, mp.created_at, mp.updated_at
+    GROUP BY mp.id, mp.user_id, mp.name, mp.description,
+             mp.notes, mp.rating, mp.created_at, mp.updated_at,
+             mp.objective, mp.activity, mp.gender, mp.quantity_unit
 `
 
 	rows, err := m.pgpool.Query(ctx, query, req.UserId)
@@ -1834,6 +1861,8 @@ func (m *MealPlanRepository) GetMealPlans(ctx context.Context, req *pbml.GetMeal
 			&mealPlan.Description,
 			&mealPlan.Notes,
 			&mealPlan.Rating,
+			&mealPlan.Objective, &mealPlan.Activity,
+			&mealPlan.Gender, &mealPlan.QuantityUnit,
 			&mealPlan.CreatedAt,
 			&mealPlan.UpdatedAt,
 			&rawMeals,
@@ -1974,10 +2003,10 @@ func (m *MealPlanRepository) CreateMealPlan(ctx context.Context, req *pbml.Creat
 		return nil, status.Errorf(codes.Internal, "pgpool is nil")
 	}
 
-	if req == nil || req.UserId == "" || req.Name == "" || req.Description == "" {
+	if req == nil || req.MealPlan.UserId == "" || req.MealPlan.Name == "" || req.MealPlan.Description == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: required fields are missing")
 	}
-	if req.Meal == nil {
+	if req.MealPlan.Meal == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "meal list cannot be nil")
 	}
 
@@ -1993,7 +2022,7 @@ func (m *MealPlanRepository) CreateMealPlan(ctx context.Context, req *pbml.Creat
 
 	// Verify user existence
 	var exists bool
-	err = m.pgpool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)`, req.UserId).Scan(&exists)
+	err = m.pgpool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)`, req.MealPlan.UserId).Scan(&exists)
 	if err != nil || !exists {
 		return nil, status.Errorf(codes.InvalidArgument, "user_id does not exist")
 	}
@@ -2001,15 +2030,23 @@ func (m *MealPlanRepository) CreateMealPlan(ctx context.Context, req *pbml.Creat
 	// Insert meal plan
 	var mealPlanID string
 	err = tx.QueryRow(ctx, `
-       INSERT INTO meal_plans (user_id, name, description, created_at)
-       VALUES ($1, $2, $3, $4)
+       INSERT INTO meal_plans (user_id, name, description, objective, activity,
+							   gender, quantity_unit, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING id
-   `, req.UserId, req.Name, req.Description, time.Now()).Scan(&mealPlanID)
+   `, req.MealPlan.UserId,
+		req.MealPlan.Name,
+		req.MealPlan.Description,
+		req.MealPlan.Objective,
+		req.MealPlan.Activity,
+		req.MealPlan.Gender,
+		req.MealPlan.QuantityUnit,
+		time.Now()).Scan(&mealPlanID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to insert meal plan: %v", err)
 	}
 
-	for i, meal := range req.Meal {
+	for i, meal := range req.MealPlan.Meal {
 		mealOrder := i + 1
 		if meal == nil || meal.MealId == "" {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid meal at index %d", i)
@@ -2047,15 +2084,11 @@ func (m *MealPlanRepository) CreateMealPlan(ctx context.Context, req *pbml.Creat
 		var mealID string
 		err := m.pgpool.QueryRow(ctx, `
            SELECT id FROM meals WHERE user_id = $1 AND id = $2
-       `, req.UserId, meal.MealId).Scan(&mealID)
+       `, req.MealPlan.UserId, meal.MealId).Scan(&mealID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				if m.CreateMeal == nil {
-					return nil, status.Errorf(codes.Internal, "CreateMeal function is nil")
-				}
-
 				mealReq := &pbml.CreateMealReq{
-					UserId: req.UserId,
+					UserId: req.MealPlan.UserId,
 					Meal:   meal,
 				}
 				createdMeal, err := m.CreateMeal(ctx, mealReq)
@@ -2091,10 +2124,14 @@ func (m *MealPlanRepository) CreateMealPlan(ctx context.Context, req *pbml.Creat
 	}
 
 	// Populate response
-	mealPlanProto.Meal = req.Meal
+	mealPlanProto.Meal = req.MealPlan.Meal
 	mealPlanProto.MealPlanId = mealPlanID
-	mealPlanProto.Description = req.Description
-	mealPlanProto.Name = req.Name
+	mealPlanProto.Description = req.MealPlan.Description
+	mealPlanProto.Name = req.MealPlan.Name
+	mealPlanProto.Objective = req.MealPlan.Objective
+	mealPlanProto.Activity = req.MealPlan.Activity
+	mealPlanProto.QuantityUnit = req.MealPlan.QuantityUnit
+	mealPlanProto.Gender = req.MealPlan.Gender
 	mealPlanProto.TotalMealNutrients = totalMealNutrients
 
 	if err = tx.Commit(ctx); err != nil {
@@ -2104,8 +2141,110 @@ func (m *MealPlanRepository) CreateMealPlan(ctx context.Context, req *pbml.Creat
 	return mealPlanProto, nil
 }
 
-func (m *MealPlanRepository) UpdateMealPlan(ctx context.Context, req *pbml.UpdateMealPlanReq) (*pbml.UpdateMealPlanRes, error) {
-	return nil, nil
+func (m *MealPlanRepository) UpdateMealPlan(ctx context.Context, req *pbml.UpdateMealPlanReq) (*pbml.XMealPlan, error) {
+	tx, err := m.pgpool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to begin transaction: %v", err)
+	}
+	defer tx.Rollback(ctx)
+
+	query := `UPDATE meal_plans SET `
+	var setClauses []string
+	var args []interface{}
+	argIndex := 1
+
+	updatedMealPlan := &pbml.XMealPlan{}
+
+	// Add updated_at timestamp
+	setClauses = append(setClauses, "updated_at = NOW()")
+
+	for _, update := range req.Updates {
+		switch update.Field {
+		case "name":
+			setClauses = append(setClauses, fmt.Sprintf("name = $%d", argIndex))
+			args = append(args, update.NewValue)
+			updatedMealPlan.Name = update.NewValue
+			argIndex++
+		case "description":
+			setClauses = append(setClauses, fmt.Sprintf("description = $%d", argIndex))
+			args = append(args, update.NewValue)
+			updatedMealPlan.Description = update.NewValue
+			argIndex++
+		case "notes":
+			setClauses = append(setClauses, fmt.Sprintf("notes = $%d", argIndex))
+			args = append(args, update.NewValue)
+			updatedMealPlan.Notes = update.NewValue
+			argIndex++
+		case "rating":
+			rating, _ := parseStringToFloat(update.NewValue, "invalid rating value")
+			setClauses = append(setClauses, fmt.Sprintf("notes = $%d", argIndex))
+			args = append(args, update.NewValue)
+			updatedMealPlan.Rating = int32(rating)
+			argIndex++
+		default:
+			return nil, status.Errorf(codes.InvalidArgument, "invalid field %s", update.Field)
+
+		}
+	}
+
+	if len(setClauses) == 0 {
+		return nil, status.Errorf(codes.InvalidArgument, "no updates provided")
+	}
+
+	query += strings.Join(setClauses, ", ")
+	query += fmt.Sprintf(" WHERE id = $%d AND user_id = $%d RETURNING id, name, description, created_at, updated_at, user_id",
+		argIndex, argIndex+1)
+	args = append(args, req.MealPlanId, req.UserId)
+
+	var createdAt time.Time
+	var updatedAt sql.NullTime
+	var userID uuid.UUID
+
+	err = tx.QueryRow(ctx, query, args...).Scan(
+		&updatedMealPlan.MealPlanId,
+		&updatedMealPlan.Name,
+		&updatedMealPlan.Description,
+		&createdAt,
+		&updatedAt,
+		&userID,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, status.Error(codes.NotFound, "meal plan not found")
+		}
+		return nil, status.Errorf(codes.Internal, "failed to update meal plan: %v", err)
+	}
+
+	// Update related meals if provided
+	//for _, mealUpdate := range req.Updates {
+	//	mealReq := &pbml.UpdateMealReq{
+	//		MealId:  mealUpdate.MealId,
+	//		UserId:  req.UserId,
+	//		Updates: mealUpdate.Updates,
+	//	}
+	//
+	//	if m.UpdateMeal == nil {
+	//		return nil, status.Errorf(codes.Internal, "UpdateMeal function is nil")
+	//	}
+	//
+	//	_, err := m.UpdateMeal(ctx, mealReq)
+	//	if err != nil {
+	//		return nil, status.Errorf(codes.Internal, "failed to update meal: %v", err)
+	//	}
+	//}
+
+	if err = tx.Commit(ctx); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to commit transaction: %v", err)
+	}
+
+	updatedMealPlan.CreatedAt = timestamppb.New(createdAt)
+	if updatedAt.Valid {
+		updatedMealPlan.UpdatedAt = timestamppb.New(updatedAt.Time)
+	}
+	updatedMealPlan.UserId = userID.String()
+
+	return updatedMealPlan, nil
 }
 
 func (m *MealPlanRepository) DeleteMealPlan(ctx context.Context, req *pbml.DeleteMealPlanReq) (*pbml.NilRes, error) {

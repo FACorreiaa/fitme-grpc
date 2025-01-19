@@ -1,6 +1,10 @@
 package calculator
 
-import "time"
+import (
+	"time"
+
+	pb "github.com/FACorreiaa/fitme-protos/modules/calculator/generated"
+)
 
 type UserMacroDistribution struct {
 	ID                              string    `json:"id,string" db:"id" pg:"default:gen_random_uuid()"`
@@ -54,12 +58,12 @@ type Goals struct {
 }
 
 type ActivityList struct {
-	Activity    Activity            `json:"activity"`
+	Activity    string              `json:"activity"`
 	Description ActivityDescription `json:"description"`
 }
 
 type ObjectiveList struct {
-	Objective   Objective            `json:"objective"`
+	Objective   string               `json:"objective"`
 	Description ObjectiveDescription `json:"description"`
 }
 
@@ -75,11 +79,11 @@ type UserData struct {
 }
 
 type ActivityInfo struct {
-	Activity    Activity            `json:"activity" db:"activity"`
+	Activity    string              `json:"activity" db:"activity"`
 	Description ActivityDescription `json:"description" db:"activity_description"`
 }
 type ObjectiveInfo struct {
-	Objective   Objective            `json:"objective" db:"objective"`
+	Objective   string               `json:"objective" db:"objective"`
 	Description ObjectiveDescription `json:"description" db:"objective_description"`
 }
 
@@ -196,24 +200,24 @@ var (
 	carbGramValue    = 4
 )
 
-var activityDescriptionMap = map[Activity]ActivityDescription{
-	sedentaryActivity:  sedentaryActivityDescription,
-	lightActivity:      lightActivityDescription,
-	moderateActivity:   moderateActivityDescription,
-	heavyActivity:      heavyActivityDescription,
-	extraHeavyActivity: extraHeavyActivityDescription,
+var activityDescriptionMap = map[pb.Activity]ActivityDescription{
+	pb.Activity_SEDENTARY:   sedentaryActivityDescription,
+	pb.Activity_LIGHT:       lightActivityDescription,
+	pb.Activity_MODERATE:    moderateActivityDescription,
+	pb.Activity_HEAVY:       heavyActivityDescription,
+	pb.Activity_EXTRA_HEAVY: extraHeavyActivityDescription,
 }
-var activityValuesMap = map[Activity]ActivityValues{
-	sedentaryActivity:  sedentaryActivityValue,
-	lightActivity:      lightActivityValue,
-	moderateActivity:   moderateActivityValue,
-	heavyActivity:      heavyActivityValue,
-	extraHeavyActivity: extraHeavyActivityValue,
+var activityValuesMap = map[pb.Activity]ActivityValues{
+	pb.Activity_SEDENTARY:   sedentaryActivityValue,
+	pb.Activity_LIGHT:       lightActivityValue,
+	pb.Activity_MODERATE:    moderateActivityValue,
+	pb.Activity_HEAVY:       heavyActivityValue,
+	pb.Activity_EXTRA_HEAVY: extraHeavyActivityValue,
 }
-var objectiveDescriptionMap = map[Objective]ObjectiveDescription{
-	maintenance: maintenanceDescription,
-	bulking:     bulkingDescription,
-	cutting:     cuttingDescription,
+var objectiveDescriptionMap = map[pb.Objective]ObjectiveDescription{
+	pb.Objective_MAINTENANCE: maintenanceDescription,
+	pb.Objective_BULKING:     bulkingDescription,
+	pb.Objective_CUTTING:     cuttingDescription,
 }
 
 var carbsDistribution = map[CaloriesDistribution]CaloriesDistributionDescription{
