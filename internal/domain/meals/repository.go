@@ -729,31 +729,6 @@ func (m *MealPlanRepository) GetMeal(ctx context.Context, req *pbml.GetMealReq) 
 	return mealProto, nil
 }
 
-// Helper function to calculate nutrient totals
-func calculateTotals(ingredients []*pbml.XMealIngredient) *pbml.XTotalMealNutrients {
-	totals := &pbml.XTotalMealNutrients{}
-	for _, ing := range ingredients {
-		totals.Calories += ing.Calories
-		totals.Protein += ing.Protein
-		totals.CarbohydratesTotal += ing.CarbohydratesTotal
-		totals.FatTotal += ing.FatTotal
-		totals.FatSaturated += ing.FatSaturated
-		totals.Fiber += ing.Fiber
-		totals.Sugar += ing.Sugar
-		totals.Sodium += ing.Sodium
-		totals.Potassium += ing.Potassium
-		totals.Cholesterol += ing.Cholesterol
-	}
-	return totals
-}
-
-func convertFloat(n sql.NullFloat64) float64 {
-	if n.Valid {
-		return n.Float64
-	}
-	return 0
-}
-
 func (m *MealPlanRepository) GetMeals(ctx context.Context, req *pbml.GetMealsReq) ([]*pbml.XMeal, error) {
 	// Check if UserID is valid
 	if req.UserId == "" {
@@ -1516,19 +1491,7 @@ func (m *MealPlanRepository) UpdateIngredientInMeal(ctx context.Context, req *pb
 	return updatedIngredient, nil
 }
 
-func parseStringToFloat(s, errorMessage string) (float64, error) {
-	val, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		return 0, status.Errorf(codes.InvalidArgument, "%s: %v", errorMessage, err)
-	}
-	return val, nil
-}
-
-func (m *MealPlanRepository) GetMealPlan(ctx context.Context, req *pbml.GetMealPlanReq) (*pbml.XMealPlan, error) {
-	return nil, nil
-}
-
-func (m *MealPlanRepository) GetMealPlans(ctx context.Context, req *pbml.GetMealPlansReq) (*pbml.GetMealPlansRes, error) {
+func (m *MealPlanRepository) GetMealPlan(ctx context.Context, req *pbml.GetMealPlanReq) (*pbml.GetMealPlanRes, error) {
 	// Check if UserID is valid
 	if req.UserId == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "user ID cannot be empty")
@@ -1575,7 +1538,17 @@ func (m *MealPlanRepository) GetMealPlans(ctx context.Context, req *pbml.GetMeal
 									'meal_id', m.id::TEXT,
 									'meal_number', m.meal_number,
 									'meal_description', m.meal_description,
-									'total_macros', m.total_macros
+									'total_macros', jsonb_build_object(
+										'calories', t.calories,
+										'protein', t.protein,
+										'carbohydrates_total', t.carbohydrates_total,
+										'fat_total', t.fat_total,
+										'fat_saturated', t.fat_saturated,
+										'fiber', t.fiber,
+										'sugar', t.sugar,
+										'sodium', t.sodium,
+										'potassium', t.potassium
+									)
 								)
 								ELSE NULL
 							END
@@ -1583,8 +1556,250 @@ func (m *MealPlanRepository) GetMealPlans(ctx context.Context, req *pbml.GetMeal
 					) AS meals
 				FROM meal_plans mp
 				LEFT JOIN meals m ON mp.id = m.meal_plan_id
-				WHERE mp.user_id = $1
+				LEFT JOIN (
+					SELECT
+						mi.meal_id,
+						SUM(mi.quantity * (m.total_macros->>'calories')::numeric) / 100 AS calories,
+						SUM(mi.quantity * (m.total_macros->>'protein')::numeric) / 100 AS protein,
+						SUM(mi.quantity * (m.total_macros->>'carbohydrates_total')::numeric) / 100 AS carbohydrates_total,
+						SUM(mi.quantity * (m.total_macros->>'fat_total')::numeric) / 100 AS fat_total,
+						SUM(mi.quantity * (m.total_macros->>'fat_saturated')::numeric) / 100 AS fat_saturated,
+						SUM(mi.quantity * (m.total_macros->>'fiber')::numeric) / 100 AS fiber,
+						SUM(mi.quantity * (m.total_macros->>'sugar')::numeric) / 100 AS sugar,
+						SUM(mi.quantity * (m.total_macros->>'sodium')::numeric) / 100 AS sodium,
+						SUM(mi.quantity * (m.total_macros->>'potassium')::numeric)/ 100 AS potassium
+					FROM meal_ingredients mi
+					JOIN meals m ON mi.meal_id = m.id
+					GROUP BY mi.meal_id, m.total_macros
+				) t ON t.meal_id = m.id
+				WHERE mp.user_id = $1 and mp.id = $2
 				GROUP BY mp.id, mp.user_id, mp.name, mp.description, mp.notes, mp.rating, mp.created_at, mp.updated_at
+`
+
+	var rawMeals []byte
+	mealPlansProtoNutri := &pbml.XTotalMealPlanNutrients{
+		Calories:           0,
+		Protein:            0,
+		CarbohydratesTotal: 0,
+		FatTotal:           0,
+		FatSaturated:       0,
+		Fiber:              0,
+		Sugar:              0,
+		Sodium:             0,
+		Potassium:          0,
+		Cholesterol:        0,
+	}
+	mealPlan := &MealPlan{
+		TotalMacros: &TotalNutrients{},
+	}
+	if err := m.pgpool.QueryRow(ctx, query, req.UserId, req.MealPlanId).Scan(&mealPlan.ID,
+		&mealPlan.UserID, &mealPlan.Name, &mealPlan.Description,
+		&mealPlan.Notes, &mealPlan.Rating, &mealPlan.CreatedAt,
+		&mealPlan.UpdatedAt, &rawMeals); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to fetch meal plans: %v", err)
+	}
+
+	var meals []map[string]interface{}
+	if err := json.Unmarshal(rawMeals, &meals); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to parse meals: %v", err)
+	}
+
+	fmt.Println("Raw Meals:", string(rawMeals))
+
+	mealProtos := make([]*pbml.XMeal, 0)
+	totalNutrients := &pbml.XTotalMealNutrients{
+		Calories:           0,
+		Protein:            0,
+		CarbohydratesTotal: 0,
+		FatTotal:           0,
+		FatSaturated:       0,
+		Fiber:              0,
+		Sugar:              0,
+		Sodium:             0,
+		Potassium:          0,
+		Cholesterol:        0,
+	}
+
+	for _, meal := range meals {
+		mealProto := &pbml.XMeal{
+			MealId:          safeString(meal["meal_id"].(string)),
+			MealNumber:      safeFloat64ToInt32(meal["meal_number"].(float64)),
+			MealDescription: safeString(meal["meal_description"].(string)),
+		}
+
+		if totalMacros, ok := meal["total_macros"].(map[string]interface{}); ok {
+			mealProto.TotalMealNutrients = &pbml.XTotalMealNutrients{
+				Calories:           safeFloat64(totalMacros["calories"]),
+				Protein:            safeFloat64(totalMacros["protein"]),
+				CarbohydratesTotal: safeFloat64(totalMacros["carbohydrates_total"]),
+				FatTotal:           safeFloat64(totalMacros["fat_total"]),
+				FatSaturated:       safeFloat64(totalMacros["fat_saturated"]),
+				Fiber:              safeFloat64(totalMacros["fiber"]),
+				Sugar:              safeFloat64(totalMacros["sugar"]),
+				Sodium:             safeFloat64(totalMacros["sodium"]),
+				Potassium:          safeFloat64(totalMacros["potassium"]),
+				Cholesterol:        safeFloat64(totalMacros["cholesterol"]),
+			}
+
+			// Accumulate meal-level nutrients into meal plan's total nutrients
+			totalNutrients.Calories += mealProto.TotalMealNutrients.Calories
+			totalNutrients.Protein += mealProto.TotalMealNutrients.Protein
+			totalNutrients.CarbohydratesTotal += mealProto.TotalMealNutrients.CarbohydratesTotal
+			totalNutrients.FatTotal += mealProto.TotalMealNutrients.FatTotal
+			totalNutrients.FatSaturated += mealProto.TotalMealNutrients.FatSaturated
+			totalNutrients.Fiber += mealProto.TotalMealNutrients.Fiber
+			totalNutrients.Sugar += mealProto.TotalMealNutrients.Sugar
+			totalNutrients.Sodium += mealProto.TotalMealNutrients.Sodium
+			totalNutrients.Potassium += mealProto.TotalMealNutrients.Potassium
+			totalNutrients.Cholesterol += mealProto.TotalMealNutrients.Cholesterol
+
+		} else {
+			mealProto.TotalMealNutrients = &pbml.XTotalMealNutrients{}
+		}
+
+		// Append the meal to the meal list
+		mealProtos = append(mealProtos, mealProto)
+	}
+
+	createdAt := timestamppb.New(mealPlan.CreatedAt)
+	var updatedAt sql.NullTime
+
+	if mealPlan.UpdatedAt.Valid {
+		updatedAt = mealPlan.UpdatedAt
+	} else {
+		updatedAt = sql.NullTime{Valid: false}
+	}
+
+	// Build `XMealPlan`
+
+	totalMealPlanNutrients := &pbml.XTotalMealPlanNutrients{
+		Calories:           0,
+		Protein:            0,
+		CarbohydratesTotal: 0,
+		FatTotal:           0,
+		FatSaturated:       0,
+		Fiber:              0,
+		Sugar:              0,
+		Sodium:             0,
+		Potassium:          0,
+		Cholesterol:        0,
+	}
+
+	totalMealPlanNutrients.Calories += mealPlansProtoNutri.Calories
+	totalMealPlanNutrients.Protein += mealPlansProtoNutri.Protein
+	totalMealPlanNutrients.FatTotal += mealPlansProtoNutri.FatTotal
+	totalMealPlanNutrients.FatSaturated += mealPlansProtoNutri.FatSaturated
+	totalMealPlanNutrients.Fiber += mealPlansProtoNutri.Fiber
+	totalMealPlanNutrients.Sugar += mealPlansProtoNutri.Sugar
+	totalMealPlanNutrients.Sodium += mealPlansProtoNutri.Sodium
+	totalMealPlanNutrients.Potassium += mealPlansProtoNutri.Potassium
+	totalMealPlanNutrients.Cholesterol += mealPlansProtoNutri.Cholesterol
+	totalMealPlanNutrients.CarbohydratesTotal += mealPlansProtoNutri.CarbohydratesTotal
+
+	mealPlanProto := &pbml.XMealPlan{
+		MealPlanId:         mealPlan.ID.String(),
+		UserId:             mealPlan.UserID.String(),
+		Name:               mealPlan.Name.String,
+		CreatedAt:          createdAt,
+		UpdatedAt:          nullTimeToTimestamppb(updatedAt),
+		Meal:               mealProtos,
+		TotalMealNutrients: totalNutrients,
+	}
+
+	// Construct final response
+	return &pbml.GetMealPlanRes{
+		Success:                true,
+		Message:                "Meal plans fetched successfully",
+		MealPlan:               mealPlanProto,
+		TotalMealPlanNutrients: totalMealPlanNutrients,
+		CreatedAt:              timestamppb.Now(),
+		UpdatedAt:              timestamppb.Now(),
+	}, nil
+}
+
+func (m *MealPlanRepository) GetMealPlans(ctx context.Context, req *pbml.GetMealPlansReq) (*pbml.GetMealPlansRes, error) {
+	// Check if UserID is valid
+	if req.UserId == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "user ID cannot be empty")
+	}
+
+	//query := `
+	//			SELECT
+	//				mp.id AS id,
+	//				mp.user_id AS user_id,
+	//				mp.name AS name,
+	//				mp.description AS description,
+	//				mp.notes AS notes,
+	//				mp.rating AS rating,
+	//				mp.created_at AS created_at,
+	//				mp.updated_at AS updated_at,
+	//				COALESCE(
+	//					jsonb_agg(jsonb_build_object(
+	//						'meal_id', m.id::TEXT,
+	//						'meal_number', m.meal_number,
+	//						'meal_description', m.meal_description,
+	//						'total_macros', m.total_macros
+	//					)), '[]'::jsonb
+	//				) AS meals
+	//			FROM meal_plans mp
+	//			LEFT JOIN meals m ON mp.id = m.meal_plan_id
+	//			WHERE mp.user_id = $1
+	//			GROUP BY mp.id, mp.user_id, mp.name, mp.description, mp.notes, mp.rating, mp.created_at, mp.updated_at
+	//`
+
+	query := `
+    SELECT
+        mp.id AS id,
+        mp.user_id AS user_id,
+        mp.name AS name,
+        mp.description AS description,
+        mp.notes AS notes,
+        mp.rating AS rating,
+        mp.created_at AS created_at,
+        mp.updated_at AS updated_at,
+        COALESCE(
+            jsonb_agg(
+                CASE
+                    WHEN m.id IS NOT NULL THEN jsonb_build_object(
+                        'meal_id', m.id::TEXT,
+                        'meal_number', m.meal_number,
+                        'meal_description', m.meal_description,
+                        'total_macros', jsonb_build_object(
+                            'calories', t.calories,
+                            'protein', t.protein,
+                            'carbohydrates_total', t.carbohydrates_total,
+                            'fat_total', t.fat_total,
+                            'fat_saturated', t.fat_saturated,
+                            'fiber', t.fiber,
+                            'sugar', t.sugar,
+                            'sodium', t.sodium,
+                            'potassium', t.potassium
+                        )
+                    )
+                    ELSE NULL
+                END
+            ) FILTER (WHERE m.id IS NOT NULL), '[]'::jsonb
+        ) AS meals
+    FROM meal_plans mp
+    LEFT JOIN meals m ON mp.id = m.meal_plan_id
+    LEFT JOIN (
+        SELECT
+            mi.meal_id,
+            SUM(mi.quantity * (m.total_macros->>'calories')::numeric) /100 AS calories,
+            SUM(mi.quantity * (m.total_macros->>'protein')::numeric) /100 AS protein,
+            SUM(mi.quantity * (m.total_macros->>'carbohydrates_total')::numeric) /100 AS carbohydrates_total,
+            SUM(mi.quantity * (m.total_macros->>'fat_total')::numeric) /100 AS fat_total,
+            SUM(mi.quantity * (m.total_macros->>'fat_saturated')::numeric) /100 AS fat_saturated,
+            SUM(mi.quantity * (m.total_macros->>'fiber')::numeric) /100 AS fiber,
+            SUM(mi.quantity * (m.total_macros->>'sugar')::numeric) /100 AS sugar,
+            SUM(mi.quantity * (m.total_macros->>'sodium')::numeric) /100 AS sodium,
+            SUM(mi.quantity * (m.total_macros->>'potassium')::numeric) /100  AS potassium
+        FROM meal_ingredients mi
+        JOIN meals m ON mi.meal_id = m.id
+        GROUP BY mi.meal_id
+    ) t ON t.meal_id = m.id
+    WHERE mp.user_id = $1
+    GROUP BY mp.id, mp.user_id, mp.name, mp.description, mp.notes, mp.rating, mp.created_at, mp.updated_at
 `
 
 	rows, err := m.pgpool.Query(ctx, query, req.UserId)
@@ -1636,10 +1851,20 @@ func (m *MealPlanRepository) GetMealPlans(ctx context.Context, req *pbml.GetMeal
 		fmt.Println("Raw Meals:", string(rawMeals))
 
 		mealProtos := make([]*pbml.XMeal, 0)
-		totalNutrients := &pbml.XTotalMealNutrients{}
+		totalNutrients := &pbml.XTotalMealNutrients{
+			Calories:           0,
+			Protein:            0,
+			CarbohydratesTotal: 0,
+			FatTotal:           0,
+			FatSaturated:       0,
+			Fiber:              0,
+			Sugar:              0,
+			Sodium:             0,
+			Potassium:          0,
+			Cholesterol:        0,
+		}
 
 		for _, meal := range meals {
-
 			// Convert meal data to `XMeal` format
 			mealProto := &pbml.XMeal{
 				MealId:          safeString(meal["meal_id"].(string)),
@@ -1647,25 +1872,6 @@ func (m *MealPlanRepository) GetMealPlans(ctx context.Context, req *pbml.GetMeal
 				MealDescription: safeString(meal["meal_description"].(string)),
 			}
 
-			if mealId, ok := meal["meal_id"].(string); ok {
-				mealProto.MealId = mealId
-			} else {
-				mealProto.MealId = "" // Provide a default value
-			}
-
-			if mealNumber, ok := meal["meal_number"].(float64); ok {
-				mealProto.MealNumber = int32(mealNumber)
-			} else {
-				mealProto.MealNumber = 0 // Provide a default value
-			}
-
-			if mealDescription, ok := meal["meal_description"].(string); ok {
-				mealProto.MealDescription = mealDescription
-			} else {
-				mealProto.MealDescription = "" // Provide a default value
-			}
-
-			// Parse and sum up nutrients
 			if totalMacros, ok := meal["total_macros"].(map[string]interface{}); ok {
 				mealProto.TotalMealNutrients = &pbml.XTotalMealNutrients{
 					Calories:           safeFloat64(totalMacros["calories"]),
@@ -1680,6 +1886,7 @@ func (m *MealPlanRepository) GetMealPlans(ctx context.Context, req *pbml.GetMeal
 					Cholesterol:        safeFloat64(totalMacros["cholesterol"]),
 				}
 
+				// Accumulate meal-level nutrients into meal plan's total nutrients
 				totalNutrients.Calories += mealProto.TotalMealNutrients.Calories
 				totalNutrients.Protein += mealProto.TotalMealNutrients.Protein
 				totalNutrients.CarbohydratesTotal += mealProto.TotalMealNutrients.CarbohydratesTotal
@@ -1690,10 +1897,12 @@ func (m *MealPlanRepository) GetMealPlans(ctx context.Context, req *pbml.GetMeal
 				totalNutrients.Sodium += mealProto.TotalMealNutrients.Sodium
 				totalNutrients.Potassium += mealProto.TotalMealNutrients.Potassium
 				totalNutrients.Cholesterol += mealProto.TotalMealNutrients.Cholesterol
+
 			} else {
 				mealProto.TotalMealNutrients = &pbml.XTotalMealNutrients{}
 			}
 
+			// Append the meal to the meal list
 			mealProtos = append(mealProtos, mealProto)
 		}
 
@@ -1720,19 +1929,46 @@ func (m *MealPlanRepository) GetMealPlans(ctx context.Context, req *pbml.GetMeal
 		mealPlansProto = append(mealPlansProto, mealPlanProto)
 	}
 
+	totalMealPlanNutrients := &pbml.XTotalMealPlanNutrients{
+		Calories:           0,
+		Protein:            0,
+		CarbohydratesTotal: 0,
+		FatTotal:           0,
+		FatSaturated:       0,
+		Fiber:              0,
+		Sugar:              0,
+		Sodium:             0,
+		Potassium:          0,
+		Cholesterol:        0,
+	}
+
+	for _, mp := range mealPlansProto {
+		totalMealPlanNutrients.Calories += mp.TotalMealNutrients.Calories
+		totalMealPlanNutrients.Protein += mp.TotalMealNutrients.Protein
+		totalMealPlanNutrients.FatTotal += mp.TotalMealNutrients.FatTotal
+		totalMealPlanNutrients.FatSaturated += mp.TotalMealNutrients.FatSaturated
+		totalMealPlanNutrients.Fiber += mp.TotalMealNutrients.Fiber
+		totalMealPlanNutrients.Sugar += mp.TotalMealNutrients.Sugar
+		totalMealPlanNutrients.Sodium += mp.TotalMealNutrients.Sodium
+		totalMealPlanNutrients.Potassium += mp.TotalMealNutrients.Potassium
+		totalMealPlanNutrients.Cholesterol += mp.TotalMealNutrients.Cholesterol
+		totalMealPlanNutrients.CarbohydratesTotal += mp.TotalMealNutrients.CarbohydratesTotal
+	}
+
 	// Construct final response
 	return &pbml.GetMealPlansRes{
-		Success:   true,
-		Message:   "Meal plans fetched successfully",
-		MealPlan:  mealPlansProto,
-		CreatedAt: timestamppb.Now(),
-		UpdatedAt: timestamppb.Now(),
+		Success:                true,
+		Message:                "Meal plans fetched successfully",
+		MealPlan:               mealPlansProto,
+		TotalMealPlanNutrients: totalMealPlanNutrients,
+		CreatedAt:              timestamppb.Now(),
+		UpdatedAt:              timestamppb.Now(),
 	}, nil
 }
 
 func (m *MealPlanRepository) CreateMealPlan(ctx context.Context, req *pbml.CreateMealPlanReq) (*pbml.XMealPlan, error) {
 	mealPlanProto := &pbml.XMealPlan{}
-	// totalMealNutrients := &pbml.XTotalMealNutrients{}
+	totalMealNutrients := &pbml.XTotalMealNutrients{}
 
 	if m.pgpool == nil {
 		return nil, status.Errorf(codes.Internal, "pgpool is nil")
@@ -1755,12 +1991,14 @@ func (m *MealPlanRepository) CreateMealPlan(ctx context.Context, req *pbml.Creat
 		}
 	}()
 
+	// Verify user existence
 	var exists bool
 	err = m.pgpool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)`, req.UserId).Scan(&exists)
 	if err != nil || !exists {
 		return nil, status.Errorf(codes.InvalidArgument, "user_id does not exist")
 	}
 
+	// Insert meal plan
 	var mealPlanID string
 	err = tx.QueryRow(ctx, `
        INSERT INTO meal_plans (user_id, name, description, created_at)
@@ -1776,6 +2014,34 @@ func (m *MealPlanRepository) CreateMealPlan(ctx context.Context, req *pbml.Creat
 		if meal == nil || meal.MealId == "" {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid meal at index %d", i)
 		}
+
+		if meal.TotalMealNutrients == nil {
+			meal.TotalMealNutrients = &pbml.XTotalMealNutrients{}
+		}
+
+		// Calculate meal's total nutrients
+		for _, ing := range meal.MealIngredients {
+			meal.TotalMealNutrients.Calories += calculateMacro(ing.Calories, ing.Quantity)
+			meal.TotalMealNutrients.Protein += calculateMacro(ing.Protein, ing.Quantity)
+			meal.TotalMealNutrients.CarbohydratesTotal += calculateMacro(ing.CarbohydratesTotal, ing.Quantity)
+			meal.TotalMealNutrients.FatTotal += calculateMacro(ing.FatTotal, ing.Quantity)
+			meal.TotalMealNutrients.FatSaturated += calculateMacro(ing.FatSaturated, ing.Quantity)
+			meal.TotalMealNutrients.Fiber += calculateMacro(ing.Fiber, ing.Quantity)
+			meal.TotalMealNutrients.Sugar += calculateMacro(ing.Sugar, ing.Quantity)
+			meal.TotalMealNutrients.Sodium += calculateMacro(ing.Sodium, ing.Quantity)
+			meal.TotalMealNutrients.Potassium += calculateMacro(ing.Potassium, ing.Quantity)
+		}
+
+		// Aggregate meal nutrients for the meal plan
+		totalMealNutrients.Calories += meal.TotalMealNutrients.Calories
+		totalMealNutrients.Protein += meal.TotalMealNutrients.Protein
+		totalMealNutrients.CarbohydratesTotal += meal.TotalMealNutrients.CarbohydratesTotal
+		totalMealNutrients.FatTotal += meal.TotalMealNutrients.FatTotal
+		totalMealNutrients.FatSaturated += meal.TotalMealNutrients.FatSaturated
+		totalMealNutrients.Fiber += meal.TotalMealNutrients.Fiber
+		totalMealNutrients.Sugar += meal.TotalMealNutrients.Sugar
+		totalMealNutrients.Sodium += meal.TotalMealNutrients.Sodium
+		totalMealNutrients.Potassium += meal.TotalMealNutrients.Potassium
 
 		// Query or create meal
 		var mealID string
@@ -1802,34 +2068,34 @@ func (m *MealPlanRepository) CreateMealPlan(ctx context.Context, req *pbml.Creat
 			}
 		}
 
+		// Associate meal with meal plan and set meal_plan_id
 		_, err = tx.Exec(ctx, `
            INSERT INTO meal_plan_meals (meal_plan_id, meal_id, meal_order)
-           VALUES ($1, $2, $3)
-       `, mealPlanID, mealID, mealOrder)
+           SELECT $1, $2, $3
+           WHERE NOT EXISTS (
+               SELECT 1 FROM meal_plan_meals WHERE meal_plan_id = $1 AND meal_id = $2
+           )`, mealPlanID, mealID, mealOrder)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to associate meal with meal plan: %v", err)
 		}
+
+		// Update meal with the meal_plan_id
+		_, err = tx.Exec(ctx, `
+           UPDATE meals
+           SET meal_plan_id = $1
+           WHERE id = $2
+       `, mealPlanID, mealID)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to update meal with meal_plan_id: %v", err)
+		}
 	}
 
-	// Add each macro value to the meal plan's total macros
-	//if totalMealNutrients != nil {
-	//	totalMealNutrients.Calories += totalMealNutrients.Calories
-	//	totalMealNutrients.Protein += totalMealNutrients.Protein
-	//	totalMealNutrients.CarbohydratesTotal += totalMealNutrients.CarbohydratesTotal
-	//	totalMealNutrients.FatTotal += totalMealNutrients.FatTotal
-	//	totalMealNutrients.FatSaturated += totalMealNutrients.FatSaturated
-	//	totalMealNutrients.Fiber += totalMealNutrients.Fiber
-	//	totalMealNutrients.Sugar += totalMealNutrients.Sugar
-	//	totalMealNutrients.Sodium += totalMealNutrients.Sodium
-	//	totalMealNutrients.Potassium += totalMealNutrients.Potassium
-	//	totalMealNutrients.Cholesterol += totalMealNutrients.Cholesterol
-	//}
-
+	// Populate response
 	mealPlanProto.Meal = req.Meal
 	mealPlanProto.MealPlanId = mealPlanID
 	mealPlanProto.Description = req.Description
 	mealPlanProto.Name = req.Name
-	//mealPlanProto.TotalMealNutrients = totalMealNutrients
+	mealPlanProto.TotalMealNutrients = totalMealNutrients
 
 	if err = tx.Commit(ctx); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to commit transaction: %v", err)
@@ -1843,26 +2109,51 @@ func (m *MealPlanRepository) UpdateMealPlan(ctx context.Context, req *pbml.Updat
 }
 
 func (m *MealPlanRepository) DeleteMealPlan(ctx context.Context, req *pbml.DeleteMealPlanReq) (*pbml.NilRes, error) {
-	return nil, nil
-}
-
-func safeString(value interface{}) string {
-	if v, ok := value.(string); ok {
-		return v
+	if req.MealPlanId == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "meal plan id cannot be empty")
 	}
-	return ""
-}
 
-func safeFloat64ToInt32(value interface{}) int32 {
-	if v, ok := value.(float64); ok {
-		return int32(v)
+	tx, err := m.pgpool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to start transaction: %v", err)
 	}
-	return 0
-}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback(ctx)
+		}
+	}()
 
-func safeFloat64(value interface{}) float64 {
-	if v, ok := value.(float64); ok {
-		return v
+	// Delete from meal_plan_meals
+	_, err = tx.Exec(ctx, `
+		DELETE FROM meal_plan_meals
+		WHERE meal_plan_id = $1
+	`, req.MealPlanId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to delete from meal_plan_meals: %v", err)
 	}
-	return 0
+
+	// Unlink meals (set meal_plan_id to NULL)
+	_, err = tx.Exec(ctx, `
+		UPDATE meals
+		SET meal_plan_id = NULL
+		WHERE meal_plan_id = $1
+	`, req.MealPlanId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to unlink meals: %v", err)
+	}
+
+	// Delete from meal_plans
+	_, err = tx.Exec(ctx, `
+		DELETE FROM meal_plans
+		WHERE id = $1 AND user_id = $2
+	`, req.MealPlanId, req.UserId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to delete meal plan: %v", err)
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to commit transaction: %v", err)
+	}
+
+	return &pbml.NilRes{}, nil
 }

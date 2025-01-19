@@ -30,6 +30,7 @@ CREATE TABLE "meal_plans" (
                             "created_at" TIMESTAMP DEFAULT NOW(),
                             "updated_at" TIMESTAMP DEFAULT NULL
 );
+CREATE INDEX idx_total_macros ON "meal_plans" USING GIN ("total_macros");
 
 --
 CREATE TABLE "meals" (
