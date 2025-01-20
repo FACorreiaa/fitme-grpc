@@ -169,3 +169,20 @@ Mike uses AI insights to tweak Jane’s plan after analyzing her weekly progress
 
 # FitSynch’s Vision
 FitSynch combines the best of personal training, nutrition management, and AI. It empowers users to achieve their fitness goals while helping trainers scale their services. With a seamless blend of human expertise and AI-driven insights, it has the potential to disrupt the fitness industry.
+
+# Meal Plan Validation
+
+## 1.Maintaining the Objective
+The objective (e.g., "maintenance") typically aligns with a specific calorie goal (e.g., 2500 kcal). Allowing the user to create a meal plan that exceeds this goal could be counterproductive, as it would contradict the objective.
+For example, if a user is in maintenance mode, and the system tells them their calorie goal is 2500 kcal, then creating a meal plan that pushes them beyond this could affect the expected outcome of their dietary plan (e.g., leading to weight gain if the goal is maintenance).
+## 2. User Guidance and Intent
+By enforcing a calorie limit (based on their objective), you are providing guidance to the user on what is a reasonable meal plan for their goal. This improves the overall user experience and ensures they don't unintentionally exceed the calorie goals they’ve set, especially if they lack knowledge about how to balance macros and calories.
+It also helps prevent the user from getting overwhelmed by a system that could potentially create unhealthy eating habits due to lack of restrictions.
+## 3.Flexibility with Limits
+While it's beneficial to enforce a limit, you might want to allow some flexibility. For instance:
+Warning messages: You can let the user know if they exceed their calorie goal, and allow them to confirm or adjust the plan.
+Custom limits: Users might want to override this rule occasionally (e.g., for a special meal plan). In such cases, you could allow users to set custom goals or acknowledge the warning before proceeding.
+## 4.Implementation Strategy
+- Option 1: Enforce strict limits – Prevent users from creating a meal plan that exceeds their calorie goal (2500 kcal) for that objective.
+- Option 2: Warning with flexibility – Allow the meal plan to be saved even if it exceeds the calorie goal, but show a warning message to the user (e.g., "The meal plan exceeds your maintenance calorie goal by X kcal. Are you sure you want to proceed?").
+- Option 3: Optional overrides – Allow users to override the limit, but log this decision or require additional confirmation (e.g., "Are you sure you want to proceed with this meal plan that exceeds your calorie goal?").
