@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	pbc "github.com/FACorreiaa/fitme-protos/modules/calculator/generated"
@@ -119,44 +118,72 @@ func (c *CalculatorRepository) GetUserMacros(ctx context.Context, req *pbc.GetUs
 	return &pbc.GetUserMacroResponse{UserMacro: &macroDistribution}, nil
 }
 
-func (c *CalculatorRepository) CreateUserMacro(ctx context.Context, req *pbc.UserMacroDistribution) (*pbc.UserMacroDistribution, error) {
-	query := `INSERT INTO user_macro_distribution (user_id, age, height, weight,
-                                    gender, system, activity, activity_description, objective,
-                                    objective_description, calories_distribution, calories_distribution_description,
-                                    protein, fats, carbs, bmr, tdee, goal, created_at)
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
-              RETURNING *`
+func (c *CalculatorRepository) CreateUserMacro(ctx context.Context, req *pbc.CreateUserMacroRequest) (*pbc.UserMacroDistribution, error) {
+	// Start a transaction if you want to ensure atomic update
+	tx, err := c.pgpool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to start transaction: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback(ctx)
+		}
+	}()
+
+	// If the incoming macro should be "current," set all other macros for this user to false
+	if req.IsCurrent {
+		_, err = tx.Exec(ctx, `
+	 UPDATE user_macro_distribution
+	 SET is_current = false
+	 WHERE user_id = $1
+	`, req.UserMacro.UserId)
+		if err != nil {
+			return nil, fmt.Errorf("failed to reset is_current: %w", err)
+		}
+	}
+
+	// Then insert the new macro
+	query := `
+    INSERT INTO user_macro_distribution (
+      user_id, age, height, weight, gender, system, activity, activity_description,
+      objective, objective_description, calories_distribution, calories_distribution_description,
+      protein, fats, carbs, bmr, tdee, goal, created_at, is_current
+    )
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,now(),$19)
+    RETURNING
+      id, user_id, age, height, weight, gender, system, activity, activity_description,
+      objective, objective_description, calories_distribution, calories_distribution_description,
+      protein, fats, carbs, bmr, tdee, goal, created_at, is_current
+  `
 
 	var macro pbc.UserMacroDistribution
 	var createdAt time.Time
-
-	rows, err := c.pgpool.Query(ctx, query,
-		req.UserId, req.Age, req.Height, req.Weight, req.Gender, req.System, req.Activity,
-		req.ActivityDescription, req.Objective, req.ObjectiveDescription, req.CaloriesDistribution,
-		req.CaloriesDistributionDescription, req.Protein, req.Fats, req.Carbs, req.Bmr, req.Tdee,
-		req.Goal, createdAt,
+	var isCurrent bool
+	userMacro := req.UserMacro
+	row := tx.QueryRow(ctx, query,
+		userMacro.UserId, userMacro.Age, userMacro.Height, userMacro.Weight, userMacro.Gender, userMacro.System, userMacro.Activity,
+		userMacro.ActivityDescription, userMacro.Objective, userMacro.ObjectiveDescription,
+		userMacro.CaloriesDistribution, userMacro.CaloriesDistributionDescription,
+		userMacro.Protein, userMacro.Fats, userMacro.Carbs, userMacro.Bmr, userMacro.Tdee, userMacro.Goal, req.IsCurrent,
 	)
 
+	err = row.Scan(
+		&macro.Id, &macro.UserId, &macro.Age, &macro.Height, &macro.Weight, &macro.Gender,
+		&macro.System, &macro.Activity, &macro.ActivityDescription, &macro.Objective,
+		&macro.ObjectiveDescription, &macro.CaloriesDistribution,
+		&macro.CaloriesDistributionDescription, &macro.Protein,
+		&macro.Fats, &macro.Carbs, &macro.Bmr, &macro.Tdee,
+		&macro.Goal, &createdAt, &isCurrent,
+	)
 	if err != nil {
-		log.Printf("Query execution error: %v", err) // Log detailed error
-		return nil, fmt.Errorf("failed to execute query: %w", err)
+		return nil, fmt.Errorf("failed to scan row: %w", err)
 	}
-	defer rows.Close()
 
-	if rows.Next() {
-		err = rows.Scan(
-			&macro.Id, &macro.UserId, &macro.Age, &macro.Height, &macro.Weight, &macro.Gender, &macro.System,
-			&macro.Activity, &macro.ActivityDescription, &macro.Objective, &macro.ObjectiveDescription,
-			&macro.CaloriesDistribution, &macro.CaloriesDistributionDescription, &macro.Protein,
-			&macro.Fats, &macro.Carbs, &macro.Bmr, &macro.Tdee, &macro.Goal, &createdAt,
-		)
+	macro.CreatedAt = timestamppb.New(createdAt)
+	req.IsCurrent = isCurrent
 
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan row: %w", err)
-		}
-
-		// Convert `createdAt` (Go time.Time) to Protobuf Timestamp
-		macro.CreatedAt = timestamppb.New(createdAt)
+	if err = tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return &macro, nil

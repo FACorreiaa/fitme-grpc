@@ -93,7 +93,6 @@ func InitConfig() (Config, error) {
 	if err != nil {
 		fmt.Printf("Warning: Failed to find file-based config: %s. Falling back to embedded config.\n", err)
 
-		// Fallback to embedded config
 		if err = v.ReadConfig(bytes.NewReader(embeddedConfig)); err != nil {
 			return Config{}, fmt.Errorf("failed to read embedded config: %s", err)
 		}

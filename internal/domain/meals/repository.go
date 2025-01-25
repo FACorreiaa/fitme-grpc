@@ -2080,9 +2080,21 @@ func (m *MealPlanRepository) CreateMealPlan(ctx context.Context, req *pbml.Creat
 		totalMealNutrients.Sodium += meal.TotalMealNutrients.Sodium
 		totalMealNutrients.Potassium += meal.TotalMealNutrients.Potassium
 
+		// Create service to set limit
+		dailyLimit, err := m.getUserCalorieLimit(ctx, req.MealPlan.UserId)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to get user’s calorie limit: %v", err)
+		}
+
+		if totalMealNutrients.Calories > dailyLimit {
+			log.Printf("Warning: user %s is exceeding daily limit by %v kcal", req.MealPlan.UserId,
+				totalMealNutrients.Calories-dailyLimit)
+			// Possibly set a field in the response that warns the client, or request a confirm
+		}
+
 		// Query or create meal
 		var mealID string
-		err := m.pgpool.QueryRow(ctx, `
+		err = m.pgpool.QueryRow(ctx, `
            SELECT id FROM meals WHERE user_id = $1 AND id = $2
        `, req.MealPlan.UserId, meal.MealId).Scan(&mealID)
 		if err != nil {
@@ -2178,12 +2190,11 @@ func (m *MealPlanRepository) UpdateMealPlan(ctx context.Context, req *pbml.Updat
 		case "rating":
 			rating, _ := parseStringToFloat(update.NewValue, "invalid rating value")
 			setClauses = append(setClauses, fmt.Sprintf("notes = $%d", argIndex))
-			args = append(args, update.NewValue)
+			args = append(args, rating)
 			updatedMealPlan.Rating = int32(rating)
 			argIndex++
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "invalid field %s", update.Field)
-
 		}
 	}
 
@@ -2295,4 +2306,26 @@ func (m *MealPlanRepository) DeleteMealPlan(ctx context.Context, req *pbml.Delet
 	}
 
 	return &pbml.NilRes{}, nil
+}
+
+func (m *MealPlanRepository) getUserCalorieLimit(ctx context.Context, userId string) (float64, error) {
+	var limit float64
+
+	// Query the user’s current macro
+	err := m.pgpool.QueryRow(ctx, `
+     SELECT goal
+     FROM user_macro_distribution
+     WHERE user_id = $1
+     AND is_current = TRUE
+     LIMIT 1
+   `, userId).Scan(&limit)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			// The user has no current macro. Return 0 or some default.
+			return 0, nil
+		}
+		return 0, err
+	}
+	return limit, nil
 }

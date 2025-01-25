@@ -165,3 +165,22 @@ func Listen[T any](ctx context.Context, mb *Broadcaster) <-chan T {
 	}()
 	return ch
 }
+
+//func validateMealPlanCalories(mealPlan *XMealPlan, objectiveCalories int) error {
+//	totalCalories := calculateTotalCalories(mealPlan)
+//	if totalCalories > objectiveCalories {
+//		return fmt.Errorf("meal plan exceeds your calorie goal by %d kcal", totalCalories-objectiveCalories)
+//	}
+//	return nil
+//}
+//
+//func createMealPlan(ctx context.Context, mealPlan *XMealPlan, userObjective *UserMacroDistribution) (*XMealPlan, error) {
+//	// Check if the meal plan exceeds the calorie goal for the user objective
+//	err := validateMealPlanCalories(mealPlan, userObjective.goal)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	// Proceed with saving the meal plan
+//	// Save the meal plan logic here...
+//}

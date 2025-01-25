@@ -94,7 +94,7 @@ type Macros struct {
 }
 
 type CaloriesInfo struct {
-	CaloriesDistribution            CaloriesDistribution            `json:"carbDistribution"`
+	CaloriesDistribution            pb.CaloriesDistribution         `json:"carbDistribution"`
 	CaloriesDistributionDescription CaloriesDistributionDescription `json:"carbDistributionDescription"`
 }
 type MacrosInfo struct {
@@ -220,8 +220,8 @@ var objectiveDescriptionMap = map[pb.Objective]ObjectiveDescription{
 	pb.Objective_CUTTING:     cuttingDescription,
 }
 
-var carbsDistribution = map[CaloriesDistribution]CaloriesDistributionDescription{
-	HighCarbRatios:     highCarbs,
-	LowCarbRatios:      lowCarbs,
-	ModerateCarbRatios: moderateCarbs,
+var carbsDistribution = map[pb.CaloriesDistribution]CaloriesDistributionDescription{
+	pb.CaloriesDistribution_HIGH_CALORIE:     highCarbs,
+	pb.CaloriesDistribution_LOW_CALORIE:      lowCarbs,
+	pb.CaloriesDistribution_MODERATE_CALORIE: moderateCarbs,
 }

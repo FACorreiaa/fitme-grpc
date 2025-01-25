@@ -205,6 +205,14 @@ CREATE TABLE IF NOT EXISTS "user_macro_distribution" (
                                                        "goal" INTEGER NOT NULL,
                                                        "created_at" TIMESTAMP NOT NULL DEFAULT NOW()
 );
+ALTER TABLE user_macro_distribution
+  ADD COLUMN is_current BOOLEAN NOT NULL DEFAULT FALSE;
+
+CREATE UNIQUE INDEX idx_one_current_macro_per_user
+  ON user_macro_distribution (user_id)
+  WHERE is_current = TRUE;
+
+
 
 CREATE TABLE "food_logs" (
                            "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,

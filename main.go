@@ -18,6 +18,11 @@ import (
 	"github.com/FACorreiaa/fitme-grpc/logger"
 )
 
+type Dependencies struct {
+	DB    *pgxpool.Pool
+	Redis *redis.Client
+}
+
 func initializeLogger() error {
 	return logger.Init(
 		zap.DebugLevel,
@@ -35,6 +40,7 @@ func setupDatabases(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, *re
 
 	pool, err := internal.Init(dbConfig.ConnectionURL)
 	if err != nil {
+		pool.Close()
 		return nil, nil, fmt.Errorf("failed to initialize database pool: %w", err)
 	}
 
@@ -44,6 +50,12 @@ func setupDatabases(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, *re
 		zap.String("port", os.Getenv("POSTGRES_PORT")))
 
 	redisClient, err := internal.NewRedisConfig()
+	//defer func(redisClient *redis.Client) {
+	//	err = redisClient.Close()
+	//	if err != nil {
+	//		logger.Log.Info("Failed to close redis connection", zap.Error(err))
+	//	}
+	//}(redisClient)
 	if err != nil {
 		pool.Close()
 		return nil, nil, fmt.Errorf("failed to initialize Redis configuration: %w", err)
@@ -92,12 +104,17 @@ func startServices(ctx context.Context, cfg *config.Config, container *internal.
 	}
 }
 
-func run(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, *redis.Client, error) {
+func run(ctx context.Context, cfg *config.Config) (*Dependencies, error) {
 	pool, redisClient, err := setupDatabases(ctx, cfg)
 	if err != nil {
-		return nil, nil, err
+		logger.Log.Error("failed to run the application", zap.Error(err))
+		return nil, err
+
 	}
-	return pool, redisClient, nil
+	return &Dependencies{
+		DB:    pool,
+		Redis: redisClient,
+	}, nil
 }
 
 func main() {
@@ -118,13 +135,11 @@ func main() {
 		return
 	}
 
-	pool, redisClient, err := run(ctx, &cfg)
+	deps, err := run(ctx, &cfg)
 	if err != nil {
 		logger.Log.Error("failed to run the application", zap.Error(err))
 		return
 	}
-	defer pool.Close()
-	defer redisClient.Close()
 
 	tu := new(utils.TransportUtils)
 	brokers := internal.ConfigureUpstreamClients(logger.Log, tu)
@@ -135,9 +150,12 @@ func main() {
 
 	metrics.InitPprof()
 
-	container := internal.NewServiceContainer(ctx, pool, redisClient, brokers)
+	container := internal.NewServiceContainer(ctx, deps.DB, deps.Redis, brokers)
 
-	if err := startServices(ctx, &cfg, container, reg); err != nil {
+	if err = startServices(ctx, &cfg, container, reg); err != nil {
 		logger.Log.Error("service error", zap.Error(err))
 	}
+
+	deps.DB.Close()
+	deps.Redis.Close()
 }

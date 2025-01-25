@@ -83,7 +83,7 @@ func mapObjective(ctx context.Context, objective pb.Objective) (*ObjectiveList, 
 	}, nil
 }
 
-func mapDistribution(ctx context.Context, distribution CaloriesDistribution) (*CaloriesInfo, error) {
+func mapDistribution(ctx context.Context, distribution pb.CaloriesDistribution) (*CaloriesInfo, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -244,7 +244,7 @@ func calculateUserPersonalMacros(ctx context.Context, params UserParams) (UserIn
 		return UserInfo{}, err
 	}
 
-	d, err := mapDistribution(ctx, CaloriesDistribution(params.CaloriesDist))
+	d, err := mapDistribution(ctx, parseCaloriesDistribution(params.CaloriesDist))
 	if err != nil {
 		return UserInfo{}, err
 	}
@@ -331,7 +331,7 @@ func (s *CalculatorService) CreateUserMacro(ctx context.Context, req *pb.CreateU
 		//ActivityDesc:     req.UserMacro.ActivityDescription,
 		Objective: req.UserMacro.Objective.String(),
 		//ObjectiveDesc:    req.UserMacro.ObjectiveDescription,
-		CaloriesDist: req.UserMacro.CaloriesDistribution,
+		CaloriesDist: string(req.UserMacro.CaloriesDistribution),
 		//CaloriesDistDesc: req.UserMacro.CaloriesDistributionDescription,
 	}
 
@@ -367,7 +367,7 @@ func (s *CalculatorService) CreateUserMacro(ctx context.Context, req *pb.CreateU
 		ActivityDescription:             string(userInfo.ActivityInfo.Description),
 		Objective:                       objective,
 		ObjectiveDescription:            string(userInfo.ObjectiveInfo.Description),
-		CaloriesDistribution:            string(userInfo.MacrosInfo.CaloriesInfo.CaloriesDistribution),
+		CaloriesDistribution:            userInfo.MacrosInfo.CaloriesInfo.CaloriesDistribution,
 		CaloriesDistributionDescription: string(userInfo.MacrosInfo.CaloriesInfo.CaloriesDistributionDescription),
 		Protein:                         uint32(userInfo.MacrosInfo.Macros.Protein),
 		Fats:                            uint32(userInfo.MacrosInfo.Macros.Fats),
@@ -378,7 +378,11 @@ func (s *CalculatorService) CreateUserMacro(ctx context.Context, req *pb.CreateU
 		CreatedAt:                       createdAt,
 	}
 
-	savedMacro, err := s.repo.CreateUserMacro(ctx, macroDistribution)
+	req = &pb.CreateUserMacroRequest{
+		UserMacro: macroDistribution,
+	}
+
+	savedMacro, err := s.repo.CreateUserMacro(ctx, req)
 	if err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.type", fmt.Sprintf("%T", err)))
@@ -470,7 +474,7 @@ func (s *CalculatorService) CreateOfflineUserMacro(ctx context.Context, req *pb.
 		System:       req.UserMacro.System,
 		Activity:     req.UserMacro.Activity,
 		Objective:    req.UserMacro.Objective,
-		CaloriesDist: req.UserMacro.CaloriesDistribution,
+		CaloriesDist: string(req.UserMacro.CaloriesDistribution),
 	}
 
 	// Perform the offline calculations
@@ -491,7 +495,7 @@ func (s *CalculatorService) CreateOfflineUserMacro(ctx context.Context, req *pb.
 			ActivityDescription:             string(userInfo.ActivityInfo.Description),
 			Objective:                       userInfo.ObjectiveInfo.Objective,
 			ObjectiveDescription:            string(userInfo.ObjectiveInfo.Description),
-			CaloriesDistribution:            string(userInfo.MacrosInfo.CaloriesInfo.CaloriesDistribution),
+			CaloriesDistribution:            userInfo.MacrosInfo.CaloriesInfo.CaloriesDistribution,
 			CaloriesDistributionDescription: string(userInfo.MacrosInfo.CaloriesInfo.CaloriesDistributionDescription),
 			Protein:                         uint32(userInfo.MacrosInfo.Macros.Protein),
 			Fats:                            uint32(userInfo.MacrosInfo.Macros.Fats),
@@ -558,5 +562,25 @@ func StringToActivityEnum(s string) (pb.Activity, error) {
 		return pb.Activity_EXTRA_HEAVY, nil
 	default:
 		return pb.Activity_ACTIVITY_UNSPECIFIED, fmt.Errorf("invalid Activity: %s", s)
+	}
+}
+
+func (s *CalculatorService) SetActiveUserMacro(ctx context.Context, req *pb.SetActiveUserMacroRequest) (*pb.SetActiveUserMacroResponse, error) {
+	return nil, nil
+}
+
+func parseCaloriesDistribution(s string) pb.CaloriesDistribution {
+	switch s {
+	case "CD_UNSPECIFIED":
+		return pb.CaloriesDistribution_CD_UNSPECIFIED
+	case "HIGH_CALORIE":
+		return pb.CaloriesDistribution_HIGH_CALORIE
+	case "MODERATE_CALORIE":
+		return pb.CaloriesDistribution_MODERATE_CALORIE
+	case "LOW_CALORIE":
+		return pb.CaloriesDistribution_LOW_CALORIE
+	default:
+		// Return a default if the string is unknown
+		return pb.CaloriesDistribution_CD_UNSPECIFIED
 	}
 }
