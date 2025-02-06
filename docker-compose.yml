@@ -11,32 +11,30 @@ services:
 #    volumes:
 #      - ./tempo-data:/var/tempo
 #
-#  app:
-#    platform: linux/amd64
-#    container_name: fitme-dev
-#    build:
-#      dockerfile: Dockerfile
-#      context: .
-#      target: dev
-#    volumes:
-#      - .:/app
-#    ports:
-#      - "8000:8000"
-#      - "8001:8001"
-#      - "40000:40000"
-#    environment:
-#      #- OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=otel-collector:4317
-#      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=tempo:4317
-#
-#    depends_on:
-#      - postgres
-#      - redis
-#    logging:
-#      driver: loki
-#      options:
-#        loki-url: http://localhost:3100/loki/api/v1/push
-#    networks:
-#      fit-me:
+  app:
+    platform: linux/amd64
+    container_name: fitme-dev
+    build:
+      dockerfile: Dockerfile
+      context: .
+      target: dev
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+    environment:
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=otel-collector:4317
+      #- OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=tempo:4317
+    depends_on:
+      - postgres
+      - redis
+    logging:
+      driver: loki
+      options:
+        loki-url: http://localhost:3100/loki/api/v1/push
+    networks:
+      fit-me:
 
   postgres:
     env_file:
@@ -54,7 +52,6 @@ services:
       - "5440:5432"
     restart: on-failure
     volumes:
-      #- ./.data/docker-postgres:/var/lib/postgresql/data
       - postgres-data:/var/lib/postgresql/data
 
     networks:
@@ -74,91 +71,103 @@ services:
       - ./.data/docker-redis:/var/lib/redis/data
     networks:
       - fit-me
-#  tempo:
-#    container_name: tempo
-#    image: *tempoImage
-#    command: [ "-config.file=/etc/tempo.yaml" ]
-#    volumes:
-#      - ./config/docker/tempo.yaml:/etc/tempo.yaml
-#      - ./tempo-data:/var/tempo
-#    ports:
-#      - "3200:3200"  # Tempo API
-#      #- "9411:9411"  # Zipkin
-#      # - "4317:4317"  # OTLP
-#    restart: unless-stopped
-#    depends_on:
-#      - init
-#    networks:
-#      fit-me:
-#
-#
+
+  otel-collector:
+    image: otel/opentelemetry-collector:latest
+    container_name: otel-collector
+    volumes:
+      - ./config/docker/otel-collector.yaml:/etc/otel-collector.yaml
+    command: [ "--config", "/etc/otel-collector.yaml" ]
+    networks:
+      - fit-me
+
+  tempo:
+    image: grafana/tempo:latest
+    container_name: tempo
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+      - "4318:4318"
+    volumes:
+      - ./config/docker/tempo.yml:/etc/tempo/tempo.yml
+      - ./tempo-data:/var/tempo
+    command:
+      - '-config.file=/etc/tempo/tempo.yml'
+    networks:
+      - fit-me
+
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-remote-write-receiver
+      - --enable-feature=exemplar-storage
+      - --enable-feature=native-histograms
+    volumes:
+      - ./config/docker/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - fit-me
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./config/docker/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor
+    depends_on:
+      - prometheus
+      - tempo
+    networks:
+      - fit-me
+
 #  jaeger:
-#    image: jaegertracing/all-in-one:1.46
+#    image: jaegertracing/all-in-one:latest
 #    container_name: jaeger
-#    environment:
-#      COLLECTOR_ZIPKIN_HTTP_PORT: 9411  # Enable Zipkin endpoint
 #    ports:
-#      - "16686:16686"  # Jaeger UI
-#      - "14268:14268"  # Jaeger HTTP ingestion
-#      - "14250:14250"  # OTLP gRPC ingestion
-#      # - "9411:9411"    # Zipkin HTTP ingestion
+#      - "16686:16686"      # Jaeger UI (open in your browser)
+#      - "6831:6831/udp"    # Jaeger Agent (thrift UDP)
+#      - "14250:14250"  # OTLP gRPC receiver
 #    networks:
 #      - fit-me
-#
-#  # And put them in an OTEL collector pipeline...
-#  otel-collector:
-#    image: otel/opentelemetry-collector:0.86.0
-#    container_name: otel-collector
-#    command: [ "--config=/etc/otel-collector.yaml" ]
-#    volumes:
-#      - ./config/docker/otel-collector.yaml:/etc/otel-collector.yaml
-#    ports:
-#      - "4317:4317"  # OTLP gRPC
-#      - "4318:4318"  # OTLP HTTP
-#      - "9464:9464"  # Prometheus metrics
-#    networks:
-#      fit-me:
-#  prometheus:
-#    container_name: prometheus
-#    image: prom/prometheus:latest
-#    command:
-#      - --config.file=/etc/prometheus.yml
-#      - --web.enable-remote-write-receiver
-#      - --enable-feature=exemplar-storage
-#      - --enable-feature=native-histograms
-#    volumes:
-#      - ./config/docker/prometheus.yml:/etc/prometheus.yml
-#    ports:
-#      - "9090:9090"
-#    networks:
-#      fit-me:
-#  grafana:
-#    container_name: grafana
-#    image: grafana/grafana:11.0.0
-#    volumes:
-#      - ./config/docker/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
-#    environment:
-#      - GF_AUTH_ANONYMOUS_ENABLED=true
-#      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
-#      - GF_AUTH_DISABLE_LOGIN_FORM=true
-#      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor
-#    depends_on:
-#      - prometheus
-#      - loki
-#      - tempo
-#    ports:
-#      - "3000:3000"
-#    networks:
-#      fit-me:
-#  loki:
-#    container_name: loki
-#    image: grafana/loki:main
-#    ports:
-#      - "3100:3100"
-#    volumes:
-#      - ./config/docker/loki-config.yaml:/etc/loki/local-config.yaml
-#    command: -config.file=/etc/loki/local-config.yaml
-#    networks:
-#      - fit-me
+
+  loki:
+    container_name: loki
+    image: grafana/loki:main
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./config/docker/loki-config.yaml:/etc/loki/local-config.yaml
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - fit-me
+
+  promtail:
+    container_name: promtail
+    image: grafana/promtail:latest
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./config/docker/promtail-config.yaml:/etc/promtail/promtail.yaml
+    command: -config.file=/etc/promtail/promtail.yaml
+    networks:
+      - fit-me
+
+  k6-tracing:
+    image: ghcr.io/grafana/xk6-client-tracing:v0.0.5
+    environment:
+      - ENDPOINT=otel-collector:4317
+    restart: always
+    depends_on:
+      - otel-collector
+
 networks:
   fit-me:

@@ -1,31 +1,53 @@
 receivers:
   otlp:
     protocols:
-      grpc: {}
-      http: {}
-  prometheus:
-    config:
-      scrape_configs:
-        - job_name: 'fitme'
-          static_configs:
-            - targets: ['fitme-dev:8001']  # Replace with the actual service name and port
+      grpc:
+      http:
 
 processors:
-  batch: {}  # Simplified to only use the batch processor
+  batch: {}
 
 exporters:
+  # Debug exporter (writes telemetry to the Collector logs)
+  debug:
+    verbosity: detailed
+    sampling_initial: 5
+    sampling_thereafter: 200
+
+  # Export traces to Jaeger via OTLP
+#  otlp/jaeger:
+#    endpoint: jaeger:14250
+#    tls:
+#      insecure: true
+
+  # Export traces to Tempo via OTLP
   otlp:
-    endpoint: tempo:4317  # Replace 'tempo' with the actual service name if using Jaeger
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+
+  # Expose metrics on an internal endpoint for Prometheus to scrape
   prometheus:
-    endpoint: "0.0.0.0:9464"  # Expose metrics for Prometheus
+    endpoint: "0.0.0.0:9090"
+
+  # Export logs to Loki via OTLP HTTP
+  otlphttp/loki:
+    endpoint: "loki:3100/loki/api/v1/push"
+    tls:
+      insecure: true
 
 service:
   pipelines:
-    metrics:
-      receivers: [prometheus, otlp]
-      processors: [batch]
-      exporters: [prometheus]
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [otlp]
+      exporters: [debug, otlp]
+      #otlp/jaeger
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug, prometheus]
+
+    logs:
+      receivers: [otlp]
+      exporters: [debug, otlphttp/loki]

@@ -74,9 +74,9 @@ services:
   tempo:
     container_name: tempo
     image: *tempoImage
-    command: [ "-config.file=/etc/tempo.yaml" ]
+    command: [ "-config.file=/etc/tempo.yml" ]
     volumes:
-      - ./config/docker/tempo.yaml:/etc/tempo.yaml
+      - ./config/docker/tempo.yml:/etc/tempo.yml
       - ./tempo-data:/var/tempo
     ports:
       - "3200:3200"  # Tempo API

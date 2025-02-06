@@ -85,6 +85,36 @@ import (
 //	return tp, nil
 //}
 
+//type multiExporter struct {
+//	exporters []sdktrace.SpanExporter
+//}
+//
+//func (m *multiExporter) Shutdown(ctx context.Context) error {
+//	var lastErr error
+//	for _, exp := range m.exporters {
+//		if err := exp.Shutdown(ctx); err != nil {
+//			// You could choose to combine errors or log them.
+//			lastErr = err
+//		}
+//	}
+//	return lastErr
+//}
+
+//func NewMultiExporter(exporters ...sdktrace.SpanExporter) sdktrace.SpanExporter {
+//	return &multiExporter{exporters: exporters}
+//}
+//
+//func (m *multiExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpan) error {
+//	var lastErr error
+//	for _, exp := range m.exporters {
+//		if err := exp.ExportSpans(ctx, spans); err != nil {
+//			// You could choose to combine errors or log them.
+//			lastErr = err
+//		}
+//	}
+//	return lastErr
+//}
+
 func NewOTLPExporter(ctx context.Context) (trace.SpanExporter, error) {
 	// Change default HTTPS -> HTTP
 	log := logger.Log
