@@ -2,6 +2,7 @@ package meals
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	pbml "github.com/FACorreiaa/fitme-protos/modules/meal/generated"
@@ -1126,9 +1127,11 @@ func (m *MealPlanService) UpdateIngredientInMeal(ctx context.Context, req *pbml.
 }
 
 func (m *MealPlanService) CreateMealPlan(ctx context.Context, req *pbml.CreateMealPlanReq) (*pbml.CreateMealPlanRes, error) {
+	var warningMsg string
 	tracer := otel.Tracer("FitSphere")
 	ctx, span := tracer.Start(ctx, "Meal/CreateMealPlan")
 	defer span.End()
+
 	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
 	if !ok {
 		return nil, status.Error(codes.Internal, "request id not found in context")
@@ -1141,6 +1144,12 @@ func (m *MealPlanService) CreateMealPlan(ctx context.Context, req *pbml.CreateMe
 	userID := ctx.Value("userID").(string)
 	if userID == "" {
 		return nil, status.Error(codes.Unauthenticated, "userID is missing in context")
+	}
+
+	activeMacro, err := m.repo.GetUserCalorieLimit(ctx, req.MealPlan.UserId)
+	if err != nil {
+		span.RecordError(err)
+		return nil, status.Errorf(codes.Internal, "failed to get active macro: %v", err)
 	}
 
 	req.Request.RequestId = requestID
@@ -1159,6 +1168,11 @@ func (m *MealPlanService) CreateMealPlan(ctx context.Context, req *pbml.CreateMe
 		}, status.Errorf(codes.Internal, "failed to create new meal plan: %v", err)
 	}
 
+	if mp.TotalMealNutrients != nil && mp.TotalMealNutrients.Calories > activeMacro {
+		warningMsg = fmt.Sprintf("Warning: The total calories of your meal plan (%.0f) exceed your active calorie objective (%.0f).", mp.TotalMealNutrients.Calories, activeMacro)
+		span.SetAttributes(attribute.String("mealplan.warning", warningMsg))
+	}
+
 	span.SetAttributes(
 		attribute.String("request.id", req.Request.RequestId),
 		attribute.String("request.details", req.String()))
@@ -1168,6 +1182,7 @@ func (m *MealPlanService) CreateMealPlan(ctx context.Context, req *pbml.CreateMe
 		Message:  "Meal plan inserted successfully",
 		MealPlan: mp,
 		Status:   strconv.Itoa(int(codes.OK)),
+		Warning:  warningMsg,
 		Response: &pbml.BaseResponse{
 			Upstream:  "meal-service",
 			RequestId: requestID,

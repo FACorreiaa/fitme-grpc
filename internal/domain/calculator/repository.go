@@ -153,8 +153,7 @@ func (c *CalculatorRepository) CreateUserMacro(ctx context.Context, req *pbc.Cre
     RETURNING
       id, user_id, age, height, weight, gender, system, activity, activity_description,
       objective, objective_description, calories_distribution, calories_distribution_description,
-      protein, fats, carbs, bmr, tdee, goal, created_at, is_current
-  `
+      protein, fats, carbs, bmr, tdee, goal, created_at, is_current`
 
 	var macro pbc.UserMacroDistribution
 	var createdAt time.Time
@@ -208,4 +207,58 @@ func (c *CalculatorRepository) DeleteUserMacro(ctx context.Context, req *pbc.Del
 	}
 
 	return &pbc.DeleteUserMacroResponse{}, nil
+}
+
+func (c *CalculatorRepository) SetActiveUserMacro(ctx context.Context, userID, macroID string) (*pbc.UserMacroDistribution, error) {
+	tx, err := c.pgpool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to start transaction: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback(ctx)
+		}
+	}()
+
+	_, err = tx.Exec(ctx, `
+        UPDATE user_macro_distribution
+        SET is_current = false
+        WHERE user_id = $1
+    `, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to reset active macros: %w", err)
+	}
+
+	query := `
+        UPDATE user_macro_distribution
+        SET is_current = true
+        WHERE id = $1 AND user_id = $2
+        RETURNING
+            id, user_id, age, height, weight, gender, system, activity, activity_description,
+            objective, objective_description, calories_distribution, calories_distribution_description,
+            protein, fats, carbs, bmr, tdee, goal, created_at, is_current
+    `
+	row := tx.QueryRow(ctx, query, macroID, userID)
+
+	var macro pbc.UserMacroDistribution
+	var createdAt time.Time
+	var isCurrent bool
+
+	err = row.Scan(
+		&macro.Id, &macro.UserId, &macro.Age, &macro.Height, &macro.Weight, &macro.Gender,
+		&macro.System, &macro.Activity, &macro.ActivityDescription, &macro.Objective,
+		&macro.ObjectiveDescription, &macro.CaloriesDistribution, &macro.CaloriesDistributionDescription,
+		&macro.Protein, &macro.Fats, &macro.Carbs, &macro.Bmr, &macro.Tdee, &macro.Goal,
+		&createdAt, &isCurrent,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to scan updated macro: %w", err)
+	}
+	macro.CreatedAt = timestamppb.New(createdAt)
+
+	if err = tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return &macro, nil
 }

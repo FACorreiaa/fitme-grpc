@@ -31,6 +31,7 @@ type CalculatorRepository interface {
 	GetUsersMacros(ctx context.Context, req *pbc.GetAllUserMacrosRequest) (*pbc.GetAllUserMacrosResponse, error)
 	GetUserMacros(ctx context.Context, req *pbc.GetUserMacroRequest) (*pbc.GetUserMacroResponse, error)
 	DeleteUserMacro(ctx context.Context, req *pbc.DeleteUserMacroRequest) (*pbc.DeleteUserMacroResponse, error)
+	SetActiveUserMacro(ctx context.Context, userID, macroID string) (*pbc.UserMacroDistribution, error)
 }
 
 type RepositoryActivity interface {
@@ -102,7 +103,7 @@ type MealPlanRepository interface {
 	CreateMealPlan(ctx context.Context, req *pbml.CreateMealPlanReq) (*pbml.XMealPlan, error)
 	UpdateMealPlan(ctx context.Context, req *pbml.UpdateMealPlanReq) (*pbml.XMealPlan, error)
 	DeleteMealPlan(ctx context.Context, req *pbml.DeleteMealPlanReq) (*pbml.NilRes, error)
-
+	GetUserCalorieLimit(ctx context.Context, userId string) (float64, error)
 	GetMeal(ctx context.Context, req *pbml.GetMealReq) (*pbml.XMeal, error)
 	GetMeals(ctx context.Context, req *pbml.GetMealsReq) ([]*pbml.XMeal, error)
 	CreateMeal(ctx context.Context, req *pbml.CreateMealReq) (*pbml.XMeal, error)

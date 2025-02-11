@@ -2080,18 +2080,6 @@ func (m *MealPlanRepository) CreateMealPlan(ctx context.Context, req *pbml.Creat
 		totalMealNutrients.Sodium += meal.TotalMealNutrients.Sodium
 		totalMealNutrients.Potassium += meal.TotalMealNutrients.Potassium
 
-		// Create service to set limit
-		dailyLimit, err := m.getUserCalorieLimit(ctx, req.MealPlan.UserId)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to get user’s calorie limit: %v", err)
-		}
-
-		if totalMealNutrients.Calories > dailyLimit {
-			log.Printf("Warning: user %s is exceeding daily limit by %v kcal", req.MealPlan.UserId,
-				totalMealNutrients.Calories-dailyLimit)
-			// Possibly set a field in the response that warns the client, or request a confirm
-		}
-
 		// Query or create meal
 		var mealID string
 		err = m.pgpool.QueryRow(ctx, `
@@ -2308,7 +2296,7 @@ func (m *MealPlanRepository) DeleteMealPlan(ctx context.Context, req *pbml.Delet
 	return &pbml.NilRes{}, nil
 }
 
-func (m *MealPlanRepository) getUserCalorieLimit(ctx context.Context, userId string) (float64, error) {
+func (m *MealPlanRepository) GetUserCalorieLimit(ctx context.Context, userId string) (float64, error) {
 	var limit float64
 
 	// Query the user’s current macro

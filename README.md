@@ -1,188 +1,146 @@
-# fitme-grpc
+# FitME-gRPC
 
-Rewrite of the FitME rest version to a  gRPC infrastructure with a strong emphasis on middleware, tracing, and logging integration.
-The use of a shared proto directory and containerized service architecture gives plenty of flexibility in handling upstream services and dependencies.
+Rewrite of the FitME REST version to a gRPC infrastructure with a strong emphasis on middleware, tracing, and logging integration.
+By sharing proto definitions and containerizing services, this project achieves flexible inter-service communication while ensuring proper context propagation, error handling, and telemetry across the stack.
 
-The approach to middleware management—ensuring correct ordering for context propagation, handling panics, and managing logs and metrics, wrapping OpenTelemetry's middleware for future-proofing against breaking changes.
+## Overview
+FitME-gRPC is a rewrite of the original FitME REST API into a gRPC-based service architecture. The project is built with a strong emphasis on robust middleware management, comprehensive tracing and logging, and seamless integration with modern observability tools (Prometheus, Grafana, Loki, Tempo). It aims to improve scalability and maintainability while providing enhanced telemetry and debugging capabilities.
 
-TODO
- - Fix Prometheus [x]
- - Loki [x]
- - Tempo [x]
- - Complete Grafana (In production, configure ingres and point to prometheus-grafana)
- - All above with Kubernetes [x]
- - Finish postgres and redis exporter [x]
- - Finish all services
- - Message system to communicate between PT and its clients (add communications between Institution and PTs?)
- - Kafka (?) message queue system and notifications between users and PTs
- - PDF builder: https://github.com/johnfercher/maroto
- - CSV and Excel builder: check Domonda
-- K8s deployment
-- Where to deploy ?
+## Architecture & Technology Stack
 
+- Backend:
+1. Language: Go (Golang)
+2. Communication: gRPC with shared proto definitions
+3. Middleware: Custom middleware layers wrapping OpenTelemetry for tracing, logging, and metrics
+4. Database: PostgreSQL
+5. Caching: Redis
 
-## Traces
-- Exporters: Stdout, Jaeger, Zipkin, Datadog and OpenTelemetry (OTLP) collector
-- Importers: OpenTracingShim
-## Metrics
-- Exporters: Prometheus, Datadog, and OpenTelemetry (OTLP) collector
-- Importers: SwiftMetricsShim
-## Logs
-- Exporters: OpenTelemetry (OTLP) collector
+- Telemetry:
+1. Tracing: Stdout, Jaeger, Zipkin, Datadog, and OTLP collector
+2. Metrics: Prometheus, Datadog, and OTLP collector
+3. Logs: OTLP collector (integrated with Loki)
+4. Containerization: Docker (with Kubernetes deployment for production)
 
-Docker compose just for local testing, telemetry services not relevant in there but all working within Kubernetes.
-For dev:
-Tempo => kubectl port-forward svc/tempo 4317 -n monitoring
-Grafana => kubectl port-forward svc/grafana 3000:80 -n monitoring
-Prometheus => kubectl port-forward prometheus-prometheus-kube-prometheus-prometheus-0 9090 -n monitoring
+- Other Tools:
+1. PDF builder: Maroto
+2. CSV/Excel builder: (see Domonda for inspiration)
 
-# Leaderboard feature
-=> I am thinking about opening the user platform so every user can see other users progress and plans made etc and introducing a leaderboard system with points for achievements completed. :aPES_Think:
-This only for regular users. A "PT" would still only manage their own clients and not see other "PT" clients, obviously.
+## Core Features
+- gRPC Infrastructure:
+Fully containerized and using gRPC for high-performance communication between services.
 
-=> maybe you want progress to be anonymized too. so people can only see the progress in terms of % towards some goal
+- Middleware Management:
+Ensures proper ordering for context propagation, panic handling, logging, and metrics collection. Uses wrappers around OpenTelemetry middleware to guard against breaking changes.
 
-=> i'm not too sure how embarrassed people are about their fitness goals. but it's one of the main things that keeps them out of gyms from what i can tell reading on the internet
+- Observability:
+Integrated with multiple telemetry backends including Prometheus, Grafana, Loki, Tempo, and Jaeger.
 
-=> :pog: progress leaderboard for friends who train together. can of worms to get into, you want the leaderboards to
-have customizable goals (absolute/relative/custom) be public/private  look cute
+- Data Exporters:
+Support for PostgreSQL, Redis exporters, and integration with message systems for notifications (e.g., Kafka).
 
-# FitSynch
-FitSynch is a fantastic idea with immense potential in the health and fitness space! By blending personal training management with advanced features like AI-powered assistance for meal planning and shopping, you’re addressing critical pain points for both personal trainers and users. Here's how you could approach and structure the project:
+## Telemetry
+### Traces
+- Exporters:
+Stdout
+Jaeger
+Zipkin
+Datadog
+OpenTelemetry (OTLP) Collector
+- Importers:
+OpenTracingShim
 
-Project Features
-Version 1: Core Features
+### Metrics
+- Exporters:
+Prometheus
+Datadog
+OpenTelemetry (OTLP) Collector
+- Importers:
+SwiftMetricsShim
+Logs
+Exporters:
+OpenTelemetry (OTLP) Collector
+(Integrated with Loki for log aggregation)
 
-## User Management for Personal Trainers
+## Service Integration
+- Proto Sharing:
+A shared proto directory is used for service communication across the architecture.
+- Containerized Services:
+Docker Compose is used for local testing, while Kubernetes is used in production for scalability and high availability.
+- Middleware Pipeline:
+Middleware ensures correct ordering of interceptors for tracing, logging, and metrics (e.g., Prometheus and OTEL interceptors).
 
-- Enable trainers to manage their users efficiently.
-Features for assigning workout plans, meal plans, and tracking user progress.
-Messaging/chat functionality for real-time communication between trainers and users.
-Workout Plans
+## Deployment & Kubernetes
+Local Testing:
 
-- Allow trainers to create and assign personalized workout plans.
-Users can view their daily/weekly workouts with video tutorials or animations for exercises.
-Meal Plans
+- Tempo:
 
-- Create and assign customizable meal plans for users.
-Include macros (calories, protein, fats, carbs) for each meal.
-Support for different diets (e.g., keto, vegan, gluten-free).
-Ingredients and Recipes
+```kubectl port-forward svc/tempo 4317 -n monitoring```
+- Grafana:
+```kubectl port-forward svc/grafana 3000:80 -n monitoring```
+Prometheus:
+```kubectl port-forward prometheus-prometheus-kube-prometheus-prometheus-0 9090 -n monitoring```
+Production Deployment:
+- All telemetry services (Prometheus, Grafana, Loki, Tempo, etc.) are deployed on Kubernetes.
+- Ingress configuration should be updated in production to point to the proper Grafana/Prometheus endpoints.
 
-- Database of ingredients with nutritional information (calories, protein, etc.).
-Recipe creation and sharing between trainers and users.
-Automatic generation of shopping lists based on recipes and meal plans.
-Shopping List Generator
+### Additional Features
+- Leaderboard Feature
+Concept:
+Open the user platform to allow regular users to see progress, plans, and achievements.
+- Privacy:
+Consider anonymizing data and providing customizable, public or private leaderboards.
+- Customization:
+Allow users to define goals (absolute, relative, custom) and compare progress with friends or community members.
 
-- Generate a consolidated shopping list from the user's meal plan.
-Allow users to check off items as they shop.
-Trainer Dashboard
+## FitSynch
+FitSynch expands the FitME concept by integrating personal training management with AI-powered meal planning and shopping assistance.
+Key Components:
 
-A dedicated dashboard for trainers to manage users, view progress, assign plans, and track payments.
+- User Management for Trainers:
+Manage clients, assign workout/meal plans, and communicate via messaging.
+- Workout & Meal Plans:
+Create personalized workout plans with video tutorials and customizable meal plans with macro breakdowns.
+- Ingredients, Recipes, and Shopping List Generator:
+Build a database of nutritional data, share recipes, and automatically generate shopping lists.
+- AI-Powered Assistance:
+1. Meal Plan AI: Suggest meals based on preferences and dietary restrictions.
+2. Shopping AI: Provide calorie breakdowns, healthier alternatives, and cost-saving suggestions.
+3. Fitness Insights: Analyze user progress and recommend workout adjustments.
+- Trainer Dashboard:
+A centralized dashboard for trainers to manage clients, view progress, and handle payments.
 
-## Version 2: AI-Powered Assistance
-- AI for Meal Plans
+### Meal Plan Validation
+- Purpose:
+Ensure that a meal plan aligns with the user's objective (e.g., maintenance mode should not exceed a specific calorie goal).
+- Guidance:
+Warn users if their meal plan exceeds their objective's calorie goal, allowing for adjustments or confirmations.
+- Flexibility:
+Optionally allow overrides while logging such events for further review.
 
-Suggest meals or recipes based on user preferences, dietary restrictions, and caloric goals.
-Dynamically adjust plans based on the user's progress or feedback.
-AI for Shopping Assistance
+- TODO / Future Work
 
-While shopping, users can scan items, and the AI provides:
-Calorie breakdown.
-Healthier alternatives.
-Cost-saving suggestions.
-Fitness Insights
+[x] Fix Prometheus integration
+[x]Configure Loki integration
+[x]Configure Tempo integration
+[x]Complete Grafana configuration for production (configure ingress and point to Prometheus)
+[x]Kubernetes deployment for all services
+[x]Finalize PostgreSQL and Redis exporters
+[]Finalize all remaining services
+[]Implement a messaging system for communication between personal trainers (PTs) and clients
+[]Integrate Kafka (or similar) for message queue and notifications
+[]Add PDF builder (using Maroto)
+[]Add CSV and Excel builders (see Domonda for reference)
+[]Further enhance security, data privacy, and RBAC
+[]Finalize the leaderboard feature and FitSynch enhancements
 
-AI analyzes user activity, progress, and goals to recommend workout changes or improvements.
-Habit Tracking
+### Access Telemetry UIs:
 
-Track habits like water intake, sleep, or meditation alongside workouts and meals.
-AI Chatbot for Instant Help
+Grafana: http://localhost:3000
+Jaeger: http://localhost:16686
+Prometheus: http://localhost:9090
+Loki: Use the mapped port (e.g., http://localhost:3100 for API requests)
+Kubernetes (Production):
+Follow the Kubernetes deployment manifests and use port-forwarding as outlined in the Deployment & Kubernetes section for accessing services locally.
 
-Provide users with a chatbot to answer fitness and nutrition questions instantly.
-
-**Tech Stack**
-_Frontend_
-Flutter or React Native: Cross-platform mobile app for iOS and Android.
-Web-based dashboard for trainers using React.js or Angular.
-
-_Backend_
-Go (Golang): High-performance backend to handle user data, workout plans, and meal plans.
-gRPC for communication between services.
-PostgreSQL for relational data like user profiles, workouts, and meal plans.
-Redis for caching and rate-limiting.
-Docker for containerization.
-
-_AI Integration_
-Python for AI models (using libraries like TensorFlow or PyTorch).
-Integrate AI through REST APIs or gRPC.
-Cloud
-Use AWS, Google Cloud, or Azure for hosting.
-AI models hosted on GPU instances for better performance.
-
-**Key Challenges**
-Data Privacy: Ensure the secure handling of sensitive health data.
-
-Use encryption for user data at rest and in transit.
-Implement role-based access control (RBAC) for trainers and users.
-
-_AI Training:_
-
-Collect anonymized data for AI training to provide meaningful suggestions.
-Partner with nutritionists or fitness experts to train AI models accurately.
-Scaling:
-
-Design for scalability to handle a growing user base and complex features like AI.
-Use microservices architecture for independent scaling of modules.
-
-## Revenue Model
-**Subscription Plans**
-
-For Users: Monthly or annual subscriptions to access premium features like AI assistance and personalized plans.
-For Trainers: Tiered pricing based on the number of users they manage.
-Marketplace
-
-- Sell premium workout plans, recipes, and AI-generated meal plans.
-Affiliate Revenue
-
-- Partnerships with fitness brands, grocery stores, or health products for recommendations.
-White-label Offering
-
-- Allow gyms or fitness studios to use the platform under their branding.
-
-**Example User Stories**
-User:
-Jane wants to lose weight and signs up for FitSynch.
-Her trainer assigns her a custom workout and meal plan.
-While shopping, Jane scans a product, and the AI suggests a healthier and cheaper alternative.
-Jane tracks her progress weekly, and the AI adjusts her goals dynamically.
-Trainer:
-Mike is a personal trainer managing 15 clients on FitSynch.
-He assigns meal plans and workouts through the dashboard, customizing them as needed.
-Mike uses AI insights to tweak Jane’s plan after analyzing her weekly progress.
-
-## MVP Launch Plan
-**Core Features**: Focus on user management, workout and meal plans, and shopping lists.
-**Trainer Dashboard**: Ensure trainers can manage users effectively.
-**Scalability**: Prepare infrastructure for AI integrations.
-**Marketing**: Launch with gyms and personal trainers as early adopters.
-
-# FitSynch’s Vision
-FitSynch combines the best of personal training, nutrition management, and AI. It empowers users to achieve their fitness goals while helping trainers scale their services. With a seamless blend of human expertise and AI-driven insights, it has the potential to disrupt the fitness industry.
-
-# Meal Plan Validation
-
-## 1.Maintaining the Objective
-The objective (e.g., "maintenance") typically aligns with a specific calorie goal (e.g., 2500 kcal). Allowing the user to create a meal plan that exceeds this goal could be counterproductive, as it would contradict the objective.
-For example, if a user is in maintenance mode, and the system tells them their calorie goal is 2500 kcal, then creating a meal plan that pushes them beyond this could affect the expected outcome of their dietary plan (e.g., leading to weight gain if the goal is maintenance).
-## 2. User Guidance and Intent
-By enforcing a calorie limit (based on their objective), you are providing guidance to the user on what is a reasonable meal plan for their goal. This improves the overall user experience and ensures they don't unintentionally exceed the calorie goals they’ve set, especially if they lack knowledge about how to balance macros and calories.
-It also helps prevent the user from getting overwhelmed by a system that could potentially create unhealthy eating habits due to lack of restrictions.
-## 3.Flexibility with Limits
-While it's beneficial to enforce a limit, you might want to allow some flexibility. For instance:
-Warning messages: You can let the user know if they exceed their calorie goal, and allow them to confirm or adjust the plan.
-Custom limits: Users might want to override this rule occasionally (e.g., for a special meal plan). In such cases, you could allow users to set custom goals or acknowledge the warning before proceeding.
-## 4.Implementation Strategy
-- Option 1: Enforce strict limits – Prevent users from creating a meal plan that exceeds their calorie goal (2500 kcal) for that objective.
-- Option 2: Warning with flexibility – Allow the meal plan to be saved even if it exceeds the calorie goal, but show a warning message to the user (e.g., "The meal plan exceeds your maintenance calorie goal by X kcal. Are you sure you want to proceed?").
-- Option 3: Optional overrides – Allow users to override the limit, but log this decision or require additional confirmation (e.g., "Are you sure you want to proceed with this meal plan that exceeds your calorie goal?").
+Contributing
+Contributions are welcome! Please fork the repository, create your feature branch, and submit a pull request. Ensure that your changes are covered by appropriate tests and documentation updates.

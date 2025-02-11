@@ -29,6 +29,7 @@ services:
     depends_on:
       - postgres
       - redis
+      - otel-collector
     logging:
       driver: loki
       options:
@@ -119,14 +120,13 @@ services:
       - "3000:3000"
     volumes:
       - ./config/docker/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+      - ./config/dashboards/:/var/lib/grafana/dashboards
+
     environment:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
       - GF_AUTH_DISABLE_LOGIN_FORM=true
       - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor
-    depends_on:
-      - prometheus
-      - tempo
     networks:
       - fit-me
 
@@ -161,13 +161,13 @@ services:
     networks:
       - fit-me
 
-  k6-tracing:
-    image: ghcr.io/grafana/xk6-client-tracing:v0.0.5
-    environment:
-      - ENDPOINT=otel-collector:4317
-    restart: always
-    depends_on:
-      - otel-collector
+#  k6-tracing:
+#    image: ghcr.io/grafana/xk6-client-tracing:v0.0.5
+#    environment:
+#      - ENDPOINT=otel-collector:4317
+#    restart: always
+#    depends_on:
+#      - otel-collector
 
 networks:
   fit-me:

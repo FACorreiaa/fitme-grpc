@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"errors"
@@ -215,6 +216,11 @@ func calculateUserPersonalMacros(ctx context.Context, params UserParams) (UserIn
 		return UserInfo{}, err
 	}
 
+	gender := strings.ToLower(params.Gender)
+	if gender != "male" && gender != "female" {
+		return UserInfo{}, fmt.Errorf("gender must be 'male' or 'female'")
+	}
+
 	aEnum, err := StringToActivityEnum(params.Activity) // Convert to pb.Activity
 	if err != nil {
 		return UserInfo{}, fmt.Errorf("invalid activity: %s", params.Activity)
@@ -321,11 +327,16 @@ func (s *CalculatorService) CreateUserMacro(ctx context.Context, req *pb.CreateU
 		return nil, status.Error(codes.InvalidArgument, "user macro cannot be nil")
 	}
 
+	parsedGender, err := ParseGender(req.UserMacro.Gender.String())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
 	params := UserParams{
 		Age:      uint16(req.UserMacro.Age),
 		Height:   uint16(req.UserMacro.Height),
 		Weight:   uint16(req.UserMacro.Weight),
-		Gender:   req.UserMacro.Gender.String(),
+		Gender:   strings.ToLower(parsedGender.String()),
 		System:   req.UserMacro.System.String(),
 		Activity: req.UserMacro.Activity.String(),
 		//ActivityDesc:     req.UserMacro.ActivityDescription,
@@ -566,7 +577,31 @@ func StringToActivityEnum(s string) (pb.Activity, error) {
 }
 
 func (s *CalculatorService) SetActiveUserMacro(ctx context.Context, req *pb.SetActiveUserMacroRequest) (*pb.SetActiveUserMacroResponse, error) {
-	return nil, nil
+	tracer := otel.Tracer("FitSphere")
+	ctx, span := tracer.Start(ctx, "SetActiveUserMacro")
+	defer span.End()
+
+	if req.GetUserId() == "" || req.GetMacroId() == "" {
+		err := status.Error(codes.InvalidArgument, "user_id and macro_id must be provided")
+		span.RecordError(err)
+		return nil, err
+	}
+
+	currentMacro, err := s.repo.SetActiveUserMacro(ctx, req.GetUserId(), req.GetMacroId())
+	if err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.type", fmt.Sprintf("%T", err)))
+		return nil, status.Errorf(codes.Internal, "failed to set active macro: %v", err)
+	}
+
+	span.SetAttributes(
+		attribute.String("user.id", req.GetUserId()),
+		attribute.String("macro.id", req.GetMacroId()),
+	)
+
+	return &pb.SetActiveUserMacroResponse{
+		CurrentMacro: currentMacro,
+	}, nil
 }
 
 func parseCaloriesDistribution(s string) pb.CaloriesDistribution {
@@ -582,5 +617,16 @@ func parseCaloriesDistribution(s string) pb.CaloriesDistribution {
 	default:
 		// Return a default if the string is unknown
 		return pb.CaloriesDistribution_CD_UNSPECIFIED
+	}
+}
+
+func ParseGender(input string) (pb.Gender, error) {
+	switch strings.ToLower(strings.TrimSpace(input)) {
+	case "male":
+		return pb.Gender_MALE, nil
+	case "female":
+		return pb.Gender_FEMALE, nil
+	default:
+		return pb.Gender_GENDER_UNSPECIFIED, fmt.Errorf("gender must be 'male' or 'female'")
 	}
 }

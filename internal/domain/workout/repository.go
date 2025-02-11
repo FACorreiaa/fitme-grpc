@@ -522,7 +522,7 @@ func (r *RepositoryWorkout) CreateWorkoutPlan(ctx context.Context, req *pbw.Inse
 		return &pbw.InsertWorkoutPlanRes{}, status.Error(codes.Internal, "failed to commit transaction")
 	}
 
-	//logger.Info("Workout plan created successfully", zap.String("workout_id", newWorkoutPlan.WorkoutId))
+	logger.Info("Workout plan created successfully", zap.String("workout_id", newWorkoutPlan.WorkoutId))
 
 	// Ensure insertedPlan is not nil before returning
 	//if insertedPlan == nil {
