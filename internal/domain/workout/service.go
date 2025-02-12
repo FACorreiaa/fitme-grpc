@@ -696,3 +696,21 @@ func (s ServiceWorkout) UpdateWorkoutPlan(ctx context.Context, req *pbw.UpdateWo
 
 	return res, nil
 }
+
+func (s ServiceWorkout) DownloadWorkoutPlanRequest(ctx context.Context, req *pbw.DownloadWorkoutPlanRequest) (*pbw.FileChunk, error) {
+	if req.WorkoutPlanId == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "req id is required")
+	}
+	tracer := otel.Tracer("FitSphere")
+	ctx, span := tracer.Start(ctx, "Workout/UpdateWorkoutPlan")
+	defer span.End()
+
+	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request id not found in context")
+	}
+
+	if req.Request == nil {
+		req.Request = &pbw.BaseRequest{}
+	}
+}
