@@ -1,9 +1,13 @@
 package workout
 
 import (
+	"bytes"
 	"context"
+	"encoding/csv"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	pbw "github.com/FACorreiaa/fitme-protos/modules/workout/generated"
@@ -697,20 +701,153 @@ func (s ServiceWorkout) UpdateWorkoutPlan(ctx context.Context, req *pbw.UpdateWo
 	return res, nil
 }
 
-func (s ServiceWorkout) DownloadWorkoutPlanRequest(ctx context.Context, req *pbw.DownloadWorkoutPlanRequest) (*pbw.FileChunk, error) {
+func (s ServiceWorkout) DownloadWorkoutPlanRequest(ctx context.Context, req *pbw.DownloadWorkoutPlanRequest, stream pbw.Workout_DownloadWorkoutPlanServer) (err error) {
 	if req.WorkoutPlanId == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "req id is required")
+		return status.Errorf(codes.InvalidArgument, "req id is required")
 	}
 	tracer := otel.Tracer("FitSphere")
 	ctx, span := tracer.Start(ctx, "Workout/UpdateWorkoutPlan")
 	defer span.End()
 
+	var fileData []byte
+	var fileName, contentType string
 	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
 	if !ok {
-		return nil, status.Error(codes.Internal, "request id not found in context")
+		return status.Error(codes.Internal, "request id not found in context")
 	}
 
-	if req.Request == nil {
-		req.Request = &pbw.BaseRequest{}
+	baseReq := &pbw.BaseRequest{
+		Downstream: "todo",
+		RequestId:  requestID,
 	}
+
+	workoutPlanReq := &pbw.GetWorkoutPlanReq{
+		WorkoutPlanId: req.WorkoutPlanId,
+		Request:       baseReq,
+	}
+
+	workoutPlan, err := s.repo.GetWorkoutPlan(ctx, workoutPlanReq)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failed to download workout plan request: %v", err)
+	}
+
+	switch req.Format {
+	case pbw.FileFormat_CSV:
+		fileData, fileName, contentType, err = generateCSV(ctx, workoutPlan)
+	case pbw.FileFormat_PDF:
+		fileData, fileName, contentType, err = generatePDF(ctx, workoutPlan)
+	case pbw.FileFormat_EXCEL:
+		fileData, fileName, contentType, err = generateExcel(ctx, workoutPlan)
+	default:
+		return status.Errorf(codes.InvalidArgument, "unknown format")
+	}
+
+	if err != nil {
+		return status.Errorf(codes.Internal, "failed to download workout plan request: %v", err)
+	}
+
+	const chunkSize = 64 * 1024
+	for current := 0; current < len(fileData); current += chunkSize {
+		end := current + chunkSize
+		if end > len(fileData) {
+			end = len(fileData)
+		}
+
+		chunk := &pbw.FileChunk{
+			Content: fileData[current:end],
+		}
+
+		if current == 0 {
+			// add some metadata on the first chunk
+			chunk.IsFirstChunk = true
+			chunk.FileName = fileName
+			chunk.ContentType = contentType
+		}
+
+		if err = stream.Send(chunk); err != nil {
+			return status.Errorf(codes.Internal, "failed to download workout plan request: %v", err)
+		}
+	}
+
+	span.SetAttributes(
+		attribute.String("request.id", workoutPlanReq.Request.RequestId),
+		attribute.String("request.details", workoutPlanReq.String()))
+
+	return nil
+
+}
+
+func generateCSV(ctx context.Context, workoutPlan *pbw.GetWorkoutPlanRes) ([]byte, string, string, error) {
+	if workoutPlan == nil || workoutPlan.WorkoutPlan == nil {
+		return nil, "", "", errors.New("no workout plan provided")
+	}
+
+	plan := workoutPlan.WorkoutPlan
+
+	var buf bytes.Buffer
+	writer := csv.NewWriter(&buf)
+
+	header := []string{
+		"workout_plan_id",
+		"user_id",
+		"description",
+		"notes",
+		"rating",
+		"day",
+		"exercises",
+	}
+
+	if err := writer.Write(header); err != nil {
+		return nil, "", "", fmt.Errorf("failed to write CSV header: %w", err)
+	}
+
+	// If the proto eventually uses repeated WorkoutDayResponse, handle each day.
+	if len(plan.WorkoutDay) > 0 {
+		for _, wd := range plan.WorkoutDay {
+			record := []string{
+				plan.WorkoutPlanId,
+				plan.UserId,
+				plan.Description,
+				plan.Notes,
+				strconv.Itoa(int(plan.Rating)),
+				wd.Day,
+				strings.Join(wd.Exercises, ", "),
+			}
+			if err := writer.Write(record); err != nil {
+				return nil, "", "", fmt.Errorf("failed to write CSV record: %w", err)
+			}
+		}
+	} else {
+		// Fallback: use plan.Day and plan.Exercises
+		record := []string{
+			plan.WorkoutPlanId,
+			plan.UserId,
+			plan.Description,
+			plan.Notes,
+			strconv.Itoa(int(plan.Rating)),
+			plan.Day,
+			strings.Join(plan.Exercises, ", "),
+		}
+		if err := writer.Write(record); err != nil {
+			return nil, "", "", fmt.Errorf("failed to write CSV record: %w", err)
+		}
+	}
+
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return nil, "", "", fmt.Errorf("error flushing CSV writer: %w", err)
+	}
+
+	fileName := "workout_plan.csv"
+	contentType := "text/csv"
+
+	return buf.Bytes(), fileName, contentType, nil
+}
+
+func generateExcel(ctx context.Context, workoutPlan *pbw.GetWorkoutPlanRes) ([]byte, string, string, error) {
+	return nil, "", "", nil
+}
+
+func generatePDF(ctx context.Context, workoutPlan *pbw.GetWorkoutPlanRes) ([]byte, string, string, error) {
+	return nil, "", "", nil
 }
