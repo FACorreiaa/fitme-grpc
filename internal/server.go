@@ -37,15 +37,12 @@ func ServeGRPC(ctx context.Context, port string, container *ServiceContainer, re
 	log := logger.Log
 
 	// Initialize OpenTelemetry trace provider with options as needed
-	exp, err := grpctracing.NewOTLPExporter(ctx)
+	err := grpctracing.InitOTELToCollector(ctx)
 	if err != nil {
 		return errors.Wrap(err, "failed to configure OpenTelemetry trace provider")
 	}
-	tp := grpctracing.NewTraceProvider(exp)
-	defer func() { _ = tp.Shutdown(ctx) }()
 
-	otel.SetTracerProvider(tp)
-	//tracer = tp.Tracer("myapp")
+	tp := otel.GetTracerProvider()
 
 	// Bootstrap the gRPC server
 	server, listener, err := grpc.BootstrapServer(port, log, reg, tp)

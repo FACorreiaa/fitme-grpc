@@ -53,4 +53,5 @@ service:
 
     logs:
       receivers: [otlp]
+      processors: [ ]        # (none or optional)
       exporters: [debug, otlphttp/loki]

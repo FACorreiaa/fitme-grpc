@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	sdktrace "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
@@ -115,24 +116,24 @@ import (
 //	return lastErr
 //}
 
-func NewOTLPExporter(ctx context.Context) (trace.SpanExporter, error) {
-	// Change default HTTPS -> HTTP
-	log := logger.Log
-	otlpEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
-	fmt.Printf("otlp endpoint %s\n", otlpEndpoint)
-	if otlpEndpoint == "" {
-		log.Error("You MUST set OTEL_EXPORTER_OTLP_TRACES_ENDPOINT env variable!")
-	}
-
-	insecureOpt := sdktrace.WithInsecure()
-
-	// Update default OTLP reciver endpoint
-	endpointOpt := sdktrace.WithEndpoint(otlpEndpoint)
-
-	//timeout := otlptracehttp.WithTimeout(30 * time.Second)
-
-	return sdktrace.New(ctx, insecureOpt, endpointOpt)
-}
+//func NewOTLPExporter(ctx context.Context) (trace.SpanExporter, error) {
+//	// Change default HTTPS -> HTTP
+//	log := logger.Log
+//	otlpEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
+//	fmt.Printf("otlp endpoint %s\n", otlpEndpoint)
+//	if otlpEndpoint == "" {
+//		log.Error("You MUST set OTEL_EXPORTER_OTLP_TRACES_ENDPOINT env variable!")
+//	}
+//
+//	insecureOpt := sdktrace.WithInsecure()
+//
+//	// Update default OTLP reciver endpoint
+//	endpointOpt := sdktrace.WithEndpoint(otlpEndpoint)
+//
+//	//timeout := otlptracehttp.WithTimeout(30 * time.Second)
+//
+//	return sdktrace.New(ctx, insecureOpt, endpointOpt)
+//}
 
 func NewTraceProvider(exp trace.SpanExporter) *trace.TracerProvider {
 	r, err := resource.Merge(
@@ -148,4 +149,43 @@ func NewTraceProvider(exp trace.SpanExporter) *trace.TracerProvider {
 	return trace.NewTracerProvider(
 		trace.WithBatcher(exp),
 		trace.WithResource(r))
+}
+
+func InitOTELToCollector(ctx context.Context) error {
+	log := logger.Log
+	otlpEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
+	fmt.Printf("otlp endpoint %s\n", otlpEndpoint)
+	if otlpEndpoint == "" {
+		log.Error("You MUST set OTEL_EXPORTER_OTLP_TRACES_ENDPOINT env variable!")
+	}
+
+	exp, err := otlptracegrpc.New(ctx,
+		otlptracegrpc.WithEndpoint(otlpEndpoint),
+		otlptracegrpc.WithInsecure(),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create otlp trace exporter: %w", err)
+	}
+
+	// Create a Resource describing this application/service.
+	// This adds standard attributes like service.name, service.version, etc.
+	res, err := resource.New(ctx,
+		resource.WithAttributes(
+			semconv.ServiceNameKey.String("score-app"),
+			semconv.ServiceVersionKey.String("1.0.0"),
+		),
+	)
+	if err != nil {
+		return fmt.Errorf("failed creating resource: %w", err)
+	}
+
+	// Create a TracerProvider with a batch span processor and the OTLP exporter.
+	tp := trace.NewTracerProvider(
+		trace.WithBatcher(exp),
+		trace.WithResource(res),
+	)
+
+	// Finally, set the global TracerProvider.
+	otel.SetTracerProvider(tp)
+	return nil
 }

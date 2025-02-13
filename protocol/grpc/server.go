@@ -20,93 +20,74 @@ import (
 	"github.com/FACorreiaa/fitme-grpc/protocol/grpc/middleware/session"
 )
 
-// BootstrapServer creates a new gRPC server with the base middleware included.
-// We ignore the first return value from each of the interceptors as we only
-// need the server interceptors.
+// BootstrapServer creates a gRPC server preconfigured with interceptors for
+// tracing, Prometheus metrics, logging, rate limiting, etc.
 func BootstrapServer(
 	port string,
 	log *zap.Logger,
 	registry *prometheus.Registry,
-	traceProvider trace.TracerProvider,
+	traceProvider trace.TracerProvider, // [currently not used directly, but available if needed]
 	opts ...grpc.ServerOption,
 ) (*grpc.Server, net.Listener, error) {
-	// setup basic metrics
 
-	// initiate the listener
+	// Create a TCP listener on the specified port.
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to create listener")
 	}
 
-	// set redis cache
-	//newCache, _ := grpccacherequests.NewCache()
-
-	// -- Prometheus interceptor Setup
+	// Prometheus interceptors setup.
 	promCollectors := grpcprometheus.NewPrometheusMetricsCollectors()
-	// Must be called before using Prometheus interceptors
-	err = grpcprometheus.RegisterMetrics(registry, promCollectors)
+	if err := grpcprometheus.RegisterMetrics(registry, promCollectors); err != nil {
+		return nil, nil, errors.Wrap(err, "failed to register Prometheus metrics")
+	}
 	_, promInterceptor, err := grpcprometheus.Interceptors(promCollectors)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to create Prometheus interceptors")
 	}
 
-	// -- OpenTelemetry interceptor setup
-	//otel.SetTracerProvider(traceProvider)
-	//otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
-	//	propagation.TraceContext{},
-	//	propagation.Baggage{},
-	//))
-
+	// OpenTelemetry tracing interceptors. (Span creation, context propagation)
 	_, spanInterceptor := grpcspan.Interceptors()
-	_, serverInterceptor, _ := grpcprometheus.Interceptors(promCollectors)
-	// -- Zap logging interceptor setup
-	_, logInterceptor := grpclog.Interceptors(log)
-	// -- Recovery interceptor setup
-	_, recoveryInterceptor := grpcrecovery.Interceptors(grpcrecovery.RegisterMetrics(registry))
-	// session
-	sessionInterceptor := session.InterceptorSession()
-	requestGeneratorSession := grpcrequest.RequestIDMiddleware()
-	//globalRateLimiter := grpcratelimit.Interceptors()
 
+	// Additional interceptors:
+	_, logInterceptor := grpclog.Interceptors(log)
+	_, recoveryInterceptor := grpcrecovery.Interceptors(grpcrecovery.RegisterMetrics(registry))
+	sessionInterceptor := session.InterceptorSession()
+	requestIDInterceptor := grpcrequest.RequestIDMiddleware()
+
+	// Simple rate limiter for demonstration (10 requests/sec, 20 burst).
 	rateLimiter := grpcratelimit.NewRateLimiter(10, 20)
-	//cache := grpccacherequests.UnaryCachingInterceptor(newCache)
-	// Configure server options from our base configuration
+
+	// Base gRPC server options.
 	serverOptions := []grpc.ServerOption{
+		// Adjust keepalive.
 		grpc.KeepaliveEnforcementPolicy(middleware.KeepaliveEnforcementPolicy()),
 		grpc.KeepaliveParams(middleware.KeepAliveServerParams()),
 
-		// Note: Order of interceptors for the connection matters.
-		// Trace interceptor must be the first interceptor in the chain for cross-service spans
-		// to work correctly as it needs the original inbound context.
-
-		// Add the unary interceptors
+		// Chain all unary interceptors in an order that ensures correct context propagation.
 		grpc.ChainUnaryInterceptor(
-			spanInterceptor.Unary,
-			promInterceptor.Unary,
-			serverInterceptor.Unary,
-			logInterceptor.Unary,
-			sessionInterceptor,
-			requestGeneratorSession,
-			recoveryInterceptor.Unary,
-			rateLimiter.UnaryServerInterceptor(),
+			spanInterceptor.Unary,                // OTel first
+			promInterceptor.Unary,                // Prometheus
+			logInterceptor.Unary,                 // Logging
+			sessionInterceptor,                   // Session management
+			requestIDInterceptor,                 // Request ID injection
+			recoveryInterceptor.Unary,            // Recovery from panics
+			rateLimiter.UnaryServerInterceptor(), // Basic rate limiting
 		),
 
-		//grpc.StatsHandler(otelgrpc.NewServerHandler()),
-
-		// Add the stream interceptors
+		// Chain all stream interceptors.
 		grpc.ChainStreamInterceptor(
 			spanInterceptor.Stream,
 			promInterceptor.Stream,
-			serverInterceptor.Stream,
 			logInterceptor.Stream,
-			recoveryInterceptor.Stream,
 			recoveryInterceptor.Stream,
 		),
 	}
 
-	// Append any additional options passed in while connecting
+	// Include any additional options passed in.
 	serverOptions = append(serverOptions, opts...)
 
+	// Create the gRPC server.
 	server := grpc.NewServer(serverOptions...)
 
 	return server, listener, nil
