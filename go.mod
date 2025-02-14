@@ -1,9 +1,9 @@
 module github.com/FACorreiaa/fitme-grpc
 
-go 1.23.5
+go 1.24
 
 require (
-	github.com/FACorreiaa/fitme-protos v0.0.0-20250212220736-b39603dade77
+	github.com/FACorreiaa/fitme-protos v0.0.0-20250214222534-f109e11e341d
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0

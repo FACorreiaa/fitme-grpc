@@ -1,4 +1,4 @@
-FROM golang:1.23.4 AS builder
+FROM golang:1.24 AS builder
 
 LABEL maintainer="a11199"
 LABEL description="Base image fitme dev"
@@ -20,7 +20,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /app/fitme -ldflags="-w -s
 ENTRYPOINT ["/app/fitme"]
 
 # Development stage with hot reload
-FROM golang:1.23-alpine AS dev
+FROM golang:1.24 AS dev
 WORKDIR /app
 RUN go install github.com/air-verse/air@latest
 COPY go.mod go.sum ./

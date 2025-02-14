@@ -701,7 +701,7 @@ func (s ServiceWorkout) UpdateWorkoutPlan(ctx context.Context, req *pbw.UpdateWo
 	return res, nil
 }
 
-func (s ServiceWorkout) DownloadWorkoutPlanRequest(ctx context.Context, req *pbw.DownloadWorkoutPlanRequest, stream pbw.Workout_DownloadWorkoutPlanServer) (err error) {
+func (s ServiceWorkout) DownloadWorkoutPlan(ctx context.Context, req *pbw.DownloadWorkoutPlanRequest, stream pbw.Workout_DownloadWorkoutPlanServer) (err error) {
 	if req.WorkoutPlanId == "" {
 		return status.Errorf(codes.InvalidArgument, "req id is required")
 	}
