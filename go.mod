@@ -3,7 +3,7 @@ module github.com/FACorreiaa/fitme-grpc
 go 1.24
 
 require (
-	github.com/FACorreiaa/fitme-protos v0.0.0-20250215142340-31e063d4e2c1
+	github.com/FACorreiaa/fitme-protos v0.0.0-20250215162552-4d9502660cc5
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
@@ -11,7 +11,6 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.2.0
 	github.com/jackc/pgx/v5 v5.7.2
 	github.com/joho/godotenv v1.5.1
-	github.com/lib/pq v1.10.9
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.20.5
 	github.com/redis/go-redis/v9 v9.7.0

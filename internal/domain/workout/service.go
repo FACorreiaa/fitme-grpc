@@ -6,13 +6,15 @@ import (
 	"encoding/csv"
 	"errors"
 	"fmt"
-	"strconv"
+	"log"
+	"os"
 	"strings"
 	"time"
 
 	pbw "github.com/FACorreiaa/fitme-protos/modules/workout/generated"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
@@ -437,10 +439,6 @@ func (s ServiceWorkout) InsertExerciseWorkoutPlan(ctx context.Context, req *pbw.
 	return &pbw.NilRes{}, nil
 }
 
-//func (s ServiceWorkout) DeleteExerciseWorkoutPlan(ctx context.Context, req *pbw.DeleteExerciseByIdWorkoutPlanReq) *pbw.NilRes {
-//	return nil
-//}
-
 // InsertWorkoutPlan Insert workout plan
 func (s ServiceWorkout) InsertWorkoutPlan(
 	ctx context.Context,
@@ -461,16 +459,13 @@ func (s ServiceWorkout) InsertWorkoutPlan(
 		req.Request = &pbw.BaseRequest{}
 	}
 
-	// We'll build a new array of “resolved” days, each with a slice of *pbw.XExercises.
 	resolvedDays := make([]*pbw.XWorkoutPlanDay, len(req.PlanDay))
 
 	for i, planDay := range req.PlanDay {
 		dayExercises := make([]*pbw.XExercises, len(planDay.Exercises))
 		dayName := planDay.Day
 
-		// Loop over each XExerciseInput
 		for j, exInput := range planDay.Exercises {
-			// If the request has an exercise_id, try to fetch from DB
 			if exInput.ExerciseId != "" {
 				getReq := &pbw.GetExerciseIDReq{
 					ExerciseId: exInput.ExerciseId,
@@ -483,7 +478,6 @@ func (s ServiceWorkout) InsertWorkoutPlan(
 					// If the repo returns NOT_FOUND, create a new exercise.
 					_, ok := status.FromError(err)
 					if !ok {
-						// Construct a CreateExerciseReq
 						createReq := &pbw.CreateExerciseReq{
 							Exercise: &pbw.XExercises{
 								ExerciseId:   exInput.ExerciseId,
@@ -497,24 +491,20 @@ func (s ServiceWorkout) InsertWorkoutPlan(
 								CreatedAt:    exInput.CreatedAt, // or timestamppb.Now()
 							},
 							UserId: userID,
-							// Optionally fill .request if needed
+							// fill the rest
 						}
 						newExerciseRes, err2 := s.repo.CreateExercise(ctx, createReq)
 						if err2 != nil {
 							return nil, status.Errorf(codes.Internal, "failed to create new exercise: %v", err2)
 						}
-						// Now we have a *pbw.CreateExerciseRes, which has .Exercise
 						dayExercises[j] = newExerciseRes.Exercise
 					} else {
-						// Some other database error
 						return nil, status.Errorf(codes.Internal, "failed to get exercise details: %v", err)
 					}
 				} else {
-					// existing is *pbw.GetExerciseIDRes; use .Exercise
 					dayExercises[j] = existing.Exercise
 				}
 			} else {
-				// No exercise_id => definitely create a new exercise
 				newID := uuid.NewString()
 				createReq := &pbw.CreateExerciseReq{
 					Exercise: &pbw.XExercises{
@@ -536,27 +526,21 @@ func (s ServiceWorkout) InsertWorkoutPlan(
 				}
 				dayExercises[j] = newExerciseRes.Exercise
 			}
-		} // end for exInput
+		}
 
-		// Build final day object with fully resolved exercises
 		resolvedDays[i] = &pbw.XWorkoutPlanDay{
 			Day:       dayName,
 			Exercises: dayExercises,
 		}
 	}
 
-	// Overwrite the “workout_plan_day” in the request so the repo can insert them
 	req.Workout.WorkoutPlanDay = resolvedDays
 	req.Workout.UserId = userID
-	// If the client didn’t provide a workout_id, generate one
 	if req.Workout.WorkoutId == "" {
 		req.Workout.WorkoutId = uuid.NewString()
 	}
 	req.Request.RequestId = requestID
 
-	// Now call the repo’s CreateWorkoutPlan with the entire InsertWorkoutPlanReq
-	// that includes the final resolved exercises. The repo presumably returns
-	// (*pbw.InsertWorkoutPlanRes, error).
 	response, err := s.repo.CreateWorkoutPlan(ctx, req)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to insert workout plan: %v", err)
@@ -615,20 +599,22 @@ func (s ServiceWorkout) GetWorkoutPlans(ctx context.Context, req *pbw.GetWorkout
 	}, nil
 }
 
-func (s ServiceWorkout) GetWorkoutPlan(ctx context.Context, req *pbw.GetWorkoutPlanReq) (*pbw.GetWorkoutPlanRes, error) {
+func (s ServiceWorkout) GetWorkoutPlan(
+	ctx context.Context,
+	req *pbw.GetWorkoutPlanReq,
+) (*pbw.GetWorkoutPlanRes, error) {
+
 	tracer := otel.Tracer("FitSphere")
-	ctx, span := tracer.Start(ctx, "Workout/GetExercises")
+	ctx, span := tracer.Start(ctx, "Workout/GetWorkoutPlan")
 	defer span.End()
 
 	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
 	if !ok {
 		return nil, status.Error(codes.Internal, "request id not found in context")
 	}
-
 	if req.Request == nil {
 		req.Request = &pbw.BaseRequest{}
 	}
-
 	req.Request.RequestId = requestID
 
 	userID := ctx.Value("userID").(string)
@@ -638,6 +624,7 @@ func (s ServiceWorkout) GetWorkoutPlan(ctx context.Context, req *pbw.GetWorkoutP
 
 	workout, err := s.repo.GetWorkoutPlan(ctx, req)
 	if err != nil {
+		// handle or wrap the error
 		return &pbw.GetWorkoutPlanRes{
 			Success: false,
 			Message: "Workout plan fetch failed",
@@ -648,15 +635,17 @@ func (s ServiceWorkout) GetWorkoutPlan(ctx context.Context, req *pbw.GetWorkoutP
 		}, status.Errorf(codes.Internal, "failed to get workout plan: %v", err)
 	}
 
+	// Optionally add tracing attributes
 	span.SetAttributes(
 		attribute.String("request.id", req.Request.RequestId),
 		attribute.String("request.details", req.String()),
 	)
 
+	// Return exactly what the repository built:
 	return &pbw.GetWorkoutPlanRes{
-		Success:     true,
-		Message:     "Workout plan fetch succeed",
-		WorkoutPlan: workout.WorkoutPlan,
+		Success:     workout.Success,
+		Message:     workout.Message,
+		WorkoutPlan: workout.WorkoutPlan, // includes full exercise details
 		Response: &pbw.BaseResponse{
 			Upstream:  "workout-service",
 			RequestId: requestID,
@@ -771,6 +760,12 @@ func (s ServiceWorkout) DownloadWorkoutPlan(req *pbw.DownloadWorkoutPlanRequest,
 	switch req.Format {
 	case pbw.FileFormat_CSV:
 		fileData, fileName, contentType, err = generateCSV(ctx, workoutPlan)
+		err = os.WriteFile(fileName, fileData, 0644)
+		if err != nil {
+			log.Fatalf("Failed to write file: %v", err)
+		}
+		log.Printf("File %s saved (%d bytes)", fileName, len(fileData))
+
 	case pbw.FileFormat_PDF:
 		fileData, fileName, contentType, err = generatePDF(ctx, workoutPlan)
 	case pbw.FileFormat_EXCEL:
@@ -825,45 +820,34 @@ func generateCSV(ctx context.Context, workoutPlan *pbw.GetWorkoutPlanRes) ([]byt
 	writer := csv.NewWriter(&buf)
 
 	header := []string{
-		"workout_plan_id",
-		"user_id",
-		"description",
-		"notes",
-		"rating",
 		"day",
-		"exercises",
+		"name",
+		"type",
+		"notes",
+		"muscle",
+		"video",
 	}
 
 	if err := writer.Write(header); err != nil {
 		return nil, "", "", fmt.Errorf("failed to write CSV header: %w", err)
 	}
 
-	// If the proto eventually uses repeated WorkoutDayResponse, handle each day.
-	if len(plan.WorkoutDay) > 0 {
-		for _, wd := range plan.WorkoutDay {
-			record := []string{
-				plan.WorkoutPlanId,
-				plan.UserId,
-				plan.Description,
-				plan.Notes,
-				strconv.Itoa(int(plan.Rating)),
-				wd.Day,
-				strings.Join(wd.Exercises, ", "),
-			}
-			if err := writer.Write(record); err != nil {
-				return nil, "", "", fmt.Errorf("failed to write CSV record: %w", err)
-			}
+	//exercisesString := strings.Join(exerciseSummaries, "\n")
+	for _, wd := range plan.WorkoutDay {
+		// Build a slice of strings for each exercise's details.
+		var exerciseStrs []string
+		for _, ex := range wd.Exercises {
+			// Format the details as desired.
+			// Here we include id, name, type, and muscle_group.
+			exStr := fmt.Sprintf("%s, %s, %s, %s, %s", wd.Day, ex.Name, ex.ExerciseType, ex.MuscleGroup, ex.Video)
+			exerciseStrs = append(exerciseStrs, exStr)
 		}
-	} else {
-		// Fallback: use plan.Day and plan.Exercises
+		// Join all exercises with a delimiter.
+		exercisesString := strings.Join(exerciseStrs, "\n")
+
 		record := []string{
-			plan.WorkoutPlanId,
-			plan.UserId,
-			plan.Description,
-			plan.Notes,
-			strconv.Itoa(int(plan.Rating)),
-			plan.Day,
-			strings.Join(plan.Exercises, ", "),
+			wd.Day,
+			exercisesString,
 		}
 		if err := writer.Write(record); err != nil {
 			return nil, "", "", fmt.Errorf("failed to write CSV record: %w", err)

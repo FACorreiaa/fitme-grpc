@@ -3,13 +3,12 @@ package workout
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/lib/pq"
 
 	pbw "github.com/FACorreiaa/fitme-protos/modules/workout/generated"
 	"github.com/google/uuid"
@@ -431,7 +430,7 @@ func (r *RepositoryWorkout) CreateWorkoutPlan(
 	req *pbw.InsertWorkoutPlanReq,
 ) (*pbw.InsertWorkoutPlanRes, error) {
 
-	// Begin transaction
+	// Begin a transaction.
 	tx, err := r.pgpool.Begin(ctx)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to begin transaction")
@@ -442,15 +441,14 @@ func (r *RepositoryWorkout) CreateWorkoutPlan(
 		}
 	}()
 
-	// Extract the main plan from the request
 	plan := req.Workout
 	if plan == nil {
 		return nil, status.Error(codes.InvalidArgument, "request.Workout cannot be nil")
 	}
 
-	// Insert the main workout_plan row
 	createdAt := time.Now()
 
+	// Insert the main workout_plan row.
 	insertPlanQ := `
        INSERT INTO workout_plan (id, user_id, description, notes, rating, created_at)
        VALUES ($1, $2, $3, $4, $5, $6)
@@ -467,9 +465,10 @@ func (r *RepositoryWorkout) CreateWorkoutPlan(
 		return nil, status.Error(codes.Internal, "failed to insert workout_plan")
 	}
 
-	// For each day in plan.WorkoutPlanDay, insert into workout_day + workout_plan_detail
+	// We'll build a new slice for the final days that includes full exercise details.
 	finalDays := make([]*pbw.XWorkoutPlanDay, len(plan.WorkoutPlanDay))
 	for i, d := range plan.WorkoutPlanDay {
+		// Insert a new workout_day row.
 		dayID := uuid.NewString()
 		insertDayQ := `
             INSERT INTO workout_day (id, workout_plan_id, day, created_at)
@@ -485,12 +484,20 @@ func (r *RepositoryWorkout) CreateWorkoutPlan(
 			return nil, status.Error(codes.Internal, "failed to insert workout_day")
 		}
 
-		// Build a string slice of exercise IDs to store in "exercises" (UUID[]) column
-		exerciseIDs := make([]string, len(d.Exercises))
+		// Extract the exercise IDs from the provided exercises.
+		exerciseIDsStr := make([]string, len(d.Exercises))
+		var exerciseUUIDs []uuid.UUID
 		for j, ex := range d.Exercises {
-			exerciseIDs[j] = ex.ExerciseId
+			exerciseIDsStr[j] = ex.ExerciseId
+			// Convert string ID to uuid.UUID.
+			id, err := uuid.Parse(ex.ExerciseId)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "invalid exercise id %q: %v", ex.ExerciseId, err)
+			}
+			exerciseUUIDs = append(exerciseUUIDs, id)
 		}
 
+		// Insert a row into workout_plan_detail, storing the list of exercise IDs.
 		detailID := uuid.NewString()
 		insertDetailQ := `
             INSERT INTO workout_plan_detail (id, workout_plan_id, day, exercises, created_at)
@@ -500,48 +507,62 @@ func (r *RepositoryWorkout) CreateWorkoutPlan(
 			detailID,
 			plan.WorkoutId,
 			d.Day,
-			exerciseIDs, // the UUID[] of exercise IDs
+			exerciseIDsStr, // storing as array of strings (or UUIDs, depending on your schema)
 			time.Now(),
 		)
 		if err != nil {
 			return nil, status.Error(codes.Internal, "failed to insert workout_plan_detail")
 		}
 
-		// Rebuild a final XWorkoutPlanDay object
+		// Now, resolve full exercise details using the helper.
+		exDetails, err := r.fetchExerciseDetails(ctx, exerciseUUIDs)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to fetch exercise details for day %q: %v", d.Day, err)
+		}
+
+		// Build the final day object with the full exercise details.
 		finalDays[i] = &pbw.XWorkoutPlanDay{
 			Day:       d.Day,
-			Exercises: d.Exercises, // keep the same slice of XExercises
+			Exercises: exDetails, // now contains full exercise details
 		}
 	}
 
-	// Commit transaction
+	// Commit the transaction.
 	err = tx.Commit(ctx)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to commit transaction")
 	}
 
-	// Update the plan object with final data
+	// Update the workout plan object with the resolved days and creation timestamp.
 	plan.WorkoutPlanDay = finalDays
 	plan.CreatedAt = timestamppb.New(createdAt)
-	// UpdatedAt can remain nil or set it as needed.
 
-	// Build and return InsertWorkoutPlanRes
+	// Return the final InsertWorkoutPlanRes response.
 	return &pbw.InsertWorkoutPlanRes{
 		Success: true,
 		Message: "Workout plan created successfully",
 		Workout: plan,
 		Response: &pbw.BaseResponse{
 			Upstream:  "workout-service",
-			RequestId: req.Request.RequestId, // if your request had a request_id
+			RequestId: req.Request.RequestId,
 			Status:    "OK",
 		},
 	}, nil
 }
 
 func (r *RepositoryWorkout) GetWorkoutPlans(ctx context.Context, req *pbw.GetWorkoutPlansReq) (*pbw.GetWorkoutPlansRes, error) {
+	// Query to get top‐level workout plan info, each day, and the exercises array as JSON.
 	query := `
-		SELECT wp.id AS workout_plan_id, wp.user_id, wp.description,
-			   wp.notes, wp.rating, wp.created_at, wp.updated_at, wd.day, wpd.exercises
+		SELECT
+			wp.id          AS workout_plan_id,
+			wp.user_id     AS user_id,
+			wp.description AS description,
+			wp.notes       AS notes,
+			wp.rating      AS rating,
+			wp.created_at  AS created_at,
+			wp.updated_at  AS updated_at,
+			wd.day         AS day,
+			to_jsonb(wpd.exercises) AS raw_exercises
 		FROM workout_plan AS wp
 		LEFT JOIN workout_plan_detail AS wpd ON wp.id = wpd.workout_plan_id
 		LEFT JOIN workout_day AS wd ON wp.id = wd.workout_plan_id
@@ -551,140 +572,331 @@ func (r *RepositoryWorkout) GetWorkoutPlans(ctx context.Context, req *pbw.GetWor
 
 	rows, err := r.pgpool.Query(ctx, query)
 	if err != nil {
-		return &pbw.GetWorkoutPlansRes{}, status.Error(codes.Internal, "failed to query workout plans")
+		return nil, status.Errorf(codes.Internal, "failed to query workout plans: %v", err)
 	}
 	defer rows.Close()
 
+	// Use a map to accumulate rows by workout plan ID
 	workouts := make(map[string]*pbw.XWorkoutPlanResponse)
 
 	for rows.Next() {
+		var (
+			workoutPlanID uuid.UUID
+			userID        uuid.UUID
+			description   string
+			notes         string
+			rating        int
+			createdAt     time.Time
+			updatedAt     sql.NullTime
+			day           string
+			rawExercises  string // will hold JSON, e.g. '["id1","id2",...]'
+		)
 
-		var row struct {
-			WorkoutPlanID uuid.UUID    `db:"workout_plan_id"`
-			UserID        uuid.UUID    `db:"user_id"`
-			Description   string       `db:"description"`
-			Notes         string       `db:"notes"`
-			Rating        int          `db:"rating"`
-			CreatedAt     time.Time    `db:"created_at"`
-			UpdatedAt     sql.NullTime `db:"updated_at"`
-			Day           string       `db:"day"`
-			Exercises     []string     `db:"exercises"`
-		}
-
-		createdAt := timestamppb.New(row.CreatedAt)
-		var updatedAt *timestamppb.Timestamp
-
-		if row.UpdatedAt.Valid {
-			updatedAt = timestamppb.New(row.UpdatedAt.Time)
-		} else {
-			updatedAt = nil
-		}
-
-		err = rows.Scan(&row.WorkoutPlanID, &row.UserID, &row.Description, &row.Notes, &row.Rating, &row.CreatedAt,
-			&row.UpdatedAt, &row.Day, &row.Exercises)
+		err = rows.Scan(
+			&workoutPlanID,
+			&userID,
+			&description,
+			&notes,
+			&rating,
+			&createdAt,
+			&updatedAt,
+			&day,
+			&rawExercises,
+		)
 		if err != nil {
 			logger.Error("Failed to scan workout plan", zap.Error(err))
-			return nil, status.Error(codes.Internal, "failed to scan workout plan")
+			return nil, status.Errorf(codes.Internal, "failed to scan workout plan: %v", err)
 		}
 
-		if _, ok := workouts[row.WorkoutPlanID.String()]; !ok {
-			workouts[row.WorkoutPlanID.String()] = &pbw.XWorkoutPlanResponse{
-				WorkoutPlanId: row.WorkoutPlanID.String(),
-				UserId:        row.UserID.String(),
-				Description:   row.Description,
+		// Unmarshal the JSON into a slice of string IDs
+		var exerciseIDStrs []string
+		if err := json.Unmarshal([]byte(rawExercises), &exerciseIDStrs); err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to unmarshal exercises JSON: %v", err)
+		}
+
+		// Convert the slice of string IDs to []uuid.UUID
+		var exerciseIDs []uuid.UUID
+		for _, s := range exerciseIDStrs {
+			id, err := uuid.Parse(s)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "failed to parse exercise id: %v", err)
+			}
+			exerciseIDs = append(exerciseIDs, id)
+		}
+
+		// Fetch full exercise details for these IDs.
+		exDetails, err2 := r.fetchExerciseDetails(ctx, exerciseIDs)
+		if err2 != nil {
+			return nil, status.Errorf(codes.Internal, "failed to fetch exercise details for day=%s: %v", day, err2)
+		}
+
+		// If we haven't created a plan for this workout_plan_id yet, do so.
+		wpID := workoutPlanID.String()
+		if _, exists := workouts[wpID]; !exists {
+			workouts[wpID] = &pbw.XWorkoutPlanResponse{
+				WorkoutPlanId: wpID,
+				UserId:        userID.String(),
+				Description:   description,
+				Notes:         notes,
+				Rating:        uint32(rating),
+				CreatedAt:     timestamppb.New(createdAt),
 				WorkoutDay:    []*pbw.WorkoutDayResponse{},
-				Notes:         row.Notes,
-				CreatedAt:     createdAt,
-				UpdatedAt:     updatedAt,
-				Rating:        uint32(row.Rating),
+			}
+			if updatedAt.Valid {
+				workouts[wpID].UpdatedAt = timestamppb.New(updatedAt.Time)
 			}
 		}
 
-		if plan, ok := workouts[row.WorkoutPlanID.String()]; ok {
-			day := &pbw.WorkoutDayResponse{
-				Day:       row.Day,
-				Exercises: row.Exercises,
-			}
-			plan.WorkoutDay = append(plan.WorkoutDay, day)
-			workouts[row.WorkoutPlanID.String()] = plan
+		// Create a WorkoutDayResponse for this row
+		dayResp := &pbw.WorkoutDayResponse{
+			Day:       day,
+			Exercises: exDetails, // full details now
 		}
+		workouts[wpID].WorkoutDay = append(workouts[wpID].WorkoutDay, dayResp)
 	}
 
-	result := &pbw.GetWorkoutPlansRes{
+	if err = rows.Err(); err != nil {
+		return nil, status.Errorf(codes.Internal, "rows iteration error: %v", err)
+	}
+
+	if len(workouts) == 0 {
+		return nil, status.Errorf(codes.NotFound, "no workout plans found")
+	}
+
+	// Convert the map to a slice
+	var plans []*pbw.XWorkoutPlanResponse
+	for _, plan := range workouts {
+		plans = append(plans, plan)
+	}
+
+	return &pbw.GetWorkoutPlansRes{
 		Success:     true,
 		Message:     "Workout plans retrieved successfully",
-		WorkoutPlan: []*pbw.XWorkoutPlanResponse{},
-	}
-	for _, workout := range workouts {
-		result.WorkoutPlan = append(result.WorkoutPlan, workout)
-	}
-
-	return result, nil
+		WorkoutPlan: plans,
+	}, nil
 }
 
-func (r *RepositoryWorkout) GetWorkoutPlan(ctx context.Context, req *pbw.GetWorkoutPlanReq) (*pbw.GetWorkoutPlanRes, error) {
-	workoutPlanProto := &pbw.GetWorkoutPlanRes{
-		WorkoutPlan: &pbw.XWorkoutPlanResponse{},
-	}
-	workoutPlanID := req.WorkoutPlanId
+func (r *RepositoryWorkout) GetWorkoutPlan(
+	ctx context.Context,
+	req *pbw.GetWorkoutPlanReq,
+) (*pbw.GetWorkoutPlanRes, error) {
 
-	if workoutPlanID == "" {
-		return &pbw.GetWorkoutPlanRes{}, status.Error(codes.InvalidArgument, "workout ID is required")
-	}
-
-	var row struct {
-		WorkoutPlanID uuid.UUID      `db:"workout_plan_id"`
-		UserID        uuid.UUID      `db:"user_id"`
-		Description   string         `db:"description"`
-		Notes         string         `db:"notes"`
-		Rating        int            `db:"rating"`
-		CreatedAt     time.Time      `db:"created_at"`
-		UpdatedAt     sql.NullTime   `db:"updated_at"`
-		Day           string         `db:"day"`
-		Exercises     pq.StringArray `db:"exercises"`
+	if req.WorkoutPlanId == "" {
+		return nil, status.Error(codes.InvalidArgument, "workout_plan_id is required")
 	}
 
-	query := `SELECT
-				wp.id AS workout_plan_id, wp.user_id, wp.description,
-				wp.notes, wp.rating, wp.created_at, wp.updated_at, wd.day, wpd.exercises
-				FROM workout_plan AS wp
-				JOIN workout_plan_detail AS wpd ON wp.id = wpd.workout_plan_id
-				JOIN workout_day AS wd ON wp.id = wd.workout_plan_id
-				WHERE wp.id = $1
-				GROUP BY wp.id, wd.day, wpd.exercises
-				ORDER BY wd.day;`
+	// Prepare the final response container
+	workoutPlanRes := &pbw.GetWorkoutPlanRes{
+		Success: true,
+		Message: "Workout plan fetched",
+		WorkoutPlan: &pbw.XWorkoutPlanResponse{
+			WorkoutDay: []*pbw.WorkoutDayResponse{},
+		},
+		Response: &pbw.BaseResponse{
+			Upstream:  "workout-service",
+			RequestId: req.Request.RequestId,
+			Status:    "OK",
+		},
+	}
 
-	// Perform the query and scan the results
-	err := r.pgpool.QueryRow(ctx, query, workoutPlanID).Scan(
-		&row.WorkoutPlanID,
-		&row.UserID,
-		&row.Description,
-		&row.Notes,
-		&row.Rating,
-		&row.CreatedAt,
-		&row.UpdatedAt,
-		&row.Day,
-		&row.Exercises,
-	)
+	// Main query: get the top-level plan data + day + array of exercise IDs (as JSON)
+	query := `
+        SELECT
+          wp.id          AS workout_plan_id,
+          wp.user_id     AS user_id,
+          wp.description AS description,
+          wp.notes       AS notes,
+          wp.rating      AS rating,
+          wp.created_at  AS created_at,
+          wp.updated_at  AS updated_at,
+          wd.day         AS day,
+          wpd.exercises  AS exercises -- this is a uuid[] or text[] column
+        FROM workout_plan AS wp
+        JOIN workout_plan_detail AS wpd ON wp.id = wpd.workout_plan_id
+        JOIN workout_day        AS wd  ON wp.id = wd.workout_plan_id
+        WHERE wp.id = $1
+        ORDER BY wd.day;
+    `
 
+	rows, err := r.pgpool.Query(ctx, query, req.WorkoutPlanId)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to query workout plan")
+		return nil, status.Errorf(codes.Internal, "query failed: %v", err)
+	}
+	defer rows.Close()
+
+	foundAny := false
+
+	for rows.Next() {
+		foundAny = true
+
+		var (
+			workoutPlanID uuid.UUID
+			userID        uuid.UUID
+			description   string
+			notes         string
+			rating        int
+			createdAt     time.Time
+			updatedAt     sql.NullTime
+			day           string
+
+			// If your "exercises" column is uuid[] in Postgres:
+			exerciseIDs []uuid.UUID
+		)
+
+		err = rows.Scan(
+			&workoutPlanID,
+			&userID,
+			&description,
+			&notes,
+			&rating,
+			&createdAt,
+			&updatedAt,
+			&day,
+			&exerciseIDs, // <-- array of UUIDs
+		)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to scan row: %v", err)
+		}
+
+		// If it's text[] or something else, you might do: var exStr []string
+		// and parse them to []uuid.UUID yourself.
+
+		// Populate the top-level plan info once
+		if workoutPlanRes.WorkoutPlan.WorkoutPlanId == "" {
+			workoutPlanRes.WorkoutPlan.WorkoutPlanId = workoutPlanID.String()
+			workoutPlanRes.WorkoutPlan.UserId = userID.String()
+			workoutPlanRes.WorkoutPlan.Description = description
+			workoutPlanRes.WorkoutPlan.Notes = notes
+			workoutPlanRes.WorkoutPlan.Rating = uint32(rating)
+			workoutPlanRes.WorkoutPlan.CreatedAt = timestamppb.New(createdAt)
+			if updatedAt.Valid {
+				workoutPlanRes.WorkoutPlan.UpdatedAt = timestamppb.New(updatedAt.Time)
+			}
+		}
+
+		// -------------
+		// Fetch the full exercise details for each exercise ID
+		// -------------
+		exDetails, err2 := r.fetchExerciseDetails(ctx, exerciseIDs)
+		if err2 != nil {
+			return nil, status.Errorf(
+				codes.Internal,
+				"failed to fetch exercise details for day=%s: %v",
+				day, err2,
+			)
+		}
+
+		// Build the day response
+		dayResp := &pbw.WorkoutDayResponse{
+			Day:       day,
+			Exercises: exDetails, // repeated XExercises
+		}
+		// Append to the plan
+		workoutPlanRes.WorkoutPlan.WorkoutDay = append(workoutPlanRes.WorkoutPlan.WorkoutDay, dayResp)
 	}
 
-	createdAt := timestamppb.New(row.CreatedAt)
-	updatedAt := nullTimeToTimestamppb(row.UpdatedAt)
+	// Check for row iteration errors
+	if err := rows.Err(); err != nil {
+		return nil, status.Errorf(codes.Internal, "rows iteration error: %v", err)
+	}
 
-	workoutPlanProto.WorkoutPlan.WorkoutPlanId = row.WorkoutPlanID.String()
-	workoutPlanProto.WorkoutPlan.UserId = row.UserID.String()
-	workoutPlanProto.WorkoutPlan.Description = row.Description
-	workoutPlanProto.WorkoutPlan.Notes = row.Notes
-	workoutPlanProto.WorkoutPlan.Rating = uint32(row.Rating)
-	workoutPlanProto.WorkoutPlan.CreatedAt = createdAt
-	workoutPlanProto.WorkoutPlan.UpdatedAt = updatedAt
-	workoutPlanProto.WorkoutPlan.Day = row.Day
-	workoutPlanProto.WorkoutPlan.Exercises = row.Exercises
+	if !foundAny {
+		return nil, status.Errorf(
+			codes.NotFound,
+			"no workout plan found with id %s",
+			req.WorkoutPlanId,
+		)
+	}
 
-	return workoutPlanProto, nil
+	return workoutPlanRes, nil
+}
+
+// Helper method to query the 'exercise_list' table
+func (r *RepositoryWorkout) fetchExerciseDetails(
+	ctx context.Context,
+	ids []uuid.UUID,
+) ([]*pbw.XExercises, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	// Example query that fetches all the columns you need:
+	q := `
+      SELECT
+        id,
+        name,
+        type,
+        muscle as muscle_group,
+        equipment,
+        difficulty,
+        instructions,
+        video,
+        custom_created,
+        created_at,
+        updated_at
+      FROM exercise_list
+      WHERE id = ANY($1::uuid[])
+    `
+
+	rows, err := r.pgpool.Query(ctx, q, ids)
+	if err != nil {
+		return nil, fmt.Errorf("fetchExerciseDetails query error: %w", err)
+	}
+	defer rows.Close()
+
+	var results []*pbw.XExercises
+
+	for rows.Next() {
+		var (
+			exID          uuid.UUID
+			name          sql.NullString
+			exType        sql.NullString
+			muscleGroup   sql.NullString
+			equipment     sql.NullString
+			difficulty    sql.NullString
+			instruction   sql.NullString
+			video         sql.NullString
+			customCreated sql.NullBool
+			createdAt     time.Time
+			updatedAt     sql.NullTime
+		)
+
+		if err := rows.Scan(
+			&exID,
+			&name,
+			&exType,
+			&muscleGroup,
+			&equipment,
+			&difficulty,
+			&instruction,
+			&video,
+			&customCreated,
+			&createdAt,
+			&updatedAt,
+		); err != nil {
+			return nil, err
+		}
+
+		exProto := &pbw.XExercises{
+			ExerciseId:    exID.String(),
+			Name:          name.String,
+			ExerciseType:  exType.String,
+			MuscleGroup:   muscleGroup.String,
+			Equipment:     equipment.String,
+			Difficulty:    difficulty.String,
+			Instruction:   instruction.String,
+			Video:         video.String,
+			CustomCreated: customCreated.Bool,
+			CreatedAt:     timestamppb.New(createdAt),
+		}
+		if updatedAt.Valid {
+			exProto.UpdatedAt = timestamppb.New(updatedAt.Time)
+		}
+
+		results = append(results, exProto)
+	}
+
+	return results, rows.Err()
 }
 
 func (r *RepositoryWorkout) DeleteWorkoutPlan(ctx context.Context, req *pbw.DeleteWorkoutPlanReq) (*pbw.NilRes, error) {
