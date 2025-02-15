@@ -141,23 +141,49 @@ CREATE UNIQUE INDEX unique_ingredient ON ingredients (id, name);
 --                              "updated_at" timestamp DEFAULT null,
 --                              "rating" integer DEFAULT 10
 -- );
-CREATE TABLE "favourite" (
-                             "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                             "user_id" UUID UNIQUE,
-                             "exercise_id" UUID UNIQUE,
-                             "activity_id" UUID UNIQUE,
-                             "food_id" UUID UNIQUE,
-                             "created_at" timestamp DEFAULT (now()),
-                             "updated_at" timestamp DEFAULT null
+CREATE TABLE "favourite_exercises" (
+                                     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                                     user_id    UUID NOT NULL REFERENCES users(id),
+                                     exercise_id UUID NOT NULL REFERENCES exercise_list(id),
+                                     created_at timestamp DEFAULT now(),
+                                     UNIQUE (user_id, exercise_id)
 );
-CREATE TABLE "recipe" (
-                          "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                          "user_id" UUID UNIQUE,
-                          "ingredient_id" UUID UNIQUE,
-                          "description" varchar(255),
-                          "created_at" timestamp DEFAULT (now()),
-                          "updated_at" timestamp DEFAULT null
+
+CREATE TABLE "favourite_activities" (
+                                      id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                                      user_id    UUID NOT NULL REFERENCES users(id),
+                                      activity_id UUID NOT NULL REFERENCES activity(id),
+                                      created_at timestamp DEFAULT now(),
+                                      UNIQUE (user_id, activity_id)
 );
+
+CREATE TABLE "favourite_meals" (
+                                 id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                                 user_id    UUID NOT NULL REFERENCES users(id),
+                                 meal_id UUID NOT NULL REFERENCES meals(id),
+                                 created_at timestamp DEFAULT now(),
+                                 UNIQUE (user_id, meal_id)
+);
+
+CREATE TABLE recipes (
+                       id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                       user_id UUID NOT NULL REFERENCES users(id),
+                       description TEXT,
+                       created_at timestamp DEFAULT now(),
+                       updated_at timestamp DEFAULT now()
+  -- no unique constraints that block multiple
+);
+
+CREATE TABLE recipe_ingredients (
+                                  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                                  recipe_id UUID NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+                                  ingredient_id UUID NOT NULL REFERENCES ingredients(id) ON DELETE CASCADE,
+                                  quantity FLOAT(8),
+                                  created_at TIMESTAMP DEFAULT now(),
+                                  updated_at TIMESTAMP DEFAULT now(),
+                                  UNIQUE(recipe_id, ingredient_id)
+);
+
 CREATE TABLE "recipe_user" (
                                "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
                                "recipe_id" UUID UNIQUE,
@@ -167,19 +193,28 @@ CREATE TABLE "recipe_user" (
 );
 
 CREATE TABLE "meal_plan_meal_type" (
-                                       "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                                       "meal_plan_id" UUID UNIQUE,
-                                       "meal_type_id" UUID UNIQUE,
-                                       "created_at" timestamp DEFAULT (now()),
-                                       "updated_at" timestamp DEFAULT null
+                                     "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                                     "meal_plan_id" UUID NOT NULL
+                                       REFERENCES "meal_plans"(id) ON DELETE CASCADE,
+                                     --"meal_type_id" UUID NOT NULL
+                                     --  REFERENCES "meal_type"(id) ON DELETE CASCADE,
+                                     "created_at" timestamp DEFAULT (now()),
+                                     "updated_at" timestamp DEFAULT null,
+                                     UNIQUE ("meal_plan_id")
 );
+
+
 CREATE TABLE "meal_plan_user" (
-                                  "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                                  "meal_plan_id" UUID UNIQUE,
-                                  "user_id" UUID UNIQUE,
-                                  "created_at" timestamp DEFAULT (now()),
-                                  "updated_at" timestamp DEFAULT null
+                                "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                                "meal_plan_id" UUID NOT NULL
+                                  REFERENCES "meal_plans"(id) ON DELETE CASCADE,
+                                "user_id" UUID NOT NULL
+                                  REFERENCES "users"(id) ON DELETE CASCADE,
+                                "created_at" timestamp DEFAULT (now()),
+                                "updated_at" timestamp DEFAULT null,
+                                UNIQUE ("meal_plan_id", "user_id")
 );
+
 
 
 

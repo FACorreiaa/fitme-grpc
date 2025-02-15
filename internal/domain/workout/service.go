@@ -441,11 +441,16 @@ func (s ServiceWorkout) InsertExerciseWorkoutPlan(ctx context.Context, req *pbw.
 //	return nil
 //}
 
-// InsertWorkoutPlan Workouts
-func (s ServiceWorkout) InsertWorkoutPlan(ctx context.Context, req *pbw.InsertWorkoutPlanReq) (*pbw.InsertWorkoutPlanRes, error) {
-	tracer := otel.Tracer("FitSphere")
-	ctx, span := tracer.Start(ctx, "Workout/GetExercises")
-	defer span.End()
+// InsertWorkoutPlan Insert workout plan
+func (s ServiceWorkout) InsertWorkoutPlan(
+	ctx context.Context,
+	req *pbw.InsertWorkoutPlanReq,
+) (*pbw.InsertWorkoutPlanRes, error) {
+
+	userID := ctx.Value("userID").(string)
+	if userID == "" {
+		return nil, status.Error(codes.Unauthenticated, "userID is missing in metadata")
+	}
 
 	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
 	if !ok {
@@ -456,79 +461,109 @@ func (s ServiceWorkout) InsertWorkoutPlan(ctx context.Context, req *pbw.InsertWo
 		req.Request = &pbw.BaseRequest{}
 	}
 
-	req.Request.RequestId = requestID
-
-	userID := ctx.Value("userID").(string)
-	if userID == "" {
-		return nil, status.Error(codes.Unauthenticated, "userID is missing in metadata")
-	}
-
-	//workoutPlan := req.Workout
-	//workoutPlan.UserId = userID
-
-	// create a number of workday days for a plan
-	workoutDays := make([]*pbw.XWorkoutPlanDay, len(req.PlanDay))
+	// We'll build a new array of “resolved” days, each with a slice of *pbw.XExercises.
+	resolvedDays := make([]*pbw.XWorkoutPlanDay, len(req.PlanDay))
 
 	for i, planDay := range req.PlanDay {
-		exercises := make([]*pbw.XExercises, len(planDay.ExerciseId))
-		// var wg sync.WaitGroup
-		// var mu sync.Mutex
-		// var fetchError error
+		dayExercises := make([]*pbw.XExercises, len(planDay.Exercises))
+		dayName := planDay.Day
 
-		for j, exercise := range planDay.ExerciseId {
-			exerciseReq := &pbw.GetExerciseIDReq{
-				ExerciseId: exercise,
+		// Loop over each XExerciseInput
+		for j, exInput := range planDay.Exercises {
+			// If the request has an exercise_id, try to fetch from DB
+			if exInput.ExerciseId != "" {
+				getReq := &pbw.GetExerciseIDReq{
+					ExerciseId: exInput.ExerciseId,
+					// Optionally set the .request field if you want:
+					// Request: &pbw.BaseRequest{ request_id: "..."},
+				}
+
+				existing, err := s.repo.GetExerciseID(ctx, getReq)
+				if err != nil {
+					// If the repo returns NOT_FOUND, create a new exercise.
+					_, ok := status.FromError(err)
+					if !ok {
+						// Construct a CreateExerciseReq
+						createReq := &pbw.CreateExerciseReq{
+							Exercise: &pbw.XExercises{
+								ExerciseId:   exInput.ExerciseId,
+								Name:         exInput.Name,
+								ExerciseType: exInput.ExerciseType,
+								MuscleGroup:  exInput.MuscleGroup,
+								Equipment:    exInput.Equipment,
+								Difficulty:   exInput.Difficulty,
+								Instruction:  exInput.Instruction,
+								Video:        exInput.Video,
+								CreatedAt:    exInput.CreatedAt, // or timestamppb.Now()
+							},
+							UserId: userID,
+							// Optionally fill .request if needed
+						}
+						newExerciseRes, err2 := s.repo.CreateExercise(ctx, createReq)
+						if err2 != nil {
+							return nil, status.Errorf(codes.Internal, "failed to create new exercise: %v", err2)
+						}
+						// Now we have a *pbw.CreateExerciseRes, which has .Exercise
+						dayExercises[j] = newExerciseRes.Exercise
+					} else {
+						// Some other database error
+						return nil, status.Errorf(codes.Internal, "failed to get exercise details: %v", err)
+					}
+				} else {
+					// existing is *pbw.GetExerciseIDRes; use .Exercise
+					dayExercises[j] = existing.Exercise
+				}
+			} else {
+				// No exercise_id => definitely create a new exercise
+				newID := uuid.NewString()
+				createReq := &pbw.CreateExerciseReq{
+					Exercise: &pbw.XExercises{
+						ExerciseId:   newID,
+						Name:         exInput.Name,
+						ExerciseType: exInput.ExerciseType,
+						MuscleGroup:  exInput.MuscleGroup,
+						Equipment:    exInput.Equipment,
+						Difficulty:   exInput.Difficulty,
+						Instruction:  exInput.Instruction,
+						Video:        exInput.Video,
+						CreatedAt:    exInput.CreatedAt,
+					},
+					UserId: userID,
+				}
+				newExerciseRes, err2 := s.repo.CreateExercise(ctx, createReq)
+				if err2 != nil {
+					return nil, status.Errorf(codes.Internal, "failed to auto-create exercise: %v", err2)
+				}
+				dayExercises[j] = newExerciseRes.Exercise
 			}
-			exerciseDetails, err := s.repo.GetExerciseID(ctx, exerciseReq)
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "failed to get exercise details: %v", err)
-			}
-			exercises[j] = exerciseDetails.Exercise
-		}
-		workoutDays[i] = &pbw.XWorkoutPlanDay{
-			Day:       planDay.Day,
-			Exercises: exercises,
+		} // end for exInput
+
+		// Build final day object with fully resolved exercises
+		resolvedDays[i] = &pbw.XWorkoutPlanDay{
+			Day:       dayName,
+			Exercises: dayExercises,
 		}
 	}
 
-	workoutPlan := &pbw.XWorkoutPlan{
-		WorkoutId:      uuid.NewString(),
-		UserId:         userID,
-		Description:    req.Workout.Description,
-		Notes:          req.Workout.Notes,
-		Rating:         req.Workout.Rating,
-		WorkoutPlanDay: workoutDays,
-		CreatedAt:      timestamppb.New(time.Now()),
+	// Overwrite the “workout_plan_day” in the request so the repo can insert them
+	req.Workout.WorkoutPlanDay = resolvedDays
+	req.Workout.UserId = userID
+	// If the client didn’t provide a workout_id, generate one
+	if req.Workout.WorkoutId == "" {
+		req.Workout.WorkoutId = uuid.NewString()
 	}
+	req.Request.RequestId = requestID
 
-	req.Workout = workoutPlan
-
+	// Now call the repo’s CreateWorkoutPlan with the entire InsertWorkoutPlanReq
+	// that includes the final resolved exercises. The repo presumably returns
+	// (*pbw.InsertWorkoutPlanRes, error).
 	response, err := s.repo.CreateWorkoutPlan(ctx, req)
 	if err != nil {
-		return &pbw.InsertWorkoutPlanRes{
-			Success: false,
-			Message: "Workout creation failed",
-			Response: &pbw.BaseResponse{
-				Upstream:  "workout-service",
-				RequestId: requestID,
-			},
-		}, status.Errorf(codes.Internal, "failed to insert workout: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to insert workout plan: %v", err)
 	}
 
-	span.SetAttributes(
-		attribute.String("request.id", req.Request.RequestId),
-		attribute.String("request.details", req.String()),
-	)
-
-	return &pbw.InsertWorkoutPlanRes{
-		Success: false,
-		Message: "Workout creation failed",
-		Workout: response.Workout,
-		Response: &pbw.BaseResponse{
-			Upstream:  "workout-service",
-			RequestId: requestID,
-		},
-	}, nil
+	// The repo is expected to fill 'response.Workout' with the final data
+	return response, nil
 }
 
 func (s ServiceWorkout) GetWorkoutPlans(ctx context.Context, req *pbw.GetWorkoutPlansReq) (*pbw.GetWorkoutPlansRes, error) {
@@ -701,24 +736,26 @@ func (s ServiceWorkout) UpdateWorkoutPlan(ctx context.Context, req *pbw.UpdateWo
 	return res, nil
 }
 
-func (s ServiceWorkout) DownloadWorkoutPlan(ctx context.Context, req *pbw.DownloadWorkoutPlanRequest, stream pbw.Workout_DownloadWorkoutPlanServer) (err error) {
+func (s ServiceWorkout) DownloadWorkoutPlan(req *pbw.DownloadWorkoutPlanRequest, stream pbw.Workout_DownloadWorkoutPlanServer) (err error) {
 	if req.WorkoutPlanId == "" {
 		return status.Errorf(codes.InvalidArgument, "req id is required")
 	}
+	ctx := stream.Context()
+
 	tracer := otel.Tracer("FitSphere")
 	ctx, span := tracer.Start(ctx, "Workout/UpdateWorkoutPlan")
 	defer span.End()
 
 	var fileData []byte
 	var fileName, contentType string
-	requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
-	if !ok {
-		return status.Error(codes.Internal, "request id not found in context")
-	}
+	//requestID, ok := ctx.Value(grpcrequest.RequestIDKey{}).(string)
+	//if !ok {
+	//	return status.Error(codes.Internal, "request id not found in context")
+	//}
 
 	baseReq := &pbw.BaseRequest{
 		Downstream: "todo",
-		RequestId:  requestID,
+		//RequestId:  requestID,
 	}
 
 	workoutPlanReq := &pbw.GetWorkoutPlanReq{

@@ -1,16 +1,5 @@
-CREATE TABLE "total_exercise_stats" (
-                                      "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                                      "user_id" UUID UNIQUE,
-                                      "activity_id" UUID,
-                                      "session_name" varchar(255),
-                                      "number_of_times" integer,
-                                      "total_duration_hours" integer,
-                                      "total_duration_minutes" integer,
-                                      "total_duration_seconds" integer,
-                                      "total_calories_burned" integer,
-                                      "created_at" timestamp DEFAULT (now()),
-                                      "updated_at" timestamp
-);
+
+
 
 CREATE TABLE "total_exercise_session" (
                                         "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,

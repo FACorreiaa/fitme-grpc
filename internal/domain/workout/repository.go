@@ -426,114 +426,115 @@ func (r *RepositoryWorkout) UpdateExercise(ctx context.Context, req *pbw.UpdateE
 //	}, nil
 //}
 
-func (r *RepositoryWorkout) CreateWorkoutPlan(ctx context.Context, req *pbw.InsertWorkoutPlanReq) (*pbw.InsertWorkoutPlanRes, error) {
-	newWorkoutPlan := req.Workout
-	plan := req.PlanDay
+func (r *RepositoryWorkout) CreateWorkoutPlan(
+	ctx context.Context,
+	req *pbw.InsertWorkoutPlanReq,
+) (*pbw.InsertWorkoutPlanRes, error) {
 
-	tx, err := r.pgpool.BeginTx(ctx, pgx.TxOptions{})
+	// Begin transaction
+	tx, err := r.pgpool.Begin(ctx)
 	if err != nil {
-		logger.Error("Failed to start transaction", zap.Error(err))
-		return nil, status.Error(codes.Internal, "failed to start transaction")
+		return nil, status.Error(codes.Internal, "failed to begin transaction")
 	}
 	defer func() {
 		if err != nil {
 			_ = tx.Rollback(ctx)
-			logger.Warn("Transaction rolled back", zap.Error(err))
 		}
 	}()
 
-	var workoutPlanID string
-	insertWorkoutPlanQuery := `
-       INSERT INTO workout_plan (user_id, description, notes, rating, created_at)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id`
+	// Extract the main plan from the request
+	plan := req.Workout
+	if plan == nil {
+		return nil, status.Error(codes.InvalidArgument, "request.Workout cannot be nil")
+	}
 
-	err = tx.QueryRow(ctx, insertWorkoutPlanQuery, newWorkoutPlan.UserId,
-		newWorkoutPlan.Description, newWorkoutPlan.Notes, newWorkoutPlan.Rating, time.Now()).Scan(&workoutPlanID)
+	// Insert the main workout_plan row
+	createdAt := time.Now()
 
+	insertPlanQ := `
+       INSERT INTO workout_plan (id, user_id, description, notes, rating, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6)
+    `
+	_, err = tx.Exec(ctx, insertPlanQ,
+		plan.WorkoutId,
+		plan.UserId,
+		plan.Description,
+		plan.Notes,
+		plan.Rating,
+		createdAt,
+	)
 	if err != nil {
-		logger.Error("Failed to insert workout plan", zap.Error(err))
-		return &pbw.InsertWorkoutPlanRes{}, status.Error(codes.Internal, "failed to insert workout plan")
+		return nil, status.Error(codes.Internal, "failed to insert workout_plan")
 	}
 
-	row := tx.QueryRow(ctx, "SELECT id, user_id, description, notes, rating, created_at, updated_at FROM workout_plan WHERE id = $1", workoutPlanID)
-	insertedPlan := &pbw.XWorkoutPlan{}
-	createdAt := time.Time{}
-	updatedAt := sql.NullTime{}
-
-	err = row.Scan(&insertedPlan.WorkoutId, &insertedPlan.UserId, &insertedPlan.Description, &insertedPlan.Notes, &insertedPlan.Rating,
-		&createdAt, &updatedAt)
-	if err != nil {
-		logger.Error("no rows found on workout", zap.Error(err))
-		return &pbw.InsertWorkoutPlanRes{}, status.Error(codes.Internal, "failed to fetch inserted workout plan")
-	}
-	insertedPlan.CreatedAt = timestamppb.New(createdAt)
-	if updatedAt.Valid {
-		insertedPlan.UpdatedAt = timestamppb.New(updatedAt.Time)
-	} else {
-		insertedPlan.UpdatedAt = nil
-	}
-
-	// Insert each workout day
-	for _, day := range plan {
-		createdAt = time.Now()
-		workDayID := uuid.NewString()
-
-		workoutDayQuery := `
-       INSERT INTO workout_day (id, workout_plan_id, day, created_at)
-       VALUES ($1, $2, $3, $4)
-   `
-		_, err := tx.Exec(ctx, workoutDayQuery, workDayID, workoutPlanID, day.Day, createdAt)
-
+	// For each day in plan.WorkoutPlanDay, insert into workout_day + workout_plan_detail
+	finalDays := make([]*pbw.XWorkoutPlanDay, len(plan.WorkoutPlanDay))
+	for i, d := range plan.WorkoutPlanDay {
+		dayID := uuid.NewString()
+		insertDayQ := `
+            INSERT INTO workout_day (id, workout_plan_id, day, created_at)
+            VALUES ($1, $2, $3, $4)
+        `
+		_, err = tx.Exec(ctx, insertDayQ,
+			dayID,
+			plan.WorkoutId,
+			d.Day,
+			time.Now(),
+		)
 		if err != nil {
-			logger.Error("Failed to insert workout plan details", zap.Error(err))
-			return &pbw.InsertWorkoutPlanRes{}, status.Error(codes.Internal, "failed to insert workout day")
+			return nil, status.Error(codes.Internal, "failed to insert workout_day")
 		}
 
-		workoutPlanDetail := &pbw.XWorkoutPlanDetail{
-			WorkoutPlanId:       uuid.NewString(),
-			WorkoutPlanDetailId: insertedPlan.WorkoutId,
-			Day:                 day.Day,
-			Exercises:           day.ExerciseId,
-			CreatedAt:           timestamppb.New(createdAt),
+		// Build a string slice of exercise IDs to store in "exercises" (UUID[]) column
+		exerciseIDs := make([]string, len(d.Exercises))
+		for j, ex := range d.Exercises {
+			exerciseIDs[j] = ex.ExerciseId
 		}
 
-		// Insert workout plan details
-		workoutPlanDetailQuery := `
-       INSERT INTO workout_plan_detail (id, workout_plan_id, day, exercises, created_at)
-       VALUES ($1, $2, $3, $4, $5)
-   `
-		_, err = tx.Exec(ctx, workoutPlanDetailQuery, workoutPlanDetail.WorkoutPlanDetailId,
-			workoutPlanID,
-			workoutPlanDetail.Day,
-			workoutPlanDetail.Exercises,
-			createdAt)
-
+		detailID := uuid.NewString()
+		insertDetailQ := `
+            INSERT INTO workout_plan_detail (id, workout_plan_id, day, exercises, created_at)
+            VALUES ($1, $2, $3, $4, $5)
+        `
+		_, err = tx.Exec(ctx, insertDetailQ,
+			detailID,
+			plan.WorkoutId,
+			d.Day,
+			exerciseIDs, // the UUID[] of exercise IDs
+			time.Now(),
+		)
 		if err != nil {
-			logger.Error("Failed to insert workout plan detail", zap.Error(err))
-			return &pbw.InsertWorkoutPlanRes{}, status.Error(codes.Internal, "failed to insert workout plan detail")
+			return nil, status.Error(codes.Internal, "failed to insert workout_plan_detail")
+		}
+
+		// Rebuild a final XWorkoutPlanDay object
+		finalDays[i] = &pbw.XWorkoutPlanDay{
+			Day:       d.Day,
+			Exercises: d.Exercises, // keep the same slice of XExercises
 		}
 	}
 
-	// Commit the transaction
+	// Commit transaction
 	err = tx.Commit(ctx)
 	if err != nil {
-		logger.Error("Failed to commit transaction", zap.Error(err))
-		return &pbw.InsertWorkoutPlanRes{}, status.Error(codes.Internal, "failed to commit transaction")
+		return nil, status.Error(codes.Internal, "failed to commit transaction")
 	}
 
-	logger.Info("Workout plan created successfully", zap.String("workout_id", newWorkoutPlan.WorkoutId))
+	// Update the plan object with final data
+	plan.WorkoutPlanDay = finalDays
+	plan.CreatedAt = timestamppb.New(createdAt)
+	// UpdatedAt can remain nil or set it as needed.
 
-	// Ensure insertedPlan is not nil before returning
-	//if insertedPlan == nil {
-	//	logger.Error("Inserted plan is nil after successful commit")
-	//	return &pbw.InsertWorkoutPlanRes{}, status.Error(codes.Internal, "inserted workout plan is nil")
-	//}
-
+	// Build and return InsertWorkoutPlanRes
 	return &pbw.InsertWorkoutPlanRes{
 		Success: true,
 		Message: "Workout plan created successfully",
-		Workout: insertedPlan,
+		Workout: plan,
+		Response: &pbw.BaseResponse{
+			Upstream:  "workout-service",
+			RequestId: req.Request.RequestId, // if your request had a request_id
+			Status:    "OK",
+		},
 	}, nil
 }
 

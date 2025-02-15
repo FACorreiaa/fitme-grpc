@@ -144,3 +144,44 @@ Follow the Kubernetes deployment manifests and use port-forwarding as outlined i
 
 Contributing
 Contributions are welcome! Please fork the repository, create your feature branch, and submit a pull request. Ensure that your changes are covered by appropriate tests and documentation updates.
+
+# High-Level Technical Requirements
+## API/Backend Services
+
+Go with gRPC. Organize your services by domain—e.g.:
+1. UserService (handles sign‐up, login, user profiles, roles, friend requests, etc.)
+2. MessagingService (handles chat, file sharing, or you can split file sharing out)
+3. NotificationsService (handles push/email notifications, in‐app notifications)
+4. WorkoutService (exercise sessions, workout plans)
+5. DietService (meal plans, ingredients, logs)
+6. TrainerService / GymService (manages trainer–client relationships, gym data, classes, etc.)
+7. Each service exposes gRPC endpoints.
+8. Real-Time Communications (Chat & Video Calls)
+
+## Chat:
+Implement chat over gRPC streams (bidirectional streaming) or use WebSockets.
+Store conversations/messages in PostgreSQL (or a NoSQL store).
+## Video Calls:
+Typically done with a signaling server that sets up a WebRTC or other real-time protocol.
+Do signaling over gRPC streams or a separate WebSocket.
+Actual video/voice runs peer-to-peer (or via SFU/MCU if group calls).
+
+## Notifications
+You will want an internal mechanism (e.g., a small pub/sub or events) to generate notifications for “new message,” “new plan,” “friend request,” etc.
+Store them in a notifications table, with a “read/unread” flag.
+Send push/email/SMS via third-party providers (SendGrid, Twilio, etc.).
+
+## File Sharing
+Typically store actual files in an object store (S3, GCS, etc.).
+In DB, store only references/URLs and metadata (filename, size, content type, etc.).
+Integrations for:
+
+## Email invites (SendGrid/Mailgun/SES).
+SMS invites (Twilio, etc.).
+Social media (Facebook/Twitter/Instagram/TikTok) if you want to share a link to invite.
+Live streaming to Instagram/TikTok typically requires those platforms’ official APIs. Usually you’d generate an RTMP URL/stream key from the social platform, then push your video feed to it.
+Leaderboards & Achievements
+
+## Keep track of user points in a table (e.g. user_points).
+A separate table for achievements (e.g. achievements + user_achievements).
+Personal Trainer & Gym Entities

@@ -1,4 +1,4 @@
-CREATE TYPE "user_role" AS ENUM ('USER', 'ADMIN', 'MODERATOR', 'COACH');
+CREATE TYPE "user_role" AS ENUM ('USER', 'ADMIN', 'MODERATOR', 'COACH', 'GYM');
 CREATE TYPE "user_gender" AS ENUM ('MALE', 'FEMALE');
 
 
@@ -41,7 +41,7 @@ CREATE TABLE "users" (
                          "id" UUID DEFAULT gen_random_uuid() PRIMARY KEY,
                          "username" varchar(255) UNIQUE NOT NULL,
                          "email" varchar(255) UNIQUE NOT NULL,
-                         "password" varchar(255) UNIQUE NOT NULL,
+                         "password" varchar(255) NOT NULL,
                          "role" user_role NOT NULL DEFAULT 'USER',
                          "created_at" timestamp DEFAULT (now()),
                          "updated_at" timestamp DEFAULT null
@@ -49,4 +49,5 @@ CREATE TABLE "users" (
 
 insert into "users" (username, email, password, role)
 values ('admin', 'admin@email.com', '$2a$10$k4uyoO3uawBjcfF5.Ccdc.XC8QKsyKUS7Bt3te./DJmhRQiKTjNNm', 'ADMIN');
+
 

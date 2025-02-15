@@ -179,10 +179,11 @@ func Migrate(conn *pgxpool.Pool) error {
 		return err
 	}
 
+	sort.SliceStable(files, func(i, j int) bool {
+		return files[i].Name() < files[j].Name()
+	})
+
 	for _, file := range files {
-		sort.SliceStable(files, func(i, j int) bool {
-			return files[i].Name() < files[j].Name()
-		})
 
 		contents, err := migrationFS.ReadFile("migrations/" + file.Name())
 		if err != nil {
@@ -193,7 +194,7 @@ func Migrate(conn *pgxpool.Pool) error {
 
 		if prevHash, ok := appliedMigrations[file.Name()]; ok {
 			if prevHash != contentHash {
-				return errors.New("hash mismatch for")
+				return fmt.Errorf("hash mismatch for migration %s", file.Name())
 			}
 
 			log.Info(file.Name() + " already applied")
