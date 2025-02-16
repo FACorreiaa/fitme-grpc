@@ -772,6 +772,11 @@ func (s ServiceWorkout) DownloadWorkoutPlan(req *pbw.DownloadWorkoutPlanRequest,
 		fileData, fileName, contentType, err = generatePDF(ctx, workoutPlan)
 	case pbw.FileFormat_EXCEL:
 		fileData, fileName, contentType, err = generateExcel(ctx, workoutPlan)
+		err = os.WriteFile(fileName, fileData, 0644)
+		if err != nil {
+			log.Fatalf("Failed to write file: %v", err)
+		}
+		log.Printf("File %s saved (%d bytes)", fileName, len(fileData))
 	default:
 		return status.Errorf(codes.InvalidArgument, "unknown format")
 	}
@@ -871,39 +876,105 @@ func generateExcel(ctx context.Context, workoutPlan *pbw.GetWorkoutPlanRes) ([]b
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	// Create a new Excel file.
-	f := excelize.NewFile()
-	// Optionally, defer closing the file (if needed for cleanup).
-	defer func() {
-		if err := f.Close(); err != nil {
-			fmt.Println("failed to close file:", err)
-		}
-	}()
+	if workoutPlan == nil || workoutPlan.WorkoutPlan == nil {
+		return nil, "", "", errors.New("no workout plan provided")
+	}
+	plan := workoutPlan.WorkoutPlan
 
-	// Create a new sheet.
-	index, err := f.NewSheet("Sheet1")
-	if err != nil {
-		return nil, "", "", status.Errorf(codes.Internal, "failed to create new sheet: %v", err)
+	f := excelize.NewFile()
+	sheetName := "Sheet1"
+
+	headers := []string{
+		"Day",
+		"Exercise",
+		"Series",
+		"Repeticoes",
+		"Equipment",
+		"Instructions",
+		"Video",
+	}
+	for colIdx, header := range headers {
+		cell, err := excelize.CoordinatesToCellName(colIdx+1, 1)
+		if err != nil {
+			return nil, "", "", fmt.Errorf("failed to get cell name for header: %w", err)
+		}
+		if err := f.SetCellValue(sheetName, cell, header); err != nil {
+			return nil, "", "", fmt.Errorf("failed to set header cell value: %w", err)
+		}
 	}
 
-	// Populate your workbook with data.
-	// For example, set some cell values:
-	f.SetCellValue("Sheet2", "A2", "Hello world.")
-	f.SetCellValue("Sheet1", "B2", 100)
+	currentRow := 2
 
-	// Set the active sheet.
-	f.SetActiveSheet(index)
+	for _, day := range plan.WorkoutDay {
+		// Write a day header row that spans across all header columns.
+		startCell, _ := excelize.CoordinatesToCellName(1, currentRow)
+		endCell, _ := excelize.CoordinatesToCellName(len(headers), currentRow)
+		if err := f.MergeCell(sheetName, startCell, endCell); err != nil {
+			return nil, "", "", fmt.Errorf("failed to merge day header cells: %w", err)
+		}
+		if err := f.SetCellValue(sheetName, startCell, day.Day); err != nil {
+			return nil, "", "", fmt.Errorf("failed to set day header value: %w", err)
+		}
 
-	// Instead of saving to disk, write the file into a buffer.
+		styleID, err := f.NewStyle(&excelize.Style{
+			Font: &excelize.Font{
+				Bold: true,
+				Size: 12,
+			},
+			Alignment: &excelize.Alignment{
+				Horizontal: "left",
+			},
+		})
+
+		if err == nil {
+			f.SetCellStyle(sheetName, startCell, endCell, styleID)
+		}
+
+		currentRow++
+
+		// For grouping exercises
+		var lastGroup string
+
+		for _, ex := range day.Exercises {
+			if ex.MuscleGroup != lastGroup {
+				if err := f.SetCellValue(sheetName, fmt.Sprintf("A%d", currentRow), ex.MuscleGroup); err != nil {
+					return nil, "", "", fmt.Errorf("failed to set muscle group: %w", err)
+				}
+				lastGroup = ex.MuscleGroup
+			}
+			if err := f.SetCellValue(sheetName, fmt.Sprintf("B%d", currentRow), ex.Name); err != nil {
+				return nil, "", "", fmt.Errorf("failed to set exercise name: %w", err)
+			}
+			if err := f.SetCellValue(sheetName, fmt.Sprintf("C%d", currentRow), ex.Series); err != nil {
+				return nil, "", "", fmt.Errorf("failed to set series: %w", err)
+			}
+			if err := f.SetCellValue(sheetName, fmt.Sprintf("D%d", currentRow), ex.Reps); err != nil {
+				return nil, "", "", fmt.Errorf("failed to set repeticoes: %w", err)
+			}
+			if err := f.SetCellValue(sheetName, fmt.Sprintf("E%d", currentRow), ex.Equipment); err != nil {
+				return nil, "", "", fmt.Errorf("failed to set equipment: %w", err)
+			}
+			if err := f.SetCellValue(sheetName, fmt.Sprintf("E%d", currentRow), ex.Instruction); err != nil {
+				return nil, "", "", fmt.Errorf("failed to set equipment: %w", err)
+			}
+			if err := f.SetCellValue(sheetName, fmt.Sprintf("E%d", currentRow), ex.Video); err != nil {
+				return nil, "", "", fmt.Errorf("failed to set equipment: %w", err)
+			}
+
+			currentRow++
+		}
+
+		currentRow++
+	}
+
+	// Instead of saving to disk, write the Excel file to an in-memory buffer.
 	var buf bytes.Buffer
 	if _, err := f.WriteTo(&buf); err != nil {
-		return nil, "", "", status.Errorf(codes.Internal, "failed to write Excel file to buffer: %v", err)
+		return nil, "", "", fmt.Errorf("failed to write Excel file to buffer: %w", err)
 	}
 
 	fileName := "workout_plan.xlsx"
 	contentType := "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-
-	// Return the bytes from the buffer.
 	return buf.Bytes(), fileName, contentType, nil
 }
 

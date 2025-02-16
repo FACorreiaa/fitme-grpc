@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS "exercise_list" (
   "instructions" text,
   "video" varchar(255),
   "custom_created" boolean DEFAULT true,
+  "series" int,
+  "repetitions" varchar(50),
   "created_at" timestamp DEFAULT (now()),
   "updated_at" timestamp DEFAULT null
   );

@@ -494,6 +494,20 @@ func (r *RepositoryWorkout) CreateWorkoutPlan(
 		exerciseIDsStr := make([]string, len(d.Exercises))
 		var exerciseUUIDs []uuid.UUID
 		for j, ex := range d.Exercises {
+			insertExerciseQuery := `
+          INSERT INTO workout_day_exercise (workout_day_id, exercise_id, series, repetitions, created_at)
+          VALUES ($1, $2, $3, $4, $5)
+        `
+			_, err = tx.Exec(ctx, insertExerciseQuery,
+				dayID,
+				ex.ExerciseId,
+				ex.Series,
+				ex.Reps,
+				time.Now(),
+			)
+			if err != nil {
+				return nil, status.Error(codes.Internal, "failed to insert workout_day_exercise")
+			}
 			exerciseIDsStr[j] = ex.ExerciseId
 			// Convert string ID to uuid.UUID.
 			id, err := uuid.Parse(ex.ExerciseId)
@@ -849,6 +863,8 @@ func (r *RepositoryWorkout) fetchExerciseDetails(
         instructions,
         video,
         custom_created,
+        series,
+        repetitions,
         created_at,
         updated_at
       FROM exercise_list
@@ -880,6 +896,8 @@ func (r *RepositoryWorkout) fetchExerciseDetails(
 			instruction   sql.NullString
 			video         sql.NullString
 			customCreated sql.NullBool
+			series        sql.NullString
+			repetitions   sql.NullString
 			createdAt     time.Time
 			updatedAt     sql.NullTime
 		)
@@ -894,6 +912,8 @@ func (r *RepositoryWorkout) fetchExerciseDetails(
 			&instruction,
 			&video,
 			&customCreated,
+			&series,
+			&repetitions,
 			&createdAt,
 			&updatedAt,
 		); err != nil {

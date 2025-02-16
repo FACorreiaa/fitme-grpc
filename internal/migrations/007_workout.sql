@@ -30,3 +30,15 @@ CREATE TABLE IF NOT EXISTS "workout_day" (
                                              "updated_at" timestamp DEFAULT null,
                                              FOREIGN KEY (workout_plan_id) REFERENCES workout_plan(id)
 );
+
+CREATE TABLE IF NOT EXISTS workout_day_exercise (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  workout_day_id UUID NOT NULL,
+  exercise_id UUID NOT NULL,
+  series INTEGER,
+  repetitions VARCHAR(50),
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT null,
+  FOREIGN KEY (workout_day_id) REFERENCES workout_day(id),
+  FOREIGN KEY (exercise_id) REFERENCES exercise_list(id)
+  );
