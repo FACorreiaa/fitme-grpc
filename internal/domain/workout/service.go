@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/xuri/excelize/v2"
+
 	pbw "github.com/FACorreiaa/fitme-protos/modules/workout/generated"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -810,6 +812,9 @@ func (s ServiceWorkout) DownloadWorkoutPlan(req *pbw.DownloadWorkoutPlanRequest,
 }
 
 func generateCSV(ctx context.Context, workoutPlan *pbw.GetWorkoutPlanRes) ([]byte, string, string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	if workoutPlan == nil || workoutPlan.WorkoutPlan == nil {
 		return nil, "", "", errors.New("no workout plan provided")
 	}
@@ -834,11 +839,8 @@ func generateCSV(ctx context.Context, workoutPlan *pbw.GetWorkoutPlanRes) ([]byt
 
 	//exercisesString := strings.Join(exerciseSummaries, "\n")
 	for _, wd := range plan.WorkoutDay {
-		// Build a slice of strings for each exercise's details.
 		var exerciseStrs []string
 		for _, ex := range wd.Exercises {
-			// Format the details as desired.
-			// Here we include id, name, type, and muscle_group.
 			exStr := fmt.Sprintf("%s, %s, %s, %s, %s", wd.Day, ex.Name, ex.ExerciseType, ex.MuscleGroup, ex.Video)
 			exerciseStrs = append(exerciseStrs, exStr)
 		}
@@ -866,7 +868,43 @@ func generateCSV(ctx context.Context, workoutPlan *pbw.GetWorkoutPlanRes) ([]byt
 }
 
 func generateExcel(ctx context.Context, workoutPlan *pbw.GetWorkoutPlanRes) ([]byte, string, string, error) {
-	return nil, "", "", nil
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	// Create a new Excel file.
+	f := excelize.NewFile()
+	// Optionally, defer closing the file (if needed for cleanup).
+	defer func() {
+		if err := f.Close(); err != nil {
+			fmt.Println("failed to close file:", err)
+		}
+	}()
+
+	// Create a new sheet.
+	index, err := f.NewSheet("Sheet1")
+	if err != nil {
+		return nil, "", "", status.Errorf(codes.Internal, "failed to create new sheet: %v", err)
+	}
+
+	// Populate your workbook with data.
+	// For example, set some cell values:
+	f.SetCellValue("Sheet2", "A2", "Hello world.")
+	f.SetCellValue("Sheet1", "B2", 100)
+
+	// Set the active sheet.
+	f.SetActiveSheet(index)
+
+	// Instead of saving to disk, write the file into a buffer.
+	var buf bytes.Buffer
+	if _, err := f.WriteTo(&buf); err != nil {
+		return nil, "", "", status.Errorf(codes.Internal, "failed to write Excel file to buffer: %v", err)
+	}
+
+	fileName := "workout_plan.xlsx"
+	contentType := "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+	// Return the bytes from the buffer.
+	return buf.Bytes(), fileName, contentType, nil
 }
 
 func generatePDF(ctx context.Context, workoutPlan *pbw.GetWorkoutPlanRes) ([]byte, string, string, error) {

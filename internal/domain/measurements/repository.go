@@ -77,6 +77,12 @@ func (r *RepositoryMeasurement) GetWeights(ctx context.Context) ([]*pbm.XWeight,
 	}
 	defer rows.Close()
 	for rows.Next() {
+		select {
+		case <-ctx.Done():
+			return nil, status.Errorf(codes.DeadlineExceeded, "operation cancelled: %v", ctx.Err())
+		default:
+		}
+
 		weightProto := &pbm.XWeight{}
 		//var weightID, userID pgtype.UUID
 		var createdAt time.Time
@@ -263,6 +269,12 @@ func (r *RepositoryMeasurement) GetWaterMeasurements(ctx context.Context) ([]*pb
 	}
 	defer rows.Close()
 	for rows.Next() {
+		select {
+		case <-ctx.Done():
+			return nil, status.Errorf(codes.DeadlineExceeded, "operation cancelled: %v", ctx.Err())
+		default:
+		}
+
 		waterProto := &pbm.XWaterIntake{}
 		//var weightID, userID pgtype.UUID
 		var createdAt time.Time
@@ -448,6 +460,12 @@ func (r *RepositoryMeasurement) GetWasteLineMeasurements(ctx context.Context) ([
 	}
 	defer rows.Close()
 	for rows.Next() {
+		select {
+		case <-ctx.Done():
+			return nil, status.Errorf(codes.DeadlineExceeded, "operation cancelled: %v", ctx.Err())
+		default:
+		}
+
 		wastelineProto := &pbm.XWasteLine{}
 		//var weightID, userID pgtype.UUID
 		var createdAt time.Time

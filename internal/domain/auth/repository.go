@@ -201,6 +201,12 @@ func (r *Repository) GetAllUsers(ctx context.Context) (*pb.GetAllUsersResponse, 
 
 	var users []*pb.User
 	for rows.Next() {
+		select {
+		case <-ctx.Done():
+			return nil, status.Errorf(codes.DeadlineExceeded, "operation cancelled: %v", ctx.Err())
+		default:
+		}
+
 		var id, username, email, roleStr string
 		var createdAt time.Time
 		var updatedAt *time.Time

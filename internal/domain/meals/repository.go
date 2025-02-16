@@ -195,6 +195,12 @@ func (i *IngredientRepository) GetIngredients(ctx context.Context, req *pbml.Get
 	defer rows.Close()
 
 	for rows.Next() {
+		select {
+		case <-ctx.Done():
+			return nil, status.Errorf(codes.DeadlineExceeded, "operation cancelled: %v", ctx.Err())
+		default:
+		}
+
 		ingredientProto := pbml.XIngredient{}
 		ingredient := &Ingredient{}
 
@@ -794,6 +800,12 @@ func (m *MealPlanRepository) GetMeals(ctx context.Context, req *pbml.GetMealsReq
 	var mealsProto []*pbml.XMeal
 
 	for rows.Next() {
+		select {
+		case <-ctx.Done():
+			return nil, status.Errorf(codes.DeadlineExceeded, "operation cancelled: %v", ctx.Err())
+		default:
+		}
+
 		var rawIngredients []byte
 		meal := &Meal{
 			TotalMacros: &TotalNutrients{},
@@ -1226,6 +1238,12 @@ func (m *MealPlanRepository) GetMealIngredients(ctx context.Context, req *pbml.G
 	ingredients := make([]*pbml.XMealIngredient, 0)
 
 	for rows.Next() {
+		select {
+		case <-ctx.Done():
+			return nil, status.Errorf(codes.DeadlineExceeded, "operation cancelled: %v", ctx.Err())
+		default:
+		}
+
 		ingredientProto := &pbml.XMealIngredient{}
 		ingredient := &Ingredient{}
 		err := rows.Scan(
@@ -1838,6 +1856,12 @@ func (m *MealPlanRepository) GetMealPlans(ctx context.Context, req *pbml.GetMeal
 	mealPlansProto := make([]*pbml.XMealPlan, 0)
 
 	for rows.Next() {
+		select {
+		case <-ctx.Done():
+			return nil, status.Errorf(codes.DeadlineExceeded, "operation cancelled: %v", ctx.Err())
+		default:
+		}
+
 		var rawMeals []byte
 		mealPlan := &MealPlan{
 			TotalMacros: &TotalNutrients{},

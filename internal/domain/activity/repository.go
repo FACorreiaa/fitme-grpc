@@ -70,6 +70,12 @@ func (a *RepositoryActivity) GetActivity(ctx context.Context, req *pba.GetActivi
 	defer rows.Close()
 
 	for rows.Next() {
+		select {
+		case <-ctx.Done():
+			return nil, status.Errorf(codes.DeadlineExceeded, "operation cancelled: %v", ctx.Err())
+		default:
+		}
+
 		ac := &Activity{}
 		a := pba.XActivity{}
 
@@ -392,6 +398,12 @@ func (a *RepositoryActivity) GetUserExerciseTotalData(ctx context.Context, req *
 	defer rows.Close()
 
 	for rows.Next() {
+		select {
+		case <-ctx.Done():
+			return nil, status.Errorf(codes.DeadlineExceeded, "operation cancelled: %v", ctx.Err())
+		default:
+		}
+
 		var eSession ExerciseSession
 		if err := rows.Scan(&eSession.DurationHours, &eSession.DurationMinutes, &eSession.DurationSeconds,
 			&eSession.CaloriesBurned, &eSession.SessionName); err != nil {
@@ -492,6 +504,12 @@ func (a *RepositoryActivity) GetUserExerciseSessionStats(ctx context.Context, re
 	defer rows.Close()
 
 	for rows.Next() {
+		select {
+		case <-ctx.Done():
+			return nil, status.Errorf(codes.DeadlineExceeded, "operation cancelled: %v", ctx.Err())
+		default:
+		}
+
 		var stat ExerciseCountStats
 		if err := rows.Scan(&stat.SessionName, &stat.ActivityID, &stat.NumberOfTimes, &stat.TotalExerciseDurationSeconds, &stat.TotalExerciseDurationMinutes, &stat.TotalExerciseDurationHours, &stat.TotalExerciseCaloriesBurned); err != nil {
 			return nil, fmt.Errorf("failed to scan exercise stats: %w", err)

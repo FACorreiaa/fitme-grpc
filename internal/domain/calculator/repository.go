@@ -53,6 +53,12 @@ func (c *CalculatorRepository) GetUsersMacros(ctx context.Context, req *pbc.GetA
 	defer rows.Close()
 
 	for rows.Next() {
+		select {
+		case <-ctx.Done():
+			return nil, status.Errorf(codes.DeadlineExceeded, "operation cancelled: %v", ctx.Err())
+		default:
+		}
+
 		var macro pbc.UserMacroDistribution
 		var createdAt time.Time
 

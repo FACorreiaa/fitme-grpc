@@ -58,6 +58,12 @@ func (r *RepositoryWorkout) GetExercises(ctx context.Context, req *pbw.GetExerci
 	defer rows.Close()
 
 	for rows.Next() {
+		select {
+		case <-ctx.Done():
+			return nil, status.Errorf(codes.DeadlineExceeded, "operation cancelled: %v", ctx.Err())
+		default:
+		}
+
 		exerciseProto := pbw.XExercises{}
 		e := &Exercises{}
 
@@ -580,6 +586,11 @@ func (r *RepositoryWorkout) GetWorkoutPlans(ctx context.Context, req *pbw.GetWor
 	workouts := make(map[string]*pbw.XWorkoutPlanResponse)
 
 	for rows.Next() {
+		select {
+		case <-ctx.Done():
+			return nil, status.Errorf(codes.DeadlineExceeded, "operation cancelled: %v", ctx.Err())
+		default:
+		}
 		var (
 			workoutPlanID uuid.UUID
 			userID        uuid.UUID
@@ -727,6 +738,12 @@ func (r *RepositoryWorkout) GetWorkoutPlan(
 	foundAny := false
 
 	for rows.Next() {
+		select {
+		case <-ctx.Done():
+			return nil, status.Errorf(codes.DeadlineExceeded, "operation cancelled: %v", ctx.Err())
+		default:
+		}
+
 		foundAny = true
 
 		var (
@@ -847,6 +864,12 @@ func (r *RepositoryWorkout) fetchExerciseDetails(
 	var results []*pbw.XExercises
 
 	for rows.Next() {
+		select {
+		case <-ctx.Done():
+			return nil, status.Errorf(codes.DeadlineExceeded, "operation cancelled: %v", ctx.Err())
+		default:
+		}
+
 		var (
 			exID          uuid.UUID
 			name          sql.NullString
@@ -970,6 +993,12 @@ func (r *RepositoryWorkout) GetWorkoutPlanExercises(ctx context.Context, req *pb
 	}
 	defer rows.Close()
 	for rows.Next() {
+		select {
+		case <-ctx.Done():
+			return nil, status.Errorf(codes.DeadlineExceeded, "operation cancelled: %v", ctx.Err())
+		default:
+		}
+
 		workoutProto := pbw.XWorkoutExerciseDay{}
 		workoutList := &WorkoutExerciseDay{}
 
