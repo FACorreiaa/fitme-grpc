@@ -249,8 +249,10 @@ func (r *RepositoryWorkout) CreateExercise(ctx context.Context, req *pbw.CreateE
 		Instruction:   req.Exercise.Instruction,
 		Video:         req.Exercise.Video,
 		CustomCreated: true,
-		CreatedAt:     timestamppb.New(currentTime), // Proto timestamp for created_at fix later
-		UpdatedAt:     timestamppb.New(currentTime), // Proto timestamp for updated_at fix later
+		CreatedAt:     timestamppb.New(currentTime),
+		UpdatedAt:     timestamppb.New(currentTime),
+		Series:        req.Exercise.Series,
+		Repetitions:   req.Exercise.Repetitions,
 	}
 
 	return &pbw.CreateExerciseRes{
@@ -540,19 +542,14 @@ func (r *RepositoryWorkout) CreateWorkoutPlan(
 			return nil, status.Errorf(codes.Internal, "failed to fetch exercise details for day %q: %v", d.Day, err)
 		}
 
-		// Build the final day object with the full exercise details.
-		//finalDays[i] = &pbw.XWorkoutPlanDay{
-		//	Day:       d.Day,
-		//	Exercises: exDetails, // now contains full exercise details
-		//}
+		finalDays[i] = &pbw.XWorkoutPlanDay{
+			Day:       d.Day,
+			Exercises: exDetails,
+		}
 
 		for idx := range exDetails {
 			exDetails[idx].Series = d.Exercises[idx].Series
 			exDetails[idx].Repetitions = d.Exercises[idx].Repetitions
-		}
-		finalDays[i] = &pbw.XWorkoutPlanDay{
-			Day:       d.Day,
-			Exercises: exDetails,
 		}
 	}
 
@@ -852,15 +849,13 @@ func (r *RepositoryWorkout) GetWorkoutPlan(
 }
 
 // Helper method to query the 'exercise_list' table
-func (r *RepositoryWorkout) fetchExerciseDetails(
-	ctx context.Context,
-	ids []uuid.UUID,
-) ([]*pbw.XExercises, error) {
-	if len(ids) == 0 {
-		return nil, nil
+func (r *RepositoryWorkout) fetchExerciseDetails(ctx context.Context, exerciseUUIDs []uuid.UUID) ([]*pbw.XExercises, error) {
+	// Convert []uuid.UUID to []string so pgx can encode it properly.
+	idStrings := make([]string, len(exerciseUUIDs))
+	for i, u := range exerciseUUIDs {
+		idStrings[i] = u.String()
 	}
 
-	// Example query that fetches all the columns you need:
 	q := `
       SELECT
         id,
@@ -879,83 +874,68 @@ func (r *RepositoryWorkout) fetchExerciseDetails(
       FROM exercise_list
       WHERE id = ANY($1::uuid[])
     `
-
-	rows, err := r.pgpool.Query(ctx, q, ids)
+	rows, err := r.pgpool.Query(ctx, q, idStrings)
 	if err != nil {
 		return nil, fmt.Errorf("fetchExerciseDetails query error: %w", err)
 	}
 	defer rows.Close()
 
-	var results []*pbw.XExercises
-
+	var exercises []*pbw.XExercises
 	for rows.Next() {
-		select {
-		case <-ctx.Done():
-			return nil, status.Errorf(codes.DeadlineExceeded, "operation cancelled: %v", ctx.Err())
-		default:
-		}
-
 		var (
-			exID          uuid.UUID
-			name          sql.NullString
-			exType        sql.NullString
-			muscleGroup   sql.NullString
-			equipment     sql.NullString
-			difficulty    sql.NullString
-			instruction   sql.NullString
-			video         sql.NullString
-			customCreated sql.NullBool
-			series        sql.NullFloat64
+			id            string
+			name          string
+			exType        string
+			muscleGroup   string
+			equipment     string
+			difficulty    string
+			instructions  string
+			video         string
+			customCreated bool
+			series        sql.NullInt32
 			repetitions   sql.NullString
 			createdAt     time.Time
 			updatedAt     sql.NullTime
 		)
-
-		if err := rows.Scan(
-			&exID,
-			&name,
-			&exType,
-			&muscleGroup,
-			&equipment,
-			&difficulty,
-			&instruction,
-			&video,
-			&customCreated,
-			&series,
-			&repetitions,
-			&createdAt,
-			&updatedAt,
-		); err != nil {
+		if err := rows.Scan(&id, &name, &exType, &muscleGroup, &equipment,
+			&difficulty, &instructions, &video, &customCreated,
+			&series, &repetitions, &createdAt, &updatedAt); err != nil {
 			return nil, err
 		}
 
-		var seriesVal uint32 = 0
+		var seriesValue uint32 = 0
 		if series.Valid {
-			seriesVal = uint32(series.Float64)
+			seriesValue = uint32(series.Int32)
 		}
 
-		exProto := &pbw.XExercises{
-			ExerciseId:    exID.String(),
-			Name:          name.String,
-			ExerciseType:  exType.String,
-			MuscleGroup:   muscleGroup.String,
-			Equipment:     equipment.String,
-			Difficulty:    difficulty.String,
-			Instruction:   instruction.String,
-			Video:         video.String,
-			Repetitions:   repetitions.String,
-			Series:        seriesVal,
-			CustomCreated: customCreated.Bool,
+		var repetitionValue string = ""
+		if repetitions.Valid {
+			repetitionValue = repetitions.String
+		}
+
+		exercise := &pbw.XExercises{
+			ExerciseId:    id,
+			Name:          name,
+			ExerciseType:  exType,
+			MuscleGroup:   muscleGroup,
+			Equipment:     equipment,
+			Difficulty:    difficulty,
+			Instruction:   instructions,
+			Video:         video,
+			CustomCreated: customCreated,
+			Series:        seriesValue,
+			Repetitions:   repetitionValue,
 			CreatedAt:     timestamppb.New(createdAt),
 		}
 		if updatedAt.Valid {
-			exProto.UpdatedAt = timestamppb.New(updatedAt.Time)
+			exercise.UpdatedAt = timestamppb.New(updatedAt.Time)
 		}
-
-		results = append(results, exProto)
+		exercises = append(exercises, exercise)
 	}
-
-	return results, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return exercises, nil
 }
 
 func (r *RepositoryWorkout) DeleteWorkoutPlan(ctx context.Context, req *pbw.DeleteWorkoutPlanReq) (*pbw.NilRes, error) {
