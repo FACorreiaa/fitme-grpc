@@ -471,8 +471,6 @@ func (s ServiceWorkout) InsertWorkoutPlan(
 			if exInput.ExerciseId != "" {
 				getReq := &pbw.GetExerciseIDReq{
 					ExerciseId: exInput.ExerciseId,
-					// Optionally set the .request field if you want:
-					// Request: &pbw.BaseRequest{ request_id: "..."},
 				}
 
 				existing, err := s.repo.GetExerciseID(ctx, getReq)
@@ -490,9 +488,12 @@ func (s ServiceWorkout) InsertWorkoutPlan(
 								Difficulty:   exInput.Difficulty,
 								Instruction:  exInput.Instruction,
 								Video:        exInput.Video,
+								Repetitions:  exInput.Repetitions,
+								Series:       exInput.Series,
 								CreatedAt:    exInput.CreatedAt, // or timestamppb.Now()
 							},
 							UserId: userID,
+
 							// fill the rest
 						}
 						newExerciseRes, err2 := s.repo.CreateExercise(ctx, createReq)
@@ -504,6 +505,8 @@ func (s ServiceWorkout) InsertWorkoutPlan(
 						return nil, status.Errorf(codes.Internal, "failed to get exercise details: %v", err)
 					}
 				} else {
+					existing.Exercise.Series = exInput.Series
+					existing.Exercise.Repetitions = exInput.Repetitions
 					dayExercises[j] = existing.Exercise
 				}
 			} else {
@@ -518,6 +521,8 @@ func (s ServiceWorkout) InsertWorkoutPlan(
 						Difficulty:   exInput.Difficulty,
 						Instruction:  exInput.Instruction,
 						Video:        exInput.Video,
+						Repetitions:  exInput.Repetitions,
+						Series:       exInput.Series,
 						CreatedAt:    exInput.CreatedAt,
 					},
 					UserId: userID,

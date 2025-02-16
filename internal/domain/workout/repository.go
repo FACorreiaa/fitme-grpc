@@ -541,19 +541,19 @@ func (r *RepositoryWorkout) CreateWorkoutPlan(
 		}
 
 		// Build the final day object with the full exercise details.
-		finalDays[i] = &pbw.XWorkoutPlanDay{
-			Day:       d.Day,
-			Exercises: exDetails, // now contains full exercise details
-		}
-
-		//for idx := range exDetails {
-		//	exDetails[idx].Series = d.Exercises[idx].Series
-		//	exDetails[idx].Repetitions = d.Exercises[idx].Repetitions
-		//}
 		//finalDays[i] = &pbw.XWorkoutPlanDay{
 		//	Day:       d.Day,
-		//	Exercises: exDetails,
+		//	Exercises: exDetails, // now contains full exercise details
 		//}
+
+		for idx := range exDetails {
+			exDetails[idx].Series = d.Exercises[idx].Series
+			exDetails[idx].Repetitions = d.Exercises[idx].Repetitions
+		}
+		finalDays[i] = &pbw.XWorkoutPlanDay{
+			Day:       d.Day,
+			Exercises: exDetails,
+		}
 	}
 
 	// Commit the transaction.
