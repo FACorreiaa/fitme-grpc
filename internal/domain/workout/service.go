@@ -461,9 +461,9 @@ func (s ServiceWorkout) InsertWorkoutPlan(
 		req.Request = &pbw.BaseRequest{}
 	}
 
-	resolvedDays := make([]*pbw.XWorkoutPlanDay, len(req.PlanDay))
+	resolvedDays := make([]*pbw.XWorkoutPlanDay, len(req.Workout.WorkoutPlanDay))
 
-	for i, planDay := range req.PlanDay {
+	for i, planDay := range req.Workout.WorkoutPlanDay {
 		dayExercises := make([]*pbw.XExercises, len(planDay.Exercises))
 		dayName := planDay.Day
 
@@ -948,7 +948,7 @@ func generateExcel(ctx context.Context, workoutPlan *pbw.GetWorkoutPlanRes) ([]b
 			if err := f.SetCellValue(sheetName, fmt.Sprintf("C%d", currentRow), ex.Series); err != nil {
 				return nil, "", "", fmt.Errorf("failed to set series: %w", err)
 			}
-			if err := f.SetCellValue(sheetName, fmt.Sprintf("D%d", currentRow), ex.Reps); err != nil {
+			if err := f.SetCellValue(sheetName, fmt.Sprintf("D%d", currentRow), ex.Repetitions); err != nil {
 				return nil, "", "", fmt.Errorf("failed to set repeticoes: %w", err)
 			}
 			if err := f.SetCellValue(sheetName, fmt.Sprintf("E%d", currentRow), ex.Equipment); err != nil {

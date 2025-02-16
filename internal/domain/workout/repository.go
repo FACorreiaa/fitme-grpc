@@ -502,7 +502,7 @@ func (r *RepositoryWorkout) CreateWorkoutPlan(
 				dayID,
 				ex.ExerciseId,
 				ex.Series,
-				ex.Reps,
+				ex.Repetitions,
 				time.Now(),
 			)
 			if err != nil {
@@ -545,6 +545,15 @@ func (r *RepositoryWorkout) CreateWorkoutPlan(
 			Day:       d.Day,
 			Exercises: exDetails, // now contains full exercise details
 		}
+
+		//for idx := range exDetails {
+		//	exDetails[idx].Series = d.Exercises[idx].Series
+		//	exDetails[idx].Repetitions = d.Exercises[idx].Repetitions
+		//}
+		//finalDays[i] = &pbw.XWorkoutPlanDay{
+		//	Day:       d.Day,
+		//	Exercises: exDetails,
+		//}
 	}
 
 	// Commit the transaction.
@@ -896,7 +905,7 @@ func (r *RepositoryWorkout) fetchExerciseDetails(
 			instruction   sql.NullString
 			video         sql.NullString
 			customCreated sql.NullBool
-			series        sql.NullString
+			series        sql.NullFloat64
 			repetitions   sql.NullString
 			createdAt     time.Time
 			updatedAt     sql.NullTime
@@ -920,6 +929,11 @@ func (r *RepositoryWorkout) fetchExerciseDetails(
 			return nil, err
 		}
 
+		var seriesVal uint32 = 0
+		if series.Valid {
+			seriesVal = uint32(series.Float64)
+		}
+
 		exProto := &pbw.XExercises{
 			ExerciseId:    exID.String(),
 			Name:          name.String,
@@ -929,6 +943,8 @@ func (r *RepositoryWorkout) fetchExerciseDetails(
 			Difficulty:    difficulty.String,
 			Instruction:   instruction.String,
 			Video:         video.String,
+			Repetitions:   repetitions.String,
+			Series:        seriesVal,
 			CustomCreated: customCreated.Bool,
 			CreatedAt:     timestamppb.New(createdAt),
 		}
