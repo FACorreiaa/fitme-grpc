@@ -1,4 +1,4 @@
-# FitME-gRPC
+`# FitME-gRPC
 
 Rewrite of the FitME REST version to a gRPC infrastructure with a strong emphasis on middleware, tracing, and logging integration.
 By sharing proto definitions and containerizing services, this project achieves flexible inter-service communication while ensuring proper context propagation, error handling, and telemetry across the stack.
@@ -209,22 +209,6 @@ Warn users if their meal plan exceeds their objective's calorie goal, allowing f
 - Flexibility:
 Optionally allow overrides while logging such events for further review.
 
-- TODO / Future Work
-
-[x] Fix Prometheus integration
-[x]Configure Loki integration
-[x]Configure Tempo integration
-[x]Complete Grafana configuration for production (configure ingress and point to Prometheus)
-[x]Kubernetes deployment for all services
-[x]Finalize PostgreSQL and Redis exporters
-[]Finalize all remaining services
-[]Implement a messaging system for communication between personal trainers (PTs) and clients
-[]Integrate Kafka (or similar) for message queue and notifications
-[]Add PDF builder (using Maroto)
-[]Add CSV and Excel builders (see Domonda for reference)
-[]Further enhance security, data privacy, and RBAC
-[]Finalize the leaderboard feature and FitSynch enhancements
-
 ### Access Telemetry UIs:
 
 Grafana: http://localhost:3000
@@ -277,3 +261,281 @@ Leaderboards & Achievements
 ## Keep track of user points in a table (e.g. user_points).
 A separate table for achievements (e.g. achievements + user_achievements).
 Personal Trainer & Gym Entities
+
+# TODO / Future Work
+
+[x] Fix Prometheus integration
+[x]Configure Loki integration
+[x]Configure Tempo integration
+[x]Complete Grafana configuration for production (configure ingress and point to Prometheus)
+[x]Kubernetes deployment for all services
+[x]Finalize PostgreSQL and Redis exporters
+[]Finalize all remaining services
+[]Implement a messaging system for communication between personal trainers (PTs) and clients
+[]Integrate Kafka (or similar) for message queue and notifications
+[]Add PDF builder (using Maroto)
+[]Add CSV and Excel builders (see Domonda for reference)
+[]Further enhance security, data privacy, and RBAC
+[]Finalize the leaderboard feature and FitSynch enhancements
+
+## Additional Microservices
+
+### 1. BiometricsService
+```protobuf
+service BiometricsService {
+  rpc TrackHRV(HRVData) returns (BiometricResponse);
+  rpc SyncWearableData(stream WearableData) returns (SyncResponse);
+  rpc GetStressScore(UserID) returns (StressScore);
+  rpc GetRecoveryMetrics(UserID) returns (RecoveryMetrics);
+  rpc StreamRealtimeMetrics(UserID) returns (stream BiometricStream);
+}
+```
+
+- Handles all wearable device integrations
+- Processes HRV, sleep, and recovery data
+- Implements device-specific adapters for Apple Health, Google Fit, Oura, etc.
+- Uses Redis for real-time metric caching
+
+### 2. MentalHealthService
+```protobuf
+service MentalHealthService {
+  rpc LogMoodEntry(MoodData) returns (MoodResponse);
+  rpc GetMoodTrends(UserID) returns (MoodTrends);
+  rpc StartMeditationSession(MeditationConfig) returns (stream GuidanceAudio);
+  rpc ProcessJournalEntry(JournalData) returns (AIInsights);
+  rpc GetWellnessScore(UserID) returns (WellnessMetrics);
+}
+```
+
+- Implements secure journaling with encryption
+- Handles meditation session management
+- Processes mood tracking and analysis
+- Integrates with AI for personalized insights
+
+### 3. AIOrchestrationService
+```protobuf
+service AIOrchestrationService {
+  rpc GetPersonalizedRecommendations(UserContext) returns (Recommendations);
+  rpc AnalyzeWorkoutForm(stream VideoFrame) returns (FormAnalysis);
+  rpc PredictBurnoutRisk(UserMetrics) returns (RiskAssessment);
+  rpc GenerateMealPlan(DietaryPreferences) returns (MealPlan);
+  rpc GetHealthInsights(HealthData) returns (HealthAnalysis);
+}
+```
+
+- Coordinates all AI model interactions
+- Manages model versioning and A/B testing
+- Handles feature extraction and preprocessing
+- Implements model serving infrastructure
+
+## Data Storage Enhancements
+
+1. Time Series Data
+
+```sql
+CREATE TABLE biometric_readings (
+    user_id UUID,
+    timestamp TIMESTAMPTZ,
+    metric_type VARCHAR(50),
+    value DOUBLE PRECISION,
+    device_source VARCHAR(100),
+    PRIMARY KEY (user_id, timestamp, metric_type)
+);
+```
+
+- Use TimescaleDB extension for PostgreSQL
+- Implement automatic data retention policies
+- Set up continuous aggregates for trending
+
+2. Event Streaming
+```yaml
+kafka:
+  topics:
+    - name: biometric-events
+      partitions: 12
+      replication: 3
+    - name: mood-updates
+      partitions: 6
+      replication: 3
+    - name: ai-predictions
+      partitions: 8
+      replication: 3
+```
+
+- Kafka for real-time event processing
+- Implement event sourcing for critical data
+- Set up stream processing for real-time analytics
+
+## Security Enhancements
+
+### 1. Health Data Compliance
+```go
+type HealthDataEncryption struct {
+    KeyRotationInterval time.Duration
+    EncryptionAlgorithm string
+    KeyManagementService interface{}
+}
+```
+
+- Implement HIPAA-compliant data storage
+- Set up PHI (Protected Health Information) handling
+- Implement data anonymization for research
+
+### 2. Consent Management
+```protobuf
+service ConsentService {
+  rpc UpdateDataSharingPreferences(SharingPreferences) returns (UpdateResponse);
+  rpc GetUserConsents(UserID) returns (ConsentStatus);
+  rpc RevokeConsent(ConsentRevocation) returns (RevocationResponse);
+}
+```
+- Handle granular data sharing permissions
+- Manage research participation consent
+- Track data usage and access logs
+
+## Integration Patterns
+
+### 1. Device Integration
+```go
+type DeviceIntegration struct {
+    Provider string
+    AuthType AuthenticationMethod
+    DataSync SyncStrategy
+    RateLimits RateLimitConfig
+}
+```
+- Implement OAuth2 for device connections
+- Handle offline data syncing
+- Manage rate limiting per provider
+
+### 2. External API Integration
+```yaml
+integrations:
+  - service: blood-test-api
+    type: REST
+    auth: oauth2
+    rate_limit: 1000/hour
+  - service: nutrition-database
+    type: GraphQL
+    auth: api_key
+    rate_limit: 5000/hour
+```
+
+- Set up API gateways for external services
+- Implement circuit breakers
+- Handle quota management
+
+## Observability Enhancements
+
+### 1. Custom Metrics
+```go
+type WellnessMetrics struct {
+    UserEngagement *prometheus.GaugeVec
+    MentalHealthScores *prometheus.HistogramVec
+    AIModelLatency *prometheus.SummaryVec
+    DeviceSyncStatus *prometheus.GaugeVec
+}
+```
+- Track wellness-specific metrics
+- Monitor AI model performance
+- Track integration health
+
+### 2. Health Checks
+```go
+type HealthCheck struct {
+    BiometricSync Status
+    AIModelServing Status
+    DataEncryption Status
+    ExternalIntegrations map[string]Status
+}
+```
+- Implement deep health checks
+- Monitor data quality
+- Track integration status
+
+## Deployment Considerations
+
+### 1. Multi-Region Setup
+```yaml
+regions:
+  - name: us-east1
+    primary: true
+    services: all
+  - name: eu-west1
+    primary: false
+    services: [user, biometric, mental-health]
+```
+
+- Handle data residency requirements
+- Implement geo-specific features
+- Manage multi-region sync
+
+### 2. Scaling Strategy
+```yaml
+autoscaling:
+  biometric_service:
+    min_replicas: 3
+    max_replicas: 10
+    metrics:
+      - type: cpu
+        target: 70
+  ai_service:
+    min_replicas: 2
+    max_replicas: 8
+    metrics:
+      - type: custom
+        name: model_queue_length
+        target: 100
+```
+- Set up service-specific scaling
+- Implement predicative scaling
+- Handle burst capacity
+
+# Todo documentation
+
+1. Visual Architecture Diagrams
+   Add Diagrams:
+   Include one or more high-level diagrams (system architecture, service interactions, deployment pipelines) to help readers visualize how the components interact. This can simplify understanding for new contributors and potential partners.
+2. Roadmap & Milestones
+   Short-Term, Mid-Term, Long-Term Goals:
+   Break down feature list into clear phases.
+   Phase 1: Core gRPC services, basic telemetry, and mobile-focused fitness features.
+   Phase 2: Trainer-specific dashboards, social/gamification elements, and web integration.
+   Phase 3: Full mental health modules, AI-driven insights, and healthcare integrations.
+   Timeline:
+   A tentative timeline or roadmap with milestones can provide clarity for contributors and stakeholders.
+3. API Documentation & Examples
+   Add sample gRPC calls or client code snippets to demonstrate how to interact with the services.
+   Documentation Links:
+   If available, link to more detailed API documentation (e.g., hosted on a wiki or a dedicated docs site) so users can dive deeper.
+4. Testing, CI/CD, and DevOps
+   Testing Strategy:
+   Outline how to test each component (unit tests, integration tests, end-to-end tests).
+   CI/CD Pipeline:
+   Briefly describe your continuous integration and deployment strategy. For instance, mention if you’re using GitHub Actions, Jenkins, or another tool.
+   DevOps Practices:
+   Explain how containerization and Kubernetes are integrated into your development and deployment cycles.
+5. Security, Privacy, and Compliance
+   Security Measures:
+   Detail any plans for securing APIs, data encryption, user authentication, and authorization (e.g., OAuth, JWTs).
+   Data Privacy:
+   Given the sensitive nature of health data, outline how you’ll handle data privacy and compliance (GDPR, HIPAA, etc.).
+   RBAC and Auditing:
+   Mention plans for robust role-based access control and logging to help with audits and anomaly detection.
+6. Community & Contribution Guidelines
+   Contribution Process:
+   Expand on the “Contributing” section by detailing your review process, coding standards, and how contributors can propose features or report issues.
+   Community Engagement:
+   Consider adding links to community channels (e.g., Slack, Discord, forums) where developers and potential trainers can discuss the project and share feedback.
+7. Marketing & User Acquisition Insights
+   Value Proposition:
+   Reinforce the unique selling points for both end-users (personalized wellness, AI-driven insights) and professional users (trainers, nutritionists) early in the readme.
+   Pilot Programs & Partnerships:
+   Briefly mention any pilot programs or partnerships in the pipeline, especially with local gyms or wellness centers, which could attract early adopters.
+   Feedback Loop:
+   Emphasize the importance of community feedback and how it’s integrated into iterative development. This can encourage external contributions and user buy-in.
+8. Future Enhancements & AI Integration
+   Detail AI Strategies:
+   Expand on how the AI components will evolve. For example, you can outline the steps toward training personalized models and integrating them with the core services.
+   Data Insights:
+   Explain how the data collected from workouts, nutrition, and mental health tracking will be leveraged not only for personalized recommendations but also for broader health insights that could drive future features or partnerships with healthcare providers.
