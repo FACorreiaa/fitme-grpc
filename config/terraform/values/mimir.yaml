@@ -3982,7 +3982,7 @@ admin_api:
 # -- Cache for admin bucket.
 # If this is disabled, in-memory cache will be set by default.
 # You can use Redis too for cache and set the configuration via structuredConfig.
-# See GEM documentation for Redis configuration option.
+# See GEM diagrams for Redis configuration option.
 admin-cache:
   # -- Specifies whether admin-cache using memcached should be enabled
   enabled: false

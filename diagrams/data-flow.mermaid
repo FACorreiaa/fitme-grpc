@@ -1,0 +1,17 @@
+sequenceDiagram
+    participant User as User App
+    participant Gateway as API Gateway
+    participant Bio as BiometricsService
+    participant AI as AIOrchestrationService
+    participant Kafka as Kafka
+    participant DB as PostgreSQL
+    participant Cache as Redis
+
+    User->>Gateway: Submit workout data
+    Gateway->>Bio: Process biometric data
+    Bio->>Cache: Cache recent metrics
+    Bio->>Kafka: Publish biometric event
+    Kafka->>AI: Process for insights
+    AI->>DB: Store analyzed results
+    AI->>Cache: Cache recommendations
+    AI->>User: Return personalized insights

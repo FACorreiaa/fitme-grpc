@@ -1,0 +1,82 @@
+graph TB
+    subgraph "Client Applications"
+        iOS["iOS App"]
+        Android["Android App (Future)"]
+        Web["Web Platform"]
+    end
+
+    subgraph "API Gateway Layer"
+        Gateway["API Gateway"]
+    end
+
+    subgraph "Core Services"
+        User["UserService"]
+        Workout["WorkoutService"]
+        Diet["DietService"]
+        Trainer["TrainerService"]
+        Mental["MentalHealthService"]
+        Bio["BiometricsService"]
+        AI["AIOrchestrationService"]
+        Notif["NotificationService"]
+        Message["MessagingService"]
+    end
+
+    subgraph "Data Layer"
+        Postgres[(PostgreSQL)]
+        Redis[(Redis Cache)]
+        Kafka{{"Kafka Events"}}
+        S3["Object Storage"]
+    end
+
+    subgraph "External Integrations"
+        Wearables["Wearable Devices"]
+        HealthAPIs["Health APIs"]
+        Payment["Payment Gateway"]
+    end
+
+    subgraph "Observability"
+        Prometheus["Prometheus"]
+        Grafana["Grafana"]
+        Loki["Loki"]
+        Tempo["Tempo"]
+    end
+
+    iOS --> Gateway
+    Android --> Gateway
+    Web --> Gateway
+    Gateway --> User
+    Gateway --> Workout
+    Gateway --> Diet
+    Gateway --> Trainer
+    Gateway --> Mental
+    Gateway --> Bio
+    Gateway --> AI
+    Gateway --> Notif
+    Gateway --> Message
+
+    User --> Postgres
+    Workout --> Postgres
+    Diet --> Postgres
+    Trainer --> Postgres
+    Mental --> Postgres
+    Bio --> Postgres
+    
+    User --> Redis
+    Workout --> Redis
+    Diet --> Redis
+    
+    Bio --> Kafka
+    AI --> Kafka
+    Notif --> Kafka
+    
+    Workout --> S3
+    Mental --> S3
+    
+    Bio --> Wearables
+    Bio --> HealthAPIs
+    Trainer --> Payment
+    
+    All --> Prometheus
+    Prometheus --> Grafana
+    Loki --> Grafana
+    Tempo --> Grafana

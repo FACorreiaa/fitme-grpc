@@ -491,6 +491,469 @@ autoscaling:
 - Implement predicative scaling
 - Handle burst capacity
 
+# Diagrams
+
+### Architechture Overview
+
+```mermaid
+graph TB
+    subgraph "Client Applications"
+        iOS["iOS App"]
+        Android["Android App (Future)"]
+        Web["Web Platform"]
+    end
+
+    subgraph "API Gateway Layer"
+        Gateway["API Gateway"]
+    end
+
+    subgraph "Core Services"
+        User["UserService"]
+        Workout["WorkoutService"]
+        Diet["DietService"]
+        Trainer["TrainerService"]
+        Mental["MentalHealthService"]
+        Bio["BiometricsService"]
+        AI["AIOrchestrationService"]
+        Notif["NotificationService"]
+        Message["MessagingService"]
+    end
+
+    subgraph "Data Layer"
+        Postgres[(PostgreSQL)]
+        Redis[(Redis Cache)]
+        Kafka{{"Kafka Events"}}
+        S3["Object Storage"]
+    end
+
+    subgraph "External Integrations"
+        Wearables["Wearable Devices"]
+        HealthAPIs["Health APIs"]
+        Payment["Payment Gateway"]
+    end
+
+    subgraph "Observability"
+        Prometheus["Prometheus"]
+        Grafana["Grafana"]
+        Loki["Loki"]
+        Tempo["Tempo"]
+    end
+
+    iOS --> Gateway
+    Android --> Gateway
+    Web --> Gateway
+    Gateway --> User
+    Gateway --> Workout
+    Gateway --> Diet
+    Gateway --> Trainer
+    Gateway --> Mental
+    Gateway --> Bio
+    Gateway --> AI
+    Gateway --> Notif
+    Gateway --> Message
+
+    User --> Postgres
+    Workout --> Postgres
+    Diet --> Postgres
+    Trainer --> Postgres
+    Mental --> Postgres
+    Bio --> Postgres
+
+    User --> Redis
+    Workout --> Redis
+    Diet --> Redis
+
+    Bio --> Kafka
+    AI --> Kafka
+    Notif --> Kafka
+
+    Workout --> S3
+    Mental --> S3
+
+    Bio --> Wearables
+    Bio --> HealthAPIs
+    Trainer --> Payment
+
+    All --> Prometheus
+    Prometheus --> Grafana
+    Loki --> Grafana
+    Tempo --> Grafana
+```
+
+### Data flow and event processing
+```mermaid
+sequenceDiagram
+    participant User as User App
+    participant Gateway as API Gateway
+    participant Bio as BiometricsService
+    participant AI as AIOrchestrationService
+    participant Kafka as Kafka
+    participant DB as PostgreSQL
+    participant Cache as Redis
+
+    User->>Gateway: Submit workout data
+    Gateway->>Bio: Process biometric data
+    Bio->>Cache: Cache recent metrics
+    Bio->>Kafka: Publish biometric event
+    Kafka->>AI: Process for insights
+    AI->>DB: Store analyzed results
+    AI->>Cache: Cache recommendations
+    AI->>User: Return personalized insights
+```
+
+### CICD PIPELINE
+```mermaid
+stateDiagram-v2
+    [*] --> CodeCommit
+    CodeCommit --> Tests: Trigger Pipeline
+
+    state Tests {
+        UnitTests --> IntegrationTests
+        IntegrationTests --> SecurityScans
+    }
+
+    Tests --> Build: Pass
+    Tests --> NotifyFailure: Fail
+
+    state Build {
+        BuildImages --> PushRegistry
+    }
+
+    Build --> Deploy
+
+    state Deploy {
+        Staging --> QA
+        QA --> Production
+    }
+
+    Deploy --> [*]: Success
+    Deploy --> Rollback: Failure
+    Rollback --> [*]
+
+    NotifyFailure --> [*]
+```
+
+### Mental Health Service Flow
+```mermaid
+graph LR
+    subgraph "Data Collection"
+        M[Mood Tracking]
+        J[Journaling]
+        S[Sleep Data]
+        H[HRV Data]
+    end
+
+    subgraph "Processing"
+        AI[AI Analysis]
+        ML[ML Models]
+        NLP[NLP Processing]
+    end
+
+    subgraph "Outputs"
+        R[Recommendations]
+        A[Alerts]
+        I[Insights]
+        MS[Mental Score]
+    end
+
+    M --> AI
+    J --> NLP
+    S --> ML
+    H --> ML
+
+    AI --> R
+    AI --> A
+    NLP --> I
+    ML --> MS
+
+    R --> NotifyUser
+    A --> AlertSystem
+    I --> Dashboard
+    MS --> HealthScore
+```
+### Database Schema
+```mermaid
+erDiagram
+    Users ||--o{ UserProfiles : has
+    Users ||--o{ WorkoutPlans : creates
+    Users ||--o{ MealPlans : has
+    Users ||--o{ BiometricData : generates
+    Users ||--o{ MentalHealthData : records
+    Users ||--o{ Achievements : earns
+
+    Trainers ||--o{ WorkoutPlans : creates
+    Trainers ||--o{ Clients : manages
+    Trainers ||--o{ TrainerProfiles : has
+
+    WorkoutPlans ||--o{ Exercises : contains
+    WorkoutPlans ||--o{ WorkoutLogs : generates
+
+    MealPlans ||--o{ Meals : contains
+    Meals ||--o{ Ingredients : contains
+
+    BiometricData ||--o{ StressScores : calculates
+    BiometricData ||--o{ SleepData : includes
+    BiometricData ||--o{ HRVReadings : contains
+
+    MentalHealthData ||--o{ MoodEntries : logs
+    MentalHealthData ||--o{ JournalEntries : contains
+    MentalHealthData ||--o{ MeditationSessions : tracks
+
+    Users ||--o{ Messages : sends
+    Messages }|--|| ChatRooms : belongs_to
+```
+
+### Authorization / Authentication
+```mermaid
+sequenceDiagram
+    participant User
+    participant App
+    participant AuthService
+    participant OAuth
+    participant JWT
+    participant Services
+
+    User->>App: Login Request
+    App->>AuthService: Authenticate
+
+    alt OAuth Login
+        AuthService->>OAuth: Redirect to Provider
+        OAuth->>AuthService: Authorization Code
+        AuthService->>OAuth: Exchange Code
+        OAuth->>AuthService: Access Token
+    else Password Login
+        AuthService->>AuthService: Validate Credentials
+    end
+
+    AuthService->>JWT: Generate Tokens
+    JWT->>App: Access + Refresh Tokens
+
+    Note over App,Services: Subsequent Requests
+
+    App->>Services: Request with JWT
+    Services->>JWT: Validate Token
+
+    alt Token Valid
+        JWT->>Services: Proceed
+        Services->>App: Response
+    else Token Expired
+        Services->>App: 401 Unauthorized
+        App->>AuthService: Refresh Token
+        AuthService->>JWT: Generate New Tokens
+        JWT->>App: New Access + Refresh Tokens
+    end
+```
+
+### AI MODEL Training Pipeline
+```mermaid
+graph TB
+    subgraph Data Collection
+        RD[Raw Data]
+        WD[Wearable Data]
+        UD[User Data]
+        HD[Health Data]
+    end
+
+    subgraph Data Processing
+        FE[Feature Engineering]
+        PP[Preprocessing]
+        CV[Cross Validation]
+    end
+
+    subgraph Model Training
+        TR[Training]
+        VA[Validation]
+        HP[Hyperparameter Tuning]
+    end
+
+    subgraph Deployment
+        EV[Model Evaluation]
+        VP[Version Control]
+        CD[Canary Deployment]
+    end
+
+    subgraph Production
+        PS[Production Serving]
+        MO[Monitoring]
+        RE[Real-time Evaluation]
+    end
+
+    RD --> PP
+    WD --> PP
+    UD --> PP
+    HD --> PP
+
+    PP --> FE
+    FE --> CV
+    CV --> TR
+    TR --> VA
+    VA --> HP
+    HP --> EV
+    EV --> VP
+    VP --> CD
+    CD --> PS
+    PS --> MO
+    MO --> RE
+    RE -.-> TR
+```
+
+
+### System Architecture:
+```mermaid
+graph TB
+    subgraph "Load Balancing"
+        LB[Load Balancer]
+        LB --> R1[Region 1]
+        LB --> R2[Region 2]
+    end
+
+    subgraph "Region 1 (Primary)"
+        R1 --> S1[Service Set 1]
+        R1 --> S2[Service Set 2]
+
+        subgraph "Autoscaling Group 1"
+            S1 --> P1[Pod 1]
+            S1 --> P2[Pod 2]
+            S1 -.-> P3[Pod N]
+        end
+
+        subgraph "Autoscaling Group 2"
+            S2 --> P4[Pod 1]
+            S2 --> P5[Pod 2]
+            S2 -.-> P6[Pod N]
+        end
+    end
+
+    subgraph "Region 2 (Failover)"
+        R2 --> S3[Service Set 1]
+        R2 --> S4[Service Set 2]
+
+        subgraph "Autoscaling Group 3"
+            S3 --> P7[Pod 1]
+            S3 --> P8[Pod 2]
+        end
+
+        subgraph "Autoscaling Group 4"
+            S4 --> P9[Pod 1]
+            S4 --> P10[Pod 2]
+        end
+    end
+
+    subgraph "Health Checks"
+        HC[Health Monitor]
+        HC --> R1
+        HC --> R2
+    end
+```
+### Security Architechture
+```mermaid
+graph TB
+    subgraph "External Layer"
+        WAF[WAF/DDoS Protection]
+        API[API Gateway]
+    end
+
+    subgraph "Authentication"
+        AUTH[Auth Service]
+        MFA[MFA Service]
+        JWT[JWT Service]
+    end
+
+    subgraph "Network Security"
+        FW[Firewall]
+        IPS[IPS/IDS]
+        VPN[VPN Access]
+    end
+
+    subgraph "Data Security"
+        ENC[Encryption Service]
+        KMS[Key Management]
+        DLP[Data Loss Prevention]
+    end
+
+    subgraph "Monitoring"
+        SIEM[SIEM]
+        AUD[Audit Logs]
+        ALT[Alerts]
+    end
+
+    WAF --> API
+    API --> AUTH
+    AUTH --> MFA
+    AUTH --> JWT
+
+    API --> FW
+    FW --> IPS
+    VPN --> FW
+
+    IPS --> ENC
+    ENC --> KMS
+    ENC --> DLP
+
+    DLP --> SIEM
+    IPS --> SIEM
+    AUTH --> AUD
+    SIEM --> ALT
+```
+Shows all major components and their interactions
+Includes both internal services and external integrations
+Demonstrates the observability stack setup
+
+
+### Data Flow:
+
+Illustrates how data moves through the system
+Shows the event processing pipeline
+Demonstrates caching and storage strategies
+
+
+### Deployment Pipeline:
+
+Shows the CI/CD process
+Includes testing and security checks
+Demonstrates the staging and production deployment flow
+
+
+### Mental Health Service Flow:
+
+Shows how mental health data is collected and processed
+Illustrates the AI/ML pipeline
+Demonstrates the various outputs and interventions
+
+### Database Schema:
+
+Shows relationships between different entities
+Illustrates data model hierarchy
+Demonstrates connections between user, trainer, and health data
+
+
+### Authentication Flow:
+
+Shows both OAuth and password-based authentication
+Illustrates token management
+Demonstrates refresh flow
+
+
+### AI Pipeline:
+
+Shows data collection through deployment
+Illustrates training and validation process
+Demonstrates monitoring and feedback loop
+
+
+### Scaling Strategy:
+
+Shows multi-region deployment
+Illustrates autoscaling groups
+Demonstrates failover mechanisms
+
+
+### Security Architecture:
+
+Shows security layers
+Illustrates data protection mechanisms
+Demonstrates monitoring and alerting
+
 # Todo documentation
 
 1. Visual Architecture Diagrams

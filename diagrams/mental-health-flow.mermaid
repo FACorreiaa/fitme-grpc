@@ -1,0 +1,35 @@
+graph LR
+    subgraph "Data Collection"
+        M[Mood Tracking]
+        J[Journaling]
+        S[Sleep Data]
+        H[HRV Data]
+    end
+
+    subgraph "Processing"
+        AI[AI Analysis]
+        ML[ML Models]
+        NLP[NLP Processing]
+    end
+
+    subgraph "Outputs"
+        R[Recommendations]
+        A[Alerts]
+        I[Insights]
+        MS[Mental Score]
+    end
+
+    M --> AI
+    J --> NLP
+    S --> ML
+    H --> ML
+    
+    AI --> R
+    AI --> A
+    NLP --> I
+    ML --> MS
+    
+    R --> NotifyUser
+    A --> AlertSystem
+    I --> Dashboard
+    MS --> HealthScore

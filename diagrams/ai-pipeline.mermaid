@@ -1,0 +1,49 @@
+graph TB
+    subgraph Data Collection
+        RD[Raw Data]
+        WD[Wearable Data]
+        UD[User Data]
+        HD[Health Data]
+    end
+    
+    subgraph Data Processing
+        FE[Feature Engineering]
+        PP[Preprocessing]
+        CV[Cross Validation]
+    end
+    
+    subgraph Model Training
+        TR[Training]
+        VA[Validation]
+        HP[Hyperparameter Tuning]
+    end
+    
+    subgraph Deployment
+        EV[Model Evaluation]
+        VP[Version Control]
+        CD[Canary Deployment]
+    end
+    
+    subgraph Production
+        PS[Production Serving]
+        MO[Monitoring]
+        RE[Real-time Evaluation]
+    end
+    
+    RD --> PP
+    WD --> PP
+    UD --> PP
+    HD --> PP
+    
+    PP --> FE
+    FE --> CV
+    CV --> TR
+    TR --> VA
+    VA --> HP
+    HP --> EV
+    EV --> VP
+    VP --> CD
+    CD --> PS
+    PS --> MO
+    MO --> RE
+    RE -.-> TR

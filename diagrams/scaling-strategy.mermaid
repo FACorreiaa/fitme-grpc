@@ -1,0 +1,44 @@
+graph TB
+    subgraph "Load Balancing"
+        LB[Load Balancer]
+        LB --> R1[Region 1]
+        LB --> R2[Region 2]
+    end
+    
+    subgraph "Region 1 (Primary)"
+        R1 --> S1[Service Set 1]
+        R1 --> S2[Service Set 2]
+        
+        subgraph "Autoscaling Group 1"
+            S1 --> P1[Pod 1]
+            S1 --> P2[Pod 2]
+            S1 -.-> P3[Pod N]
+        end
+        
+        subgraph "Autoscaling Group 2"
+            S2 --> P4[Pod 1]
+            S2 --> P5[Pod 2]
+            S2 -.-> P6[Pod N]
+        end
+    end
+    
+    subgraph "Region 2 (Failover)"
+        R2 --> S3[Service Set 1]
+        R2 --> S4[Service Set 2]
+        
+        subgraph "Autoscaling Group 3"
+            S3 --> P7[Pod 1]
+            S3 --> P8[Pod 2]
+        end
+        
+        subgraph "Autoscaling Group 4"
+            S4 --> P9[Pod 1]
+            S4 --> P10[Pod 2]
+        end
+    end
+    
+    subgraph "Health Checks"
+        HC[Health Monitor]
+        HC --> R1
+        HC --> R2
+    end

@@ -1,0 +1,47 @@
+graph TB
+    subgraph "External Layer"
+        WAF[WAF/DDoS Protection]
+        API[API Gateway]
+    end
+    
+    subgraph "Authentication"
+        AUTH[Auth Service]
+        MFA[MFA Service]
+        JWT[JWT Service]
+    end
+    
+    subgraph "Network Security"
+        FW[Firewall]
+        IPS[IPS/IDS]
+        VPN[VPN Access]
+    end
+    
+    subgraph "Data Security"
+        ENC[Encryption Service]
+        KMS[Key Management]
+        DLP[Data Loss Prevention]
+    end
+    
+    subgraph "Monitoring"
+        SIEM[SIEM]
+        AUD[Audit Logs]
+        ALT[Alerts]
+    end
+    
+    WAF --> API
+    API --> AUTH
+    AUTH --> MFA
+    AUTH --> JWT
+    
+    API --> FW
+    FW --> IPS
+    VPN --> FW
+    
+    IPS --> ENC
+    ENC --> KMS
+    ENC --> DLP
+    
+    DLP --> SIEM
+    IPS --> SIEM
+    AUTH --> AUD
+    SIEM --> ALT

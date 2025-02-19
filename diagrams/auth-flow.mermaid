@@ -1,0 +1,37 @@
+sequenceDiagram
+    participant User
+    participant App
+    participant AuthService
+    participant OAuth
+    participant JWT
+    participant Services
+    
+    User->>App: Login Request
+    App->>AuthService: Authenticate
+    
+    alt OAuth Login
+        AuthService->>OAuth: Redirect to Provider
+        OAuth->>AuthService: Authorization Code
+        AuthService->>OAuth: Exchange Code
+        OAuth->>AuthService: Access Token
+    else Password Login
+        AuthService->>AuthService: Validate Credentials
+    end
+    
+    AuthService->>JWT: Generate Tokens
+    JWT->>App: Access + Refresh Tokens
+    
+    Note over App,Services: Subsequent Requests
+    
+    App->>Services: Request with JWT
+    Services->>JWT: Validate Token
+    
+    alt Token Valid
+        JWT->>Services: Proceed
+        Services->>App: Response
+    else Token Expired
+        Services->>App: 401 Unauthorized
+        App->>AuthService: Refresh Token
+        AuthService->>JWT: Generate New Tokens
+        JWT->>App: New Access + Refresh Tokens
+    end

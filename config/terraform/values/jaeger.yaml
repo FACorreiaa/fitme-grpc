@@ -188,7 +188,7 @@ storage:
 # Begin: Override values on the Cassandra subchart to customize for Jaeger
 cassandra:
   persistence:
-    # To enable persistence, please see the documentation for the Cassandra chart
+    # To enable persistence, please see the diagrams for the Cassandra chart
     enabled: false
   config:
     cluster_name: jaeger

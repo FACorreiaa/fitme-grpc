@@ -1,0 +1,28 @@
+erDiagram
+    Users ||--o{ UserProfiles : has
+    Users ||--o{ WorkoutPlans : creates
+    Users ||--o{ MealPlans : has
+    Users ||--o{ BiometricData : generates
+    Users ||--o{ MentalHealthData : records
+    Users ||--o{ Achievements : earns
+    
+    Trainers ||--o{ WorkoutPlans : creates
+    Trainers ||--o{ Clients : manages
+    Trainers ||--o{ TrainerProfiles : has
+    
+    WorkoutPlans ||--o{ Exercises : contains
+    WorkoutPlans ||--o{ WorkoutLogs : generates
+    
+    MealPlans ||--o{ Meals : contains
+    Meals ||--o{ Ingredients : contains
+    
+    BiometricData ||--o{ StressScores : calculates
+    BiometricData ||--o{ SleepData : includes
+    BiometricData ||--o{ HRVReadings : contains
+    
+    MentalHealthData ||--o{ MoodEntries : logs
+    MentalHealthData ||--o{ JournalEntries : contains
+    MentalHealthData ||--o{ MeditationSessions : tracks
+    
+    Users ||--o{ Messages : sends
+    Messages }|--|| ChatRooms : belongs_to
