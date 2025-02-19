@@ -1,0 +1,38 @@
+graph TB
+    subgraph "Your Platform"
+        App[FitME App]
+        Bio[Biometrics Service]
+        Health[Health Data Service]
+        AI[AI Service]
+    end
+
+    subgraph "Integration Layer"
+        API[API Gateway]
+        FHIR[FHIR Adapter]
+        Auth[OAuth/Auth Service]
+        Consent[Consent Management]
+    end
+
+    subgraph "HIMS & HERS"
+        HP[HIMS Platform]
+        Doc[Healthcare Providers]
+        Rx[Prescription Service]
+    end
+
+    App --> Bio
+    Bio --> Health
+    Health --> AI
+    
+    Health --> FHIR
+    FHIR --> API
+    API --> Auth
+    Auth --> Consent
+    
+    Consent --> HP
+    HP --> Doc
+    Doc --> Rx
+
+    classDef primary fill:#f9f,stroke:#333,stroke-width:2px
+    classDef integration fill:#bbf,stroke:#333,stroke-width:2px
+    class App,Bio,Health,AI primary
+    class API,FHIR,Auth,Consent integration
