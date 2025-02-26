@@ -80,3 +80,19 @@ func NewServiceContainer(ctx context.Context, pgPool *pgxpool.Pool, redisClient 
 		MealServices:       mealServices,
 	}
 }
+
+type CoreContainer struct {
+	Ctx         context.Context
+	PgPool      *pgxpool.Pool
+	RedisClient *redis.Client
+	Brokers     *container.Brokers
+}
+
+func NewCoreContainer(ctx context.Context, pgPool *pgxpool.Pool, redisClient *redis.Client, brokers *container.Brokers) *CoreContainer {
+	return &CoreContainer{
+		Ctx:         ctx,
+		PgPool:      pgPool,
+		RedisClient: redisClient,
+		Brokers:     brokers,
+	}
+}
