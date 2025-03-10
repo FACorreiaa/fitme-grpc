@@ -1,5 +1,12 @@
 `# FitME-gRPC
 
+## TODO ASAP refactor service layer to:
+- Implementing the gRPC interface
+- Converting between proto messages and domain entities
+- Orchestrating calls to the repository and other services
+
+While letting the db schema to only have db logic
+
 Rewrite of the FitME REST version to a gRPC infrastructure with a strong emphasis on middleware, tracing, and logging integration.
 By sharing proto definitions and containerizing services, this project achieves flexible inter-service communication while ensuring proper context propagation, error handling, and telemetry across the stack.
 
